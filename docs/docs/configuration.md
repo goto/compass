@@ -136,7 +136,7 @@ $ docker run -d \
     -p 8080:8080 \
     -v $(pwd)/compass.yaml:/compass.yaml \
     --name compass-server \
-    odpf/compass:<version> \
+    gotocompany/compass:<version> \
     server start -c /compass.yaml
 ```
 
