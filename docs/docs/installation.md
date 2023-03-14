@@ -61,8 +61,8 @@ docker pull gotocompany/compass:v0.3.2
 If you like to have a shell alias that runs the latest version of compass from docker whenever you type `compass`:
 
 ```
-mkdir -p $HOME/.config/goto
-alias compass="docker run -e HOME=/tmp -v $HOME/.config/goto:/tmp/.config/goto --user $(id -u):$(id -g) --rm -it -p 3306:3306/tcp gotocompany/compass:latest"
+mkdir -p $HOME/.config/gotocompany
+alias compass="docker run -e HOME=/tmp -v $HOME/.config/gotocompany:/tmp/.config/gotocompany --user $(id -u):$(id -g) --rm -it -p 3306:3306/tcp gotocompany/compass:latest"
 ```
 
 ### Building from Source
