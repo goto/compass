@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"strings"
 
 	"github.com/goto/compass/core/asset"
@@ -15,6 +16,10 @@ import (
 // with elasticsearch as the backing store.
 type DiscoveryRepository struct {
 	cli *Client
+}
+
+type bulkResponse struct {
+	Errors bool `json:"errors"`
 }
 
 func NewDiscoveryRepository(cli *Client) *DiscoveryRepository {
@@ -58,6 +63,20 @@ func (repo *DiscoveryRepository) Upsert(ctx context.Context, ast asset.Asset) er
 	if res.IsError() {
 		return asset.DiscoveryError{Err: fmt.Errorf("error response from elasticsearch: %s", errorReasonFromResponse(res))}
 	}
+
+	resBody, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return asset.DiscoveryError{Err: fmt.Errorf("error reading response body: %w", err)}
+	}
+
+	var bulkRes bulkResponse
+	if err := json.Unmarshal(resBody, &bulkRes); err != nil {
+		return asset.DiscoveryError{Err: fmt.Errorf("error unmarshalling response: %s, error: %w", resBody, err)}
+	}
+	if bulkRes.Errors {
+		return asset.DiscoveryError{Err: fmt.Errorf("error response from elasticsearch: %s", resBody)}
+	}
+
 	return nil
 }
 
