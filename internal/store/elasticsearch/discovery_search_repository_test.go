@@ -275,3 +275,88 @@ func loadTestFixture(cli *elasticsearch.Client, esClient *store.Client, filePath
 
 	return err
 }
+
+func TestSearcherGroup(t *testing.T) {
+	ctx := context.TODO()
+	t.Run("should return an error if group string array is empty", func(t *testing.T) {
+		cli, err := esTestServer.NewClient()
+		require.NoError(t, err)
+		esClient, err := store.NewClient(
+			log.NewNoop(),
+			store.Config{},
+			store.WithClient(cli),
+		)
+		require.NoError(t, err)
+
+		repo := store.NewDiscoveryRepository(esClient)
+		_, err = repo.Group(ctx, asset.GroupConfig{
+			GroupBy: []string{""},
+		})
+
+		assert.Error(t, err)
+	})
+
+	t.Run("fixtures", func(t *testing.T) {
+		cli, err := esTestServer.NewClient()
+		require.NoError(t, err)
+		esClient, err := store.NewClient(
+			log.NewNoop(),
+			store.Config{},
+			store.WithClient(cli),
+		)
+		require.NoError(t, err)
+
+		err = loadTestFixture(cli, esClient, "./testdata/search-test-fixture.json")
+		require.NoError(t, err)
+
+		repo := store.NewDiscoveryRepository(esClient)
+
+		type expectedRow struct {
+			Key   string
+			Asset []asset.Asset
+		}
+		type groupTest struct {
+			Description string
+			Config      asset.GroupConfig
+			Expected    []expectedRow
+		}
+		tests := []groupTest{
+			{
+				Description: "should group assets which match group by fields",
+				Config: asset.GroupConfig{
+					GroupBy: []string{"type"},
+				},
+				Expected: []expectedRow{
+					{Key: "table", Asset: []asset.Asset{{Name: "tablename-1"}, {Name: "tablename-common"}, {Name: "tablename-mid"}}},
+					{Key: "topic", Asset: []asset.Asset{{Name: "order-topic"}, {Name: "purchase-topic"}, {Name: "consumer-topic"}}},
+				},
+			},
+			{
+				Description: "should not return assets without fields specified in filters",
+				Config: asset.GroupConfig{
+					GroupBy: []string{"type"},
+					Filters: map[string][]string{
+						"data.country":     {"id"},
+						"data.environment": {"production"},
+						"data.company":     {"gotocompany"},
+					},
+				},
+				Expected: []expectedRow{
+					{Key: "topic", Asset: []asset.Asset{{Name: "consumer-topic"}, {Name: "consumer-mq-2"}}},
+				},
+			},
+		}
+		for _, test := range tests {
+			t.Run(test.Description, func(t *testing.T) {
+				results, err := repo.Group(ctx, test.Config)
+				require.NoError(t, err)
+				require.Equal(t, len(test.Expected), len(results))
+
+				for i, res := range test.Expected {
+					assert.Equal(t, res.Key, results[i].Key)
+					assert.Equal(t, len(test.Expected[0].Asset), len(results[0].Assets))
+				}
+			})
+		}
+	})
+}
