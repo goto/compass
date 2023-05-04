@@ -6,15 +6,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/olivere/elastic/v7"
 	"io"
 	"strings"
 
 	"github.com/goto/compass/core/asset"
-	"github.com/olivere/elastic/v7"
 )
 
 const (
 	defaultMaxResults                  = 200
+	defaultGroupSize                   = 10
 	defaultMinScore                    = 0.01
 	defaultFunctionScoreQueryScoreMode = "sum"
 	suggesterName                      = "name-phrase-suggest"
@@ -107,7 +108,10 @@ func (repo *DiscoveryRepository) buildQuery(cfg asset.SearchConfig) (io.Reader, 
 	var query elastic.Query
 
 	query = repo.buildTextQuery(cfg.Text)
-	query = repo.buildFilterTermQueries(query, cfg.Filters)
+	filterQueries := repo.buildFilterTermQueries(cfg.Filters)
+	if filterQueries != nil {
+		query = elastic.NewBoolQuery().Should(query).Filter(filterQueries...)
+	}
 	query = repo.buildFilterMatchQueries(query, cfg.Queries)
 	query = repo.buildFunctionScoreQuery(query, cfg.RankBy)
 
@@ -191,9 +195,9 @@ func (repo *DiscoveryRepository) buildFilterMatchQueries(query elastic.Query, qu
 		Filter(esQueries...)
 }
 
-func (repo *DiscoveryRepository) buildFilterTermQueries(query elastic.Query, filters map[string][]string) elastic.Query {
+func (repo *DiscoveryRepository) buildFilterTermQueries(filters map[string][]string) []elastic.Query {
 	if len(filters) == 0 {
-		return query
+		return nil
 	}
 
 	var filterQueries []elastic.Query
@@ -214,11 +218,23 @@ func (repo *DiscoveryRepository) buildFilterTermQueries(query elastic.Query, fil
 		)
 	}
 
-	newQuery := elastic.NewBoolQuery().
-		Should(query).
-		Filter(filterQueries...)
+	return filterQueries
+}
 
-	return newQuery
+func (repo *DiscoveryRepository) buildFilterExistsQueries(filters []string) []elastic.Query {
+	if len(filters) == 0 {
+		return nil
+	}
+
+	var filterQueries []elastic.Query
+	for _, filterString := range filters {
+		filterQueries = append(
+			filterQueries,
+			elastic.NewExistsQuery(fmt.Sprintf("%s.keyword", filterString)),
+		)
+	}
+
+	return filterQueries
 }
 
 func (repo *DiscoveryRepository) buildFunctionScoreQuery(query elastic.Query, rankBy string) elastic.Query {
@@ -276,4 +292,120 @@ func (repo *DiscoveryRepository) toSuggestions(response searchResponse) (results
 	}
 
 	return
+}
+
+func (repo *DiscoveryRepository) Group(ctx context.Context, cfg asset.GroupConfig) ([]asset.GroupResult, error) {
+	if len(cfg.GroupBy) == 0 || cfg.GroupBy[0] == "" {
+		err := asset.DiscoveryError{Err: fmt.Errorf("group by field cannot be empty")}
+		return nil, err
+	}
+	query, err := repo.buildGroupQuery(cfg)
+	if err != nil {
+		err = asset.DiscoveryError{Err: fmt.Errorf("error building query %w", err)}
+		return nil, err
+	}
+
+	size := cfg.Size
+	if size <= 0 {
+		size = defaultGroupSize
+	}
+
+	res, err := repo.cli.client.Search(
+		repo.cli.client.Search.WithFilterPath("aggregations"),
+		repo.cli.client.Search.WithBody(query),
+		repo.cli.client.Search.WithIgnoreUnavailable(true),
+		repo.cli.client.Search.WithContext(ctx),
+		repo.cli.client.Search.WithSize(size),
+	)
+
+	if err != nil {
+		err = asset.DiscoveryError{Err: fmt.Errorf("error executing group query %w", err)}
+		return nil, err
+	}
+
+	var response groupResponse
+
+	err = json.NewDecoder(res.Body).Decode(&response)
+	if err != nil {
+		fmt.Println(err.Error())
+		err = asset.DiscoveryError{Err: fmt.Errorf("error decoding group response %w", err)}
+		return nil, err
+	}
+
+	results := repo.toGroupResults(&response.Aggregations.TermAggregations)
+
+	return results, nil
+}
+
+func (repo *DiscoveryRepository) toGroupResults(termAggregations *TermAggregations) []asset.GroupResult {
+
+	if len(termAggregations.Buckets) == 0 {
+		return []asset.GroupResult{}
+	}
+	groupResultArr := make([]asset.GroupResult, 0)
+	for _, bucket := range termAggregations.Buckets {
+		if bucket.Group == nil {
+			groupResultArr = append(groupResultArr, repo.getGroupResult(bucket))
+		} else {
+			groupResultArr = append(groupResultArr, repo.toGroupResults(bucket.Group)...)
+		}
+	}
+
+	return groupResultArr
+}
+
+func (repo *DiscoveryRepository) getGroupResult(bucket Buckets) asset.GroupResult {
+	assets := make([]asset.Asset, len(bucket.Hits.Hits.Hits))
+	for i, hits := range bucket.Hits.Hits.Hits {
+		assets[i] = hits.Source
+	}
+	return asset.GroupResult{
+		Key:    bucket.Key,
+		Assets: assets,
+	}
+}
+
+type GroupQuery struct {
+	Query        interface{} `json:"query,omitempty"`
+	Aggregations interface{} `json:"aggregations"`
+}
+
+func (repo *DiscoveryRepository) buildGroupQuery(cfg asset.GroupConfig) (io.Reader, error) {
+
+	var querySource interface{}
+	filterQueries := repo.buildFilterExistsQueries(cfg.GroupBy)
+	filterQueries = append(filterQueries, repo.buildFilterTermQueries(cfg.Filters)...)
+	if filterQueries != nil {
+		querySource, _ = elastic.NewBoolQuery().Filter(filterQueries...).Source()
+	}
+
+	fetchSourceContext := elastic.NewFetchSourceContext(true).Include(cfg.IncludedFields...)
+
+	searchSource := elastic.NewSearchSource().FetchSourceContext(fetchSourceContext)
+	hitsAggregations := elastic.NewTopHitsAggregation().SearchSource(searchSource)
+
+	var termAggregations *elastic.TermsAggregation
+	for idx, group := range cfg.GroupBy {
+		if idx == 0 {
+			termAggregations = elastic.NewTermsAggregation().Field(fmt.Sprintf("%s.keyword", group)).
+				SubAggregation("hits", hitsAggregations)
+		} else {
+			termAggregations = elastic.NewTermsAggregation().Field(fmt.Sprintf("%s.keyword", group)).
+				SubAggregation("group", termAggregations)
+		}
+	}
+
+	aggs := elastic.Aggregations{}
+	src, _ := termAggregations.Source()
+	payload := new(bytes.Buffer)
+	json.NewEncoder(payload).Encode(src)
+	aggs["term_agg"] = payload.Bytes()
+
+	payload = new(bytes.Buffer)
+	q := &GroupQuery{
+		Query:        querySource,
+		Aggregations: aggs,
+	}
+
+	return payload, json.NewEncoder(payload).Encode(q)
 }

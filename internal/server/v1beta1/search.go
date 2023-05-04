@@ -37,6 +37,7 @@ func (server *APIServer) SearchAssets(ctx context.Context, req *compassv1beta1.S
 
 	assetsPB := []*compassv1beta1.Asset{}
 	for _, sr := range results {
+
 		assetPB, err := assetToProto(sr.ToAsset(), false)
 		if err != nil {
 			return nil, internalServerError(server.logger, fmt.Sprintf("error converting assets to proto: %s", err.Error()))
@@ -46,6 +47,51 @@ func (server *APIServer) SearchAssets(ctx context.Context, req *compassv1beta1.S
 
 	return &compassv1beta1.SearchAssetsResponse{
 		Data: assetsPB,
+	}, nil
+}
+
+func (server *APIServer) GroupAssets(ctx context.Context, req *compassv1beta1.GroupAssetsRequest) (*compassv1beta1.GroupAssetsResponse, error) {
+	_, err := server.validateUserInCtx(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	groupby := req.GetGroupby()
+	if len(groupby) == 0 {
+		return nil, status.Error(codes.InvalidArgument, "'groupby' must be specified")
+	}
+
+	cfg := asset.GroupConfig{
+		GroupBy:        groupby,
+		Filters:        filterConfigFromValues(req.GetFilter()),
+		IncludedFields: req.GetIncludeFields(),
+		Size:           int(req.GetSize()),
+	}
+
+	results, err := server.assetService.GroupAssets(ctx, cfg)
+	if err != nil {
+		return nil, internalServerError(server.logger, fmt.Sprintf("error searching asset: %s", err.Error()))
+	}
+
+	groupInfoArr := make([]*compassv1beta1.GroupAssetInfo, len(results))
+	for idx, gr := range results {
+		assetsPB := make([]*compassv1beta1.Asset, len(gr.Assets))
+		for assetIdx, as := range gr.Assets {
+			assetPB, err := assetToProto(as, false)
+			if err != nil {
+				return nil, internalServerError(server.logger, fmt.Sprintf("error converting assets to proto: %s", err.Error()))
+			}
+			assetsPB[assetIdx] = assetPB
+		}
+		groupInfo := &compassv1beta1.GroupAssetInfo{
+			GroupKey: gr.Key,
+			Data:     assetsPB,
+		}
+		groupInfoArr[idx] = groupInfo
+	}
+
+	return &compassv1beta1.GroupAssetsResponse{
+		GroupAssetInfo: groupInfoArr,
 	}, nil
 }
 

@@ -28,20 +28,20 @@ type Repository interface {
 
 // Asset is a model that wraps arbitrary data with Compass' context
 type Asset struct {
-	ID          string                 `json:"id" diff:"-"`
-	URN         string                 `json:"urn" diff:"-"`
-	Type        Type                   `json:"type" diff:"-"`
-	Service     string                 `json:"service" diff:"-"`
-	Name        string                 `json:"name" diff:"name"`
-	Description string                 `json:"description" diff:"description"`
-	Data        map[string]interface{} `json:"data" diff:"data"`
-	URL         string                 `json:"url" diff:"url"`
-	Labels      map[string]string      `json:"labels" diff:"labels"`
+	ID          string                 `json:"id,omitempty" diff:"-"`
+	URN         string                 `json:"urn,omitempty" diff:"-"`
+	Type        Type                   `json:"type,omitempty" diff:"-"`
+	Service     string                 `json:"service,omitempty" diff:"-"`
+	Name        string                 `json:"name,omitempty" diff:"name"`
+	Description string                 `json:"description,omitempty" diff:"description"`
+	Data        map[string]interface{} `json:"data,omitempty" diff:"data"`
+	URL         string                 `json:"url,omitempty" diff:"url"`
+	Labels      map[string]string      `json:"labels,omitempty" diff:"labels"`
 	Owners      []user.User            `json:"owners,omitempty" diff:"owners"`
-	CreatedAt   time.Time              `json:"created_at" diff:"-"`
-	UpdatedAt   time.Time              `json:"updated_at" diff:"-"`
-	Version     string                 `json:"version" diff:"-"`
-	UpdatedBy   user.User              `json:"updated_by" diff:"-"`
+	CreatedAt   time.Time              `json:"created_at,omitempty" diff:"-"`
+	UpdatedAt   time.Time              `json:"updated_at,omitempty" diff:"-"`
+	Version     string                 `json:"version,omitempty" diff:"-"`
+	UpdatedBy   user.User              `json:"updated_by,omitempty" diff:"-"`
 	Changelog   diff.Changelog         `json:"changelog,omitempty" diff:"-"`
 	Probes      []Probe                `json:"probes,omitempty"`
 }

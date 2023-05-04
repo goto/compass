@@ -856,6 +856,61 @@ paths:
                 type: string
       tags:
         - Discussion
+  /v1beta1/groupassets:
+    get:
+      summary: Group api for assets
+      description: 'API for grouping documents. ''groupby'' the field provided here is used for grouping. If it is a nested fields, you can provide the path to the field. You can specify additional criteria using ''filter[.*]'' to only group those documents. You can specify each filter multiple times to specify a set of values for those filters. For instance, to specify two landscape ''vn'' and ''th'', the query could be `/groupassets/?groupby=<groupby>&filter[environment]=integration&filter[landscape]=vn&filter[landscape]=th`. ''include_fields'' is used to send only these fields in response. this helps in restricting the response. Eg:/groupassets/?groupby=<groupby>&filter[environment]&include_fields=[data.attributes.dataset, data.attributes.project] '
+      operationId: CompassService_GroupAssets
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            $ref: '#/definitions/GroupAssetsResponse'
+        "400":
+          description: Returned when the data that user input is wrong.
+          schema:
+            $ref: '#/definitions/Status'
+        "404":
+          description: Returned when the resource does not exist.
+          schema:
+            $ref: '#/definitions/Status'
+        "409":
+          description: Returned when the resource already exist.
+          schema:
+            $ref: '#/definitions/Status'
+        "500":
+          description: Returned when theres is something wrong on the server side.
+          schema:
+            $ref: '#/definitions/Status'
+        default:
+          description: An unexpected error response.
+          schema:
+            $ref: '#/definitions/Status'
+      parameters:
+        - name: groupby
+          description: fields used to group assets. multiple fields can also be provided here
+          in: query
+          required: false
+          type: array
+          items:
+            type: string
+          collectionFormat: multi
+        - name: include_fields
+          in: query
+          required: false
+          type: array
+          items:
+            type: string
+          collectionFormat: multi
+        - name: size
+          description: maximum size to fetch
+          in: query
+          required: false
+          type: integer
+          format: int64
+      tags:
+        - Group
+        - Asset
   /v1beta1/lineage/{urn}:
     get:
       summary: Get Lineage Graph
@@ -1192,6 +1247,11 @@ paths:
           required: false
           type: integer
           format: int64
+        - name: flags.is_column_search
+          description: search column names instead of table urn or name.
+          in: query
+          required: false
+          type: boolean
       tags:
         - Search
         - Asset
@@ -2072,6 +2132,22 @@ definitions:
         type: array
         items:
           $ref: '#/definitions/v1beta1.Asset'
+  GroupAssetInfo:
+    type: object
+    properties:
+      data:
+        type: array
+        items:
+          $ref: '#/definitions/v1beta1.Asset'
+      groupKey:
+        type: string
+  GroupAssetsResponse:
+    type: object
+    properties:
+      groupAssetInfo:
+        type: array
+        items:
+          $ref: '#/definitions/GroupAssetInfo'
   LineageEdge:
     type: object
     properties:
@@ -2123,6 +2199,13 @@ definitions:
         type: array
         items:
           $ref: '#/definitions/v1beta1.Asset'
+  SearchFlags:
+    type: object
+    properties:
+      is_column_search:
+        type: boolean
+        description: search column names instead of table urn or name.
+    title: SearchFlags
   StarAssetResponse:
     type: object
     properties:

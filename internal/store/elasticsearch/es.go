@@ -39,11 +39,6 @@ type searchHit struct {
 	Source asset.Asset `json:"_source"`
 }
 
-type aggregationBucket struct {
-	Key      string `json:"key"`
-	DocCount int    `json:"doc_count"`
-}
-
 type searchResponse struct {
 	ScrollID string `json:"_scroll_id"`
 	Hits     struct {
@@ -63,6 +58,43 @@ type searchResponse struct {
 			Buckets                 []aggregationBucket
 		} `json:"aggregation_name"`
 	} `json:"aggregations"`
+}
+
+type groupResponse struct {
+	Aggregations struct {
+		TermAggregations TermAggregations `json:"term_agg"`
+	} `json:"aggregations"`
+}
+
+type aggregationBucket struct {
+	Key      string `json:"key"`
+	DocCount int    `json:"doc_count"`
+	Hits     struct {
+		Hits struct {
+			Hits []groupHits `json:"hits"`
+		} `json:"hits"`
+	} `json:"hits"`
+}
+
+type groupHits struct {
+	Source asset.Asset `json:"_source"`
+}
+
+type TermAggregations struct {
+	DocCountErrorUpperBound int `json:"doc_count_error_upper_bound"`
+	SumOtherDocCount        int `json:"sum_other_doc_count"`
+	Buckets                 []Buckets
+}
+
+type Buckets struct {
+	Key      string
+	DocCount int `json:"doc_count"`
+	Hits     struct {
+		Hits struct {
+			Hits []groupHits `json:"hits"`
+		} `json:"hits"`
+	} `json:"hits"`
+	Group *TermAggregations
 }
 
 // extract error reason from an elasticsearch response
