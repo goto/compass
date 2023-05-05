@@ -859,7 +859,7 @@ paths:
   /v1beta1/groupassets:
     get:
       summary: Group api for assets
-      description: 'API for grouping documents. ''groupby'' the field provided here is used for grouping. If it is a nested fields, you can provide the path to the field. You can specify additional criteria using ''filter[.*]'' to only group those documents. You can specify each filter multiple times to specify a set of values for those filters. For instance, to specify two landscape ''vn'' and ''th'', the query could be `/groupassets/?groupby=<groupby>&filter[environment]=integration&filter[landscape]=vn&filter[landscape]=th`. ''include_fields'' is used to send only these fields in response. this helps in restricting the response. Eg:/groupassets/?groupby=<groupby>&filter[environment]&include_fields=[data.attributes.dataset, data.attributes.project] '
+      description: API for grouping documents. 'groupby' the field provided here is used for grouping. You can provide multiple fields as well. If it is a nested fields, you can provide the path to the field. You can specify additional criteria using 'filter[.*]' to only group those documents. You can specify each filter multiple times to specify a set of values for those filters. For instance, to specify two landscape 'vn' and 'th', the query could be `/groupassets/?groupby=<groupby>&filter[environment]=integration&filter[landscape]=vn&filter[landscape]=th`. 'include_fields' is used to send only these fields in response. this helps in restricting the response. Eg:/groupassets/?groupby=field1,field2&filter[environment]&include_fields=data.attributes.dataset,data.attributes.project Fields in group by will always be part of response, no need to add them in include-fields.
       operationId: CompassService_GroupAssets
       responses:
         "200":
@@ -891,17 +891,11 @@ paths:
           description: fields used to group assets. multiple fields can also be provided here
           in: query
           required: false
-          type: array
-          items:
-            type: string
-          collectionFormat: multi
+          type: string
         - name: include_fields
           in: query
           required: false
-          type: array
-          items:
-            type: string
-          collectionFormat: multi
+          type: string
         - name: size
           description: maximum size to fetch
           in: query
@@ -2139,15 +2133,24 @@ definitions:
         type: array
         items:
           $ref: '#/definitions/v1beta1.Asset'
-      groupKey:
-        type: string
+      group_field_info:
+        type: array
+        items:
+          $ref: '#/definitions/GroupFieldInfo'
   GroupAssetsResponse:
     type: object
     properties:
-      groupAssetInfo:
+      group_asset_info:
         type: array
         items:
           $ref: '#/definitions/GroupAssetInfo'
+  GroupFieldInfo:
+    type: object
+    properties:
+      group_key:
+        type: string
+      group_value:
+        type: string
   LineageEdge:
     type: object
     properties:

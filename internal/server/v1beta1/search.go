@@ -57,14 +57,14 @@ func (server *APIServer) GroupAssets(ctx context.Context, req *compassv1beta1.Gr
 	}
 
 	groupby := req.GetGroupby()
-	if len(groupby) == 0 {
+	if groupby == "" {
 		return nil, status.Error(codes.InvalidArgument, "'groupby' must be specified")
 	}
 
 	cfg := asset.GroupConfig{
-		GroupBy:        groupby,
+		GroupBy:        strings.Split(groupby, ","),
 		Filters:        filterConfigFromValues(req.GetFilter()),
-		IncludedFields: req.GetIncludeFields(),
+		IncludedFields: strings.Split(req.GetIncludeFields(), ","),
 		Size:           int(req.GetSize()),
 	}
 
@@ -83,9 +83,13 @@ func (server *APIServer) GroupAssets(ctx context.Context, req *compassv1beta1.Gr
 			}
 			assetsPB[assetIdx] = assetPB
 		}
+		groupFieldInfo := &compassv1beta1.GroupFieldInfo{
+			GroupKey:   cfg.GroupBy[0],
+			GroupValue: gr.Key,
+		}
 		groupInfo := &compassv1beta1.GroupAssetInfo{
-			GroupKey: gr.Key,
-			Data:     assetsPB,
+			GroupFieldInfo: []*compassv1beta1.GroupFieldInfo{groupFieldInfo},
+			Data:           assetsPB,
 		}
 		groupInfoArr[idx] = groupInfo
 	}
