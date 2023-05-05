@@ -379,7 +379,8 @@ func (repo *DiscoveryRepository) buildGroupQuery(cfg asset.GroupConfig) (io.Read
 		querySource, _ = elastic.NewBoolQuery().Filter(filterQueries...).Source()
 	}
 
-	fetchSourceContext := elastic.NewFetchSourceContext(true).Include(cfg.IncludedFields...)
+	includedFields := append(cfg.GroupBy, cfg.IncludedFields...)
+	fetchSourceContext := elastic.NewFetchSourceContext(true).Include(includedFields...)
 
 	searchSource := elastic.NewSearchSource().FetchSourceContext(fetchSourceContext)
 	hitsAggregations := elastic.NewTopHitsAggregation().SearchSource(searchSource)

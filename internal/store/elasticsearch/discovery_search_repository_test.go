@@ -324,11 +324,12 @@ func TestSearcherGroup(t *testing.T) {
 			{
 				Description: "should group assets which match group by fields",
 				Config: asset.GroupConfig{
-					GroupBy: []string{"type"},
+					GroupBy:        []string{"type"},
+					IncludedFields: []string{"name"},
 				},
 				Expected: []expectedRow{
-					{Key: "table", Asset: []asset.Asset{{Name: "tablename-1"}, {Name: "tablename-common"}, {Name: "tablename-mid"}}},
-					{Key: "topic", Asset: []asset.Asset{{Name: "order-topic"}, {Name: "purchase-topic"}, {Name: "consumer-topic"}}},
+					{Key: "table", Asset: []asset.Asset{{Name: "apple-invoice"}, {Name: "microsoft-invoice"}, {Name: "tablename-1"}, {Name: "tablename-common"}, {Name: "tablename-mid"}}},
+					{Key: "topic", Asset: []asset.Asset{{Name: "consumer-mq-2"}, {Name: "order-topic"}, {Name: "purchase-topic"}, {Name: "consumer-topic"}, {Name: "transaction"}}},
 				},
 			},
 			{
@@ -340,6 +341,7 @@ func TestSearcherGroup(t *testing.T) {
 						"data.environment": {"production"},
 						"data.company":     {"gotocompany"},
 					},
+					IncludedFields: []string{"name"},
 				},
 				Expected: []expectedRow{
 					{Key: "topic", Asset: []asset.Asset{{Name: "consumer-topic"}, {Name: "consumer-mq-2"}}},
