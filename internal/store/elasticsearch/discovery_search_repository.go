@@ -378,8 +378,11 @@ func (repo *DiscoveryRepository) buildGroupQuery(cfg asset.GroupConfig) (io.Read
 	if filterQueries != nil {
 		querySource, _ = elastic.NewBoolQuery().Filter(filterQueries...).Source()
 	}
+	includedFields := cfg.GroupBy
+	if len(cfg.IncludedFields) > 0 {
+		includedFields = append(cfg.GroupBy, cfg.IncludedFields...)
+	}
 
-	includedFields := append(cfg.GroupBy, cfg.IncludedFields...)
 	fetchSourceContext := elastic.NewFetchSourceContext(true).Include(includedFields...)
 
 	searchSource := elastic.NewSearchSource().FetchSourceContext(fetchSourceContext)
@@ -399,7 +402,6 @@ func (repo *DiscoveryRepository) buildGroupQuery(cfg asset.GroupConfig) (io.Read
 	for _, field := range cfg.IncludedFields {
 		termAggregations = elastic.NewTermsAggregation().Field(fmt.Sprintf("%s.keyword", field)).Size(size).
 			SubAggregation("group", termAggregations)
-
 	}
 
 	aggs := elastic.Aggregations{}

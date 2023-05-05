@@ -355,7 +355,7 @@ func TestGroup(t *testing.T) {
 		{
 			Description: "should report internal server if asset grouper fails",
 			Request: &compassv1beta1.GroupAssetsRequest{
-				Groupby: []string{"groupby"},
+				Groupby: "groupby",
 			},
 			Setup: func(ctx context.Context, as *mocks.AssetService) {
 				err := fmt.Errorf("service unavailable")
@@ -367,7 +367,7 @@ func TestGroup(t *testing.T) {
 		{
 			Description: "should pass filter to group config format",
 			Request: &compassv1beta1.GroupAssetsRequest{
-				Groupby: []string{"resource"},
+				Groupby: "resource",
 				Filter: map[string]string{
 					"data.landscape": "th",
 					"type":           "topic",
@@ -391,13 +391,13 @@ func TestGroup(t *testing.T) {
 		{
 			Description: "should pass include fields to search config format",
 			Request: &compassv1beta1.GroupAssetsRequest{
-				Groupby: []string{"resource"},
+				Groupby: "resource",
 				Filter: map[string]string{
 					"data.landscape": "th",
 					"type":           "topic",
 					"service":        "kafka,rabbitmq",
 				},
-				IncludeFields: []string{"data.columns.name", "owners.email"},
+				IncludeFields: "data.columns.name,owners.email",
 			},
 			Setup: func(ctx context.Context, as *mocks.AssetService) {
 
@@ -417,7 +417,7 @@ func TestGroup(t *testing.T) {
 		{
 			Description: "should return the grouped documents",
 			Request: &compassv1beta1.GroupAssetsRequest{
-				Groupby: []string{"resource"},
+				Groupby: "resource",
 			},
 			Setup: func(ctx context.Context, as *mocks.AssetService) {
 
@@ -448,7 +448,12 @@ func TestGroup(t *testing.T) {
 				expected := &compassv1beta1.GroupAssetsResponse{
 					GroupAssetInfo: []*compassv1beta1.GroupAssetInfo{
 						{
-							GroupKey: "kafka",
+							GroupFieldInfo: []*compassv1beta1.GroupFieldInfo{
+								{
+									GroupKey:   "resource",
+									GroupValue: "kafka",
+								},
+							},
 							Data: []*compassv1beta1.Asset{
 								{
 									Id:          "test-resource",
@@ -474,7 +479,7 @@ func TestGroup(t *testing.T) {
 		{
 			Description: "should return the requested number of assets",
 			Request: &compassv1beta1.GroupAssetsRequest{
-				Groupby: []string{"resource"},
+				Groupby: "resource",
 				Size:    2,
 			},
 			Setup: func(ctx context.Context, as *mocks.AssetService) {
