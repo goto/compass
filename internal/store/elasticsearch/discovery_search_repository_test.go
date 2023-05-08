@@ -291,6 +291,7 @@ func TestSearcherGroup(t *testing.T) {
 		repo := store.NewDiscoveryRepository(esClient)
 		_, err = repo.Group(ctx, asset.GroupConfig{
 			GroupBy: []string{""},
+			Logger:  log.NewNoop(),
 		})
 
 		assert.Error(t, err)
@@ -323,9 +324,11 @@ func TestSearcherGroup(t *testing.T) {
 		tests := []groupTest{
 			{
 				Description: "should group assets which match group by fields",
+
 				Config: asset.GroupConfig{
 					GroupBy:        []string{"type"},
 					IncludedFields: []string{"name"},
+					Logger:         log.NewNoop(),
 				},
 				Expected: []expectedRow{
 					{Key: "table", Asset: []asset.Asset{{Name: "apple-invoice"}, {Name: "microsoft-invoice"}, {Name: "tablename-1"}, {Name: "tablename-common"}, {Name: "tablename-mid"}}},
@@ -342,6 +345,7 @@ func TestSearcherGroup(t *testing.T) {
 						"data.company":     {"gotocompany"},
 					},
 					IncludedFields: []string{"name"},
+					Logger:         log.NewNoop(),
 				},
 				Expected: []expectedRow{
 					{Key: "topic", Asset: []asset.Asset{{Name: "consumer-topic"}, {Name: "consumer-mq-2"}}},

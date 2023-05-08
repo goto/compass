@@ -304,6 +304,7 @@ func (repo *DiscoveryRepository) Group(ctx context.Context, cfg asset.GroupConfi
 		err = asset.DiscoveryError{Err: fmt.Errorf("error building query %w", err)}
 		return nil, err
 	}
+	cfg.Logger.Debug(fmt.Sprintf("group asset query %s for config %+v", query, cfg))
 
 	res, err := repo.cli.client.Search(
 		repo.cli.client.Search.WithFilterPath("aggregations"),
@@ -321,10 +322,10 @@ func (repo *DiscoveryRepository) Group(ctx context.Context, cfg asset.GroupConfi
 
 	err = json.NewDecoder(res.Body).Decode(&response)
 	if err != nil {
-		fmt.Println(err.Error())
 		err = asset.DiscoveryError{Err: fmt.Errorf("error decoding group response %w", err)}
 		return nil, err
 	}
+
 	groupResultMap := make(map[string][]asset.Asset)
 	repo.ParseGroupResults(&response.Aggregations.TermAggregations, groupResultMap)
 	results := repo.toGroupResults(groupResultMap)
@@ -333,13 +334,17 @@ func (repo *DiscoveryRepository) Group(ctx context.Context, cfg asset.GroupConfi
 
 func (repo *DiscoveryRepository) ParseGroupResults(termAggregations *TermAggregations, groupResultMap map[string][]asset.Asset) {
 
+	// Since we can have multiple groups, elastic search returns the results in nested order.
+	// To make the structure flat we are clubbing the response based on one top group and appending the assets to it.
+	// If it is not the top group, we recursively invoke the same function to fetch the nested assets.
 	for _, bucket := range termAggregations.Buckets {
 		if bucket.Group == nil {
 			key := bucket.Key
+			assetSource := bucket.Hits.Hits.Hits[0].Source
 			if assets, ok := groupResultMap[key]; ok {
-				groupResultMap[key] = append(assets, bucket.Hits.Hits.Hits[0].Source)
+				groupResultMap[key] = append(assets, assetSource)
 			} else {
-				groupResultMap[key] = []asset.Asset{bucket.Hits.Hits.Hits[0].Source}
+				groupResultMap[key] = []asset.Asset{assetSource}
 			}
 		} else {
 			repo.ParseGroupResults(bucket.Group, groupResultMap)
@@ -373,21 +378,26 @@ func (repo *DiscoveryRepository) buildGroupQuery(cfg asset.GroupConfig) (io.Read
 		size = defaultGroupSize
 	}
 
+	// This code takes care of creating filter term queries from the input filters mentioned in request.
 	filterQueries := repo.buildFilterExistsQueries(cfg.GroupBy)
 	filterQueries = append(filterQueries, repo.buildFilterTermQueries(cfg.Filters)...)
 	if filterQueries != nil {
 		querySource, _ = elastic.NewBoolQuery().Filter(filterQueries...).Source()
 	}
+
+	// By default, the groupby fields would be part of the response hence added them in the input included fields list.
 	includedFields := cfg.GroupBy
 	if len(cfg.IncludedFields) > 0 {
 		includedFields = append(cfg.GroupBy, cfg.IncludedFields...)
 	}
 
+	// Hits aggregation helps to return the specific parts of _source in response.
 	fetchSourceContext := elastic.NewFetchSourceContext(true).Include(includedFields...)
-
 	searchSource := elastic.NewSearchSource().FetchSourceContext(fetchSourceContext)
 	hitsAggregations := elastic.NewTopHitsAggregation().SearchSource(searchSource)
 
+	// Terms Aggregation helps us to group by based on particular fields.
+	// If multiple fields are provided in group by a sub aggregation of type Term Aggregation is added.
 	var termAggregations *elastic.TermsAggregation
 	for idx, group := range cfg.GroupBy {
 		if idx == 0 {
@@ -399,21 +409,27 @@ func (repo *DiscoveryRepository) buildGroupQuery(cfg asset.GroupConfig) (io.Read
 		}
 	}
 
+	// A term aggregation is also added for each field provided in included fields because every field in response also
+	// needs to be part of aggregation.
 	for _, field := range cfg.IncludedFields {
 		termAggregations = elastic.NewTermsAggregation().Field(fmt.Sprintf("%s.keyword", field)).Size(size).
 			SubAggregation("group", termAggregations)
 	}
 
-	aggs := elastic.Aggregations{}
+	aggregations := elastic.Aggregations{}
 	src, _ := termAggregations.Source()
 	payload := new(bytes.Buffer)
-	json.NewEncoder(payload).Encode(src)
-	aggs["term_agg"] = payload.Bytes()
+	err := json.NewEncoder(payload).Encode(src)
+	if err != nil {
+		err = asset.DiscoveryError{Err: fmt.Errorf("error encoding group request %w", err)}
+		return nil, err
+	}
+	aggregations["term_agg"] = payload.Bytes()
 
 	payload = new(bytes.Buffer)
 	q := &GroupQuery{
 		Query:        querySource,
-		Aggregations: aggs,
+		Aggregations: aggregations,
 	}
 
 	return payload, json.NewEncoder(payload).Encode(q)

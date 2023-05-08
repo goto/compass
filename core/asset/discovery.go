@@ -3,6 +3,7 @@ package asset
 //go:generate mockery --name=DiscoveryRepository -r --case underscore --with-expecter --structname DiscoveryRepository --filename discovery_repository.go --output=./mocks
 import (
 	"context"
+	"github.com/goto/salt/log"
 )
 
 type DiscoveryRepository interface {
@@ -29,6 +30,8 @@ type GroupConfig struct {
 
 	// Number of documents you want in response
 	Size int
+
+	Logger log.Logger
 }
 
 // SearchFilter is a filter intended to be used as a search

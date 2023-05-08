@@ -355,7 +355,7 @@ func TestGroup(t *testing.T) {
 		{
 			Description: "should report internal server if asset grouper fails",
 			Request: &compassv1beta1.GroupAssetsRequest{
-				Groupby: "groupby",
+				Groupby: []string{"groupby"},
 			},
 			Setup: func(ctx context.Context, as *mocks.AssetService) {
 				err := fmt.Errorf("service unavailable")
@@ -367,7 +367,7 @@ func TestGroup(t *testing.T) {
 		{
 			Description: "should pass filter to group config format",
 			Request: &compassv1beta1.GroupAssetsRequest{
-				Groupby: "resource",
+				Groupby: []string{"resource"},
 				Filter: map[string]string{
 					"data.landscape": "th",
 					"type":           "topic",
@@ -375,7 +375,7 @@ func TestGroup(t *testing.T) {
 				},
 			},
 			Setup: func(ctx context.Context, as *mocks.AssetService) {
-
+				logger := log.NewNoop()
 				cfg := asset.GroupConfig{
 					GroupBy: []string{"resource"},
 					Filters: map[string][]string{
@@ -383,6 +383,7 @@ func TestGroup(t *testing.T) {
 						"service":        {"kafka", "rabbitmq"},
 						"data.landscape": {"th"},
 					},
+					Logger: logger,
 				}
 
 				as.EXPECT().GroupAssets(ctx, cfg).Return([]asset.GroupResult{}, nil)
@@ -391,16 +392,16 @@ func TestGroup(t *testing.T) {
 		{
 			Description: "should pass include fields to search config format",
 			Request: &compassv1beta1.GroupAssetsRequest{
-				Groupby: "resource",
+				Groupby: []string{"resource"},
 				Filter: map[string]string{
 					"data.landscape": "th",
 					"type":           "topic",
 					"service":        "kafka,rabbitmq",
 				},
-				IncludeFields: "data.columns.name,owners.email",
+				IncludeFields: []string{"data.columns.name", "owners.email"},
 			},
 			Setup: func(ctx context.Context, as *mocks.AssetService) {
-
+				logger := log.NewNoop()
 				cfg := asset.GroupConfig{
 					GroupBy: []string{"resource"},
 					Filters: map[string][]string{
@@ -409,6 +410,7 @@ func TestGroup(t *testing.T) {
 						"data.landscape": {"th"},
 					},
 					IncludedFields: []string{"data.columns.name", "owners.email"},
+					Logger:         logger,
 				}
 
 				as.EXPECT().GroupAssets(ctx, cfg).Return([]asset.GroupResult{}, nil)
@@ -417,13 +419,14 @@ func TestGroup(t *testing.T) {
 		{
 			Description: "should return the grouped documents",
 			Request: &compassv1beta1.GroupAssetsRequest{
-				Groupby: "resource",
+				Groupby: []string{"resource"},
 			},
 			Setup: func(ctx context.Context, as *mocks.AssetService) {
-
+				logger := log.NewNoop()
 				cfg := asset.GroupConfig{
 					GroupBy: []string{"resource"},
 					Filters: make(map[string][]string),
+					Logger:  logger,
 				}
 				response := []asset.GroupResult{
 					{
@@ -446,15 +449,15 @@ func TestGroup(t *testing.T) {
 
 			PostCheck: func(resp *compassv1beta1.GroupAssetsResponse) error {
 				expected := &compassv1beta1.GroupAssetsResponse{
-					GroupAssetInfo: []*compassv1beta1.GroupAssetInfo{
+					AssetGroups: []*compassv1beta1.AssetGroup{
 						{
-							GroupFieldInfo: []*compassv1beta1.GroupFieldInfo{
+							GroupFields: []*compassv1beta1.GroupField{
 								{
 									GroupKey:   "resource",
 									GroupValue: "kafka",
 								},
 							},
-							Data: []*compassv1beta1.Asset{
+							Assets: []*compassv1beta1.Asset{
 								{
 									Id:          "test-resource",
 									Description: "some description",
@@ -479,16 +482,17 @@ func TestGroup(t *testing.T) {
 		{
 			Description: "should return the requested number of assets",
 			Request: &compassv1beta1.GroupAssetsRequest{
-				Groupby: "resource",
+				Groupby: []string{"resource"},
 				Size:    2,
 			},
 			Setup: func(ctx context.Context, as *mocks.AssetService) {
-
+				logger := log.NewNoop()
 				cfg := asset.GroupConfig{
 					GroupBy:        []string{"resource"},
 					Size:           2,
 					Filters:        make(map[string][]string),
 					IncludedFields: []string(nil),
+					Logger:         logger,
 				}
 
 				results := make([]asset.GroupResult, cfg.Size)
@@ -526,7 +530,7 @@ func TestGroup(t *testing.T) {
 			},
 			PostCheck: func(resp *compassv1beta1.GroupAssetsResponse) error {
 				expectedSize := 2
-				actualSize := len(resp.GroupAssetInfo)
+				actualSize := len(resp.AssetGroups)
 				if expectedSize != actualSize {
 					return fmt.Errorf("expected group request to return %d results, returned %d results instead", expectedSize, actualSize)
 				}

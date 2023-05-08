@@ -57,19 +57,16 @@ func (server *APIServer) GroupAssets(ctx context.Context, req *compassv1beta1.Gr
 	}
 
 	groupby := req.GetGroupby()
-	if groupby == "" {
+	if len(groupby) == 0 || groupby[0] == "" {
 		return nil, status.Error(codes.InvalidArgument, "'groupby' must be specified")
 	}
 
 	cfg := asset.GroupConfig{
-		GroupBy: strings.Split(groupby, ","),
-		Filters: filterConfigFromValues(req.GetFilter()),
-		Size:    int(req.GetSize()),
-	}
-
-	includedFields := req.GetIncludeFields()
-	if includedFields != "" {
-		cfg.IncludedFields = strings.Split(includedFields, ",")
+		GroupBy:        groupby,
+		Filters:        filterConfigFromValues(req.GetFilter()),
+		IncludedFields: req.GetIncludeFields(),
+		Size:           int(req.GetSize()),
+		Logger:         server.logger,
 	}
 
 	results, err := server.assetService.GroupAssets(ctx, cfg)
@@ -77,7 +74,7 @@ func (server *APIServer) GroupAssets(ctx context.Context, req *compassv1beta1.Gr
 		return nil, internalServerError(server.logger, fmt.Sprintf("error searching asset: %s", err.Error()))
 	}
 
-	groupInfoArr := make([]*compassv1beta1.GroupAssetInfo, len(results))
+	groupInfoArr := make([]*compassv1beta1.AssetGroup, len(results))
 	for idx, gr := range results {
 		assetsPB := make([]*compassv1beta1.Asset, len(gr.Assets))
 		for assetIdx, as := range gr.Assets {
@@ -88,20 +85,20 @@ func (server *APIServer) GroupAssets(ctx context.Context, req *compassv1beta1.Gr
 			assetsPB[assetIdx] = assetPB
 		}
 
-		groupInfo := &compassv1beta1.GroupAssetInfo{
-			GroupFieldInfo: []*compassv1beta1.GroupFieldInfo{
+		groupInfo := &compassv1beta1.AssetGroup{
+			GroupFields: []*compassv1beta1.GroupField{
 				{
 					GroupKey:   cfg.GroupBy[0],
 					GroupValue: gr.Key,
 				},
 			},
-			Data: assetsPB,
+			Assets: assetsPB,
 		}
 		groupInfoArr[idx] = groupInfo
 	}
 
 	return &compassv1beta1.GroupAssetsResponse{
-		GroupAssetInfo: groupInfoArr,
+		AssetGroups: groupInfoArr,
 	}, nil
 }
 
