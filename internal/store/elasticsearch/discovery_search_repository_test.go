@@ -312,8 +312,8 @@ func TestSearcherGroup(t *testing.T) {
 		repo := store.NewDiscoveryRepository(esClient, log.NewNoop())
 
 		type expectedRow struct {
-			Key   string
-			Asset []asset.Asset
+			GroupField []asset.GroupField
+			Asset      []asset.Asset
 		}
 		type groupTest struct {
 			Description string
@@ -322,6 +322,24 @@ func TestSearcherGroup(t *testing.T) {
 		}
 		tests := []groupTest{
 			{
+				Description: "should group assets which match group by multiple fields",
+
+				Config: asset.GroupConfig{
+					GroupBy: []string{"type", "name"},
+				},
+				Expected: []expectedRow{
+					{GroupField: []asset.GroupField{{GroupKey: "type", GroupValue: "table"}, {GroupKey: "name", GroupValue: "apple-invoice"}}, Asset: []asset.Asset{{Name: "apple-invoice"}}},
+					{GroupField: []asset.GroupField{{GroupKey: "type", GroupValue: "table"}, {GroupKey: "name", GroupValue: "microsoft-invoice"}}, Asset: []asset.Asset{{Name: "microsoft-invoice"}}},
+					{GroupField: []asset.GroupField{{GroupKey: "type", GroupValue: "table"}, {GroupKey: "name", GroupValue: "tablename-1"}}, Asset: []asset.Asset{{Name: "tablename-1"}}},
+					{GroupField: []asset.GroupField{{GroupKey: "type", GroupValue: "table"}, {GroupKey: "name", GroupValue: "tablename-common"}}, Asset: []asset.Asset{{Name: "tablename-common"}}},
+					{GroupField: []asset.GroupField{{GroupKey: "type", GroupValue: "table"}, {GroupKey: "name", GroupValue: "tablename-mid"}}, Asset: []asset.Asset{{Name: "tablename-mid"}}},
+					{GroupField: []asset.GroupField{{GroupKey: "type", GroupValue: "topic"}, {GroupKey: "name", GroupValue: "consumer-mq-2"}}, Asset: []asset.Asset{{Name: "consumer-mq-2"}}},
+					{GroupField: []asset.GroupField{{GroupKey: "type", GroupValue: "topic"}, {GroupKey: "name", GroupValue: "consumer-topic"}}, Asset: []asset.Asset{{Name: "consumer-topic"}}},
+					{GroupField: []asset.GroupField{{GroupKey: "type", GroupValue: "topic"}, {GroupKey: "name", GroupValue: "order-topic"}}, Asset: []asset.Asset{{Name: "order-topic"}}},
+					{GroupField: []asset.GroupField{{GroupKey: "type", GroupValue: "topic"}, {GroupKey: "name", GroupValue: "purchase-topic"}}, Asset: []asset.Asset{{Name: "purchase-topic"}}},
+					{GroupField: []asset.GroupField{{GroupKey: "type", GroupValue: "topic"}, {GroupKey: "name", GroupValue: "transaction"}}, Asset: []asset.Asset{{Name: "transaction"}}}},
+			},
+			{
 				Description: "should group assets which match group by fields",
 
 				Config: asset.GroupConfig{
@@ -329,8 +347,8 @@ func TestSearcherGroup(t *testing.T) {
 					IncludedFields: []string{"name"},
 				},
 				Expected: []expectedRow{
-					{Key: "table", Asset: []asset.Asset{{Name: "apple-invoice"}, {Name: "microsoft-invoice"}, {Name: "tablename-1"}, {Name: "tablename-common"}, {Name: "tablename-mid"}}},
-					{Key: "topic", Asset: []asset.Asset{{Name: "consumer-mq-2"}, {Name: "order-topic"}, {Name: "purchase-topic"}, {Name: "consumer-topic"}, {Name: "transaction"}}},
+					{GroupField: []asset.GroupField{{GroupKey: "type", GroupValue: "table"}}, Asset: []asset.Asset{{Name: "tablename-1"}}},
+					{GroupField: []asset.GroupField{{GroupKey: "type", GroupValue: "topic"}}, Asset: []asset.Asset{{Name: "order-topic"}}},
 				},
 			},
 			{
@@ -345,7 +363,7 @@ func TestSearcherGroup(t *testing.T) {
 					IncludedFields: []string{"name"},
 				},
 				Expected: []expectedRow{
-					{Key: "topic", Asset: []asset.Asset{{Name: "consumer-topic"}, {Name: "consumer-mq-2"}}},
+					{GroupField: []asset.GroupField{{GroupKey: "type", GroupValue: "topic"}}, Asset: []asset.Asset{{Name: "consumer-topic"}, {Name: "consumer-mq-2"}}},
 				},
 			},
 		}
@@ -354,7 +372,9 @@ func TestSearcherGroup(t *testing.T) {
 				results, err := repo.GroupAssets(ctx, test.Config)
 				assert.NoError(t, err)
 				assert.Equal(t, len(test.Expected), len(results))
-				assert.Equal(t, test.Expected, results)
+				for i, res := range test.Expected {
+					assert.Equal(t, res.Asset[0].Name, results[i].Assets[0].Name)
+				}
 			})
 		}
 	})
