@@ -3,6 +3,8 @@ package handlersv1beta1
 import (
 	"context"
 	"fmt"
+	"github.com/goto/compass/internal/server/v1beta1/testutils"
+	"github.com/stretchr/testify/assert"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -375,7 +377,6 @@ func TestGroup(t *testing.T) {
 				},
 			},
 			Setup: func(ctx context.Context, as *mocks.AssetService) {
-				logger := log.NewNoop()
 				cfg := asset.GroupConfig{
 					GroupBy: []string{"resource"},
 					Filters: map[string][]string{
@@ -383,9 +384,7 @@ func TestGroup(t *testing.T) {
 						"service":        {"kafka", "rabbitmq"},
 						"data.landscape": {"th"},
 					},
-					Logger: logger,
 				}
-
 				as.EXPECT().GroupAssets(ctx, cfg).Return([]asset.GroupResult{}, nil)
 			},
 		},
@@ -401,7 +400,6 @@ func TestGroup(t *testing.T) {
 				IncludeFields: []string{"data.columns.name", "owners.email"},
 			},
 			Setup: func(ctx context.Context, as *mocks.AssetService) {
-				logger := log.NewNoop()
 				cfg := asset.GroupConfig{
 					GroupBy: []string{"resource"},
 					Filters: map[string][]string{
@@ -410,9 +408,7 @@ func TestGroup(t *testing.T) {
 						"data.landscape": {"th"},
 					},
 					IncludedFields: []string{"data.columns.name", "owners.email"},
-					Logger:         logger,
 				}
-
 				as.EXPECT().GroupAssets(ctx, cfg).Return([]asset.GroupResult{}, nil)
 			},
 		},
@@ -422,15 +418,17 @@ func TestGroup(t *testing.T) {
 				Groupby: []string{"resource"},
 			},
 			Setup: func(ctx context.Context, as *mocks.AssetService) {
-				logger := log.NewNoop()
 				cfg := asset.GroupConfig{
 					GroupBy: []string{"resource"},
 					Filters: make(map[string][]string),
-					Logger:  logger,
 				}
 				response := []asset.GroupResult{
 					{
-						Key: "kafka",
+						GroupFields: []asset.GroupField{{
+							GroupKey:   "resource",
+							GroupValue: "kafka",
+						},
+						},
 						Assets: []asset.Asset{{
 							Type:        "test",
 							ID:          "test-resource",
@@ -472,10 +470,7 @@ func TestGroup(t *testing.T) {
 						},
 					},
 				}
-
-				if diff := cmp.Diff(resp, expected, protocmp.Transform()); diff != "" {
-					return fmt.Errorf("expected response to be %+v, was %+v", expected, resp)
-				}
+				testutils.AssertEqualProto(t, expected, resp)
 				return nil
 			},
 		},
@@ -486,13 +481,11 @@ func TestGroup(t *testing.T) {
 				Size:    2,
 			},
 			Setup: func(ctx context.Context, as *mocks.AssetService) {
-				logger := log.NewNoop()
 				cfg := asset.GroupConfig{
 					GroupBy:        []string{"resource"},
 					Size:           2,
 					Filters:        make(map[string][]string),
 					IncludedFields: []string(nil),
-					Logger:         logger,
 				}
 
 				results := make([]asset.GroupResult, cfg.Size)
@@ -517,12 +510,20 @@ func TestGroup(t *testing.T) {
 				bigqueryAssets := []asset.Asset{asset2}
 
 				results[0] = asset.GroupResult{
-					Key:    "kafka",
+					GroupFields: []asset.GroupField{{
+						GroupKey:   "resource",
+						GroupValue: "kafka",
+					},
+					},
 					Assets: kafkaAssets,
 				}
 
 				results[1] = asset.GroupResult{
-					Key:    "bigquery",
+					GroupFields: []asset.GroupField{{
+						GroupKey:   "resource",
+						GroupValue: "bigquery",
+					},
+					},
 					Assets: bigqueryAssets,
 				}
 
@@ -531,9 +532,7 @@ func TestGroup(t *testing.T) {
 			PostCheck: func(resp *compassv1beta1.GroupAssetsResponse) error {
 				expectedSize := 2
 				actualSize := len(resp.AssetGroups)
-				if expectedSize != actualSize {
-					return fmt.Errorf("expected group request to return %d results, returned %d results instead", expectedSize, actualSize)
-				}
+				assert.Equal(t, expectedSize, actualSize)
 				return nil
 			},
 		},
@@ -558,15 +557,11 @@ func TestGroup(t *testing.T) {
 
 			got, err := handler.GroupAssets(ctx, tc.Request)
 			code := status.Code(err)
-			if code != tc.ExpectStatus {
-				t.Errorf("expected handler to return Code %s, returned Code %sinstead", tc.ExpectStatus.String(), code.String())
-				return
-			}
+			assert.Equal(t, tc.ExpectStatus, code)
+
 			if tc.PostCheck != nil {
-				if err := tc.PostCheck(got); err != nil {
-					t.Error(err)
-					return
-				}
+				err := tc.PostCheck(got)
+				assert.NoError(t, err)
 			}
 		})
 	}

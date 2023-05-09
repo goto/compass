@@ -821,7 +821,7 @@ func TestService_SearchSuggestGroupAssets(t *testing.T) {
 			Setup: func(ctx context.Context, dr *mocks.DiscoveryRepository) {
 				dr.EXPECT().Search(ctx, asset.SearchConfig{}).Return(searchResults, DisErr)
 				dr.EXPECT().Suggest(ctx, asset.SearchConfig{}).Return([]string{}, DisErr)
-				dr.EXPECT().Group(ctx, asset.GroupConfig{}).Return(groupResults, DisErr)
+				dr.EXPECT().GroupAssets(ctx, asset.GroupConfig{}).Return(groupResults, DisErr)
 			},
 			ErrSearch:  DisErr,
 			ErrSuggest: DisErr,
@@ -833,7 +833,7 @@ func TestService_SearchSuggestGroupAssets(t *testing.T) {
 			Setup: func(ctx context.Context, dr *mocks.DiscoveryRepository) {
 				dr.EXPECT().Search(ctx, asset.SearchConfig{}).Return(searchResults, nil)
 				dr.EXPECT().Suggest(ctx, asset.SearchConfig{}).Return([]string{}, nil)
-				dr.EXPECT().Group(ctx, asset.GroupConfig{}).Return(groupResults, nil)
+				dr.EXPECT().GroupAssets(ctx, asset.GroupConfig{}).Return(groupResults, nil)
 			},
 			ErrSearch:  nil,
 			ErrSuggest: nil,

@@ -62,8 +62,22 @@ type searchResponse struct {
 
 type groupResponse struct {
 	Aggregations struct {
-		TermAggregations TermAggregations `json:"term_agg"`
+		CompositeAggregations struct {
+			Buckets []bucket `json:"buckets"`
+		} `json:"composite-group"`
 	} `json:"aggregations"`
+}
+
+type bucket struct {
+	Key      map[string]string `json:"key"`
+	DocCount int               `json:"doc_count"`
+	Hits     struct {
+		Hits struct {
+			Hits []struct {
+				Source asset.Asset `json:"_source"`
+			} `json:"hits"`
+		} `json:"hits"`
+	} `json:"hits"`
 }
 
 type aggregationBucket struct {
@@ -78,23 +92,6 @@ type aggregationBucket struct {
 
 type groupHits struct {
 	Source asset.Asset `json:"_source"`
-}
-
-type TermAggregations struct {
-	DocCountErrorUpperBound int `json:"doc_count_error_upper_bound"`
-	SumOtherDocCount        int `json:"sum_other_doc_count"`
-	Buckets                 []Buckets
-}
-
-type Buckets struct {
-	Key      string
-	DocCount int `json:"doc_count"`
-	Hits     struct {
-		Hits struct {
-			Hits []groupHits `json:"hits"`
-		} `json:"hits"`
-	} `json:"hits"`
-	Group *TermAggregations
 }
 
 // extract error reason from an elasticsearch response

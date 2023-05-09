@@ -3,7 +3,6 @@ package asset
 //go:generate mockery --name=DiscoveryRepository -r --case underscore --with-expecter --structname DiscoveryRepository --filename discovery_repository.go --output=./mocks
 import (
 	"context"
-	"github.com/goto/salt/log"
 )
 
 type DiscoveryRepository interface {
@@ -12,7 +11,7 @@ type DiscoveryRepository interface {
 	DeleteByURN(ctx context.Context, assetURN string) error
 	Search(ctx context.Context, cfg SearchConfig) (results []SearchResult, err error)
 	Suggest(ctx context.Context, cfg SearchConfig) (suggestions []string, err error)
-	Group(ctx context.Context, cfg GroupConfig) (results []GroupResult, err error)
+	GroupAssets(ctx context.Context, cfg GroupConfig) (results []GroupResult, err error)
 }
 
 // GroupConfig represents a group query along
@@ -30,8 +29,6 @@ type GroupConfig struct {
 
 	// Number of documents you want in response
 	Size int
-
-	Logger log.Logger
 }
 
 // SearchFilter is a filter intended to be used as a search
@@ -71,8 +68,13 @@ type SearchResult struct {
 }
 
 type GroupResult struct {
-	Key    string  `json:"key"`
-	Assets []Asset `json:"assets"`
+	GroupFields []GroupField `json:"group_fields"` // changed to proto form
+	Assets      []Asset      `json:"assets"`
+}
+
+type GroupField struct {
+	GroupKey   string `json:"group_key"`
+	GroupValue string `json:"group_value"`
 }
 
 // ToAsset returns search result as asset

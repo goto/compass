@@ -162,7 +162,7 @@ func (s *Service) SearchAssets(ctx context.Context, cfg SearchConfig) (results [
 }
 
 func (s *Service) GroupAssets(ctx context.Context, cfg GroupConfig) (results []GroupResult, err error) {
-	return s.discoveryRepository.Group(ctx, cfg)
+	return s.discoveryRepository.GroupAssets(ctx, cfg)
 }
 
 func (s *Service) SuggestAssets(ctx context.Context, cfg SearchConfig) (suggestions []string, err error) {

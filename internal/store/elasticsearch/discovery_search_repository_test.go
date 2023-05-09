@@ -30,7 +30,7 @@ func TestSearcherSearch(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		repo := store.NewDiscoveryRepository(esClient)
+		repo := store.NewDiscoveryRepository(esClient, log.NewNoop())
 		_, err = repo.Search(ctx, asset.SearchConfig{
 			Text: "",
 		})
@@ -51,7 +51,7 @@ func TestSearcherSearch(t *testing.T) {
 		err = loadTestFixture(cli, esClient, "./testdata/search-test-fixture.json")
 		require.NoError(t, err)
 
-		repo := store.NewDiscoveryRepository(esClient)
+		repo := store.NewDiscoveryRepository(esClient, log.NewNoop())
 
 		type expectedRow struct {
 			Type    string
@@ -223,7 +223,7 @@ func TestSearcherSuggest(t *testing.T) {
 	err = loadTestFixture(cli, esClient, "./testdata/suggest-test-fixture.json")
 	require.NoError(t, err)
 
-	repo := store.NewDiscoveryRepository(esClient)
+	repo := store.NewDiscoveryRepository(esClient, log.NewNoop())
 
 	t.Run("fixtures", func(t *testing.T) {
 		testCases := []struct {
@@ -260,7 +260,7 @@ func loadTestFixture(cli *elasticsearch.Client, esClient *store.Client, filePath
 
 	ctx := context.TODO()
 	for _, testdata := range data {
-		repo := store.NewDiscoveryRepository(esClient)
+		repo := store.NewDiscoveryRepository(esClient, log.NewNoop())
 		for _, ast := range testdata.Assets {
 			if err := repo.Upsert(ctx, ast); err != nil {
 				return err
@@ -288,10 +288,9 @@ func TestSearcherGroup(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		repo := store.NewDiscoveryRepository(esClient)
-		_, err = repo.Group(ctx, asset.GroupConfig{
+		repo := store.NewDiscoveryRepository(esClient, log.NewNoop())
+		_, err = repo.GroupAssets(ctx, asset.GroupConfig{
 			GroupBy: []string{""},
-			Logger:  log.NewNoop(),
 		})
 
 		assert.Error(t, err)
@@ -310,7 +309,7 @@ func TestSearcherGroup(t *testing.T) {
 		err = loadTestFixture(cli, esClient, "./testdata/search-test-fixture.json")
 		require.NoError(t, err)
 
-		repo := store.NewDiscoveryRepository(esClient)
+		repo := store.NewDiscoveryRepository(esClient, log.NewNoop())
 
 		type expectedRow struct {
 			Key   string
@@ -328,7 +327,6 @@ func TestSearcherGroup(t *testing.T) {
 				Config: asset.GroupConfig{
 					GroupBy:        []string{"type"},
 					IncludedFields: []string{"name"},
-					Logger:         log.NewNoop(),
 				},
 				Expected: []expectedRow{
 					{Key: "table", Asset: []asset.Asset{{Name: "apple-invoice"}, {Name: "microsoft-invoice"}, {Name: "tablename-1"}, {Name: "tablename-common"}, {Name: "tablename-mid"}}},
@@ -345,7 +343,6 @@ func TestSearcherGroup(t *testing.T) {
 						"data.company":     {"gotocompany"},
 					},
 					IncludedFields: []string{"name"},
-					Logger:         log.NewNoop(),
 				},
 				Expected: []expectedRow{
 					{Key: "topic", Asset: []asset.Asset{{Name: "consumer-topic"}, {Name: "consumer-mq-2"}}},
@@ -354,14 +351,10 @@ func TestSearcherGroup(t *testing.T) {
 		}
 		for _, test := range tests {
 			t.Run(test.Description, func(t *testing.T) {
-				results, err := repo.Group(ctx, test.Config)
-				require.NoError(t, err)
-				require.Equal(t, len(test.Expected), len(results))
-
-				for i, res := range test.Expected {
-					assert.Equal(t, res.Key, results[i].Key)
-					assert.Equal(t, len(test.Expected[0].Asset), len(results[0].Assets))
-				}
+				results, err := repo.GroupAssets(ctx, test.Config)
+				assert.NoError(t, err)
+				assert.Equal(t, len(test.Expected), len(results))
+				assert.Equal(t, test.Expected, results)
 			})
 		}
 	})

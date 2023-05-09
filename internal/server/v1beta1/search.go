@@ -53,7 +53,7 @@ func (server *APIServer) SearchAssets(ctx context.Context, req *compassv1beta1.S
 func (server *APIServer) GroupAssets(ctx context.Context, req *compassv1beta1.GroupAssetsRequest) (*compassv1beta1.GroupAssetsResponse, error) {
 	_, err := server.validateUserInCtx(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("group assets: %w", err)
 	}
 
 	groupby := req.GetGroupby()
@@ -66,7 +66,6 @@ func (server *APIServer) GroupAssets(ctx context.Context, req *compassv1beta1.Gr
 		Filters:        filterConfigFromValues(req.GetFilter()),
 		IncludedFields: req.GetIncludeFields(),
 		Size:           int(req.GetSize()),
-		Logger:         server.logger,
 	}
 
 	results, err := server.assetService.GroupAssets(ctx, cfg)
@@ -75,26 +74,28 @@ func (server *APIServer) GroupAssets(ctx context.Context, req *compassv1beta1.Gr
 	}
 
 	groupInfoArr := make([]*compassv1beta1.AssetGroup, len(results))
-	for idx, gr := range results {
+	for i, gr := range results {
 		assetsPB := make([]*compassv1beta1.Asset, len(gr.Assets))
-		for assetIdx, as := range gr.Assets {
+		for j, as := range gr.Assets {
 			assetPB, err := assetToProto(as, false)
 			if err != nil {
 				return nil, internalServerError(server.logger, fmt.Sprintf("error converting assets to proto: %s", err.Error()))
 			}
-			assetsPB[assetIdx] = assetPB
+			assetsPB[j] = assetPB
 		}
 
-		groupInfo := &compassv1beta1.AssetGroup{
-			GroupFields: []*compassv1beta1.GroupField{
-				{
-					GroupKey:   cfg.GroupBy[0],
-					GroupValue: gr.Key,
-				},
-			},
-			Assets: assetsPB,
+		groupFieldList := make([]*compassv1beta1.GroupField, len(gr.GroupFields))
+		for j, gf := range gr.GroupFields {
+			groupFieldList[j] = &compassv1beta1.GroupField{
+				GroupKey:   gf.GroupKey,
+				GroupValue: gf.GroupValue,
+			}
 		}
-		groupInfoArr[idx] = groupInfo
+		groupInfo := &compassv1beta1.AssetGroup{
+			GroupFields: groupFieldList,
+			Assets:      assetsPB,
+		}
+		groupInfoArr[i] = groupInfo
 	}
 
 	return &compassv1beta1.GroupAssetsResponse{
