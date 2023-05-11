@@ -460,14 +460,11 @@ func TestGroupAssets(t *testing.T) {
 					sort.SliceStable(res.Fields, func(i, j int) bool {
 						return res.Fields[i].Name > res.Fields[j].Name
 					})
-					resultFields := results[i].Fields
-					sort.SliceStable(resultFields, func(i, j int) bool {
-						return resultFields[i].Name > resultFields[j].Name
+
+					sort.SliceStable(results[i].Fields, func(j, k int) bool {
+						return results[i].Fields[j].Name > results[i].Fields[k].Name
 					})
-					for j, field := range res.Fields {
-						assert.Equal(t, field.Name, resultFields[j].Name)
-						assert.Equal(t, field.Value, resultFields[j].Value)
-					}
+					assert.Equal(t, res.Fields, results[i].Fields)
 					for j, assetRes := range res.Assets {
 						assert.Equal(t, assetRes.Name, results[i].Assets[j].Name)
 					}

@@ -206,7 +206,7 @@ func TestSearch(t *testing.T) {
 			ctx := user.NewContext(context.Background(), user.User{UUID: userUUID})
 
 			logger := log.NewNoop()
-			mockUserSvc := new(mocks.UserService)
+			mockUserSvc := mocks.NewUserService(t)
 			mockSvc := mocks.NewAssetService(t)
 			if tc.Setup != nil {
 				tc.Setup(ctx, mockSvc)
@@ -307,7 +307,7 @@ func TestSuggest(t *testing.T) {
 			ctx := user.NewContext(context.Background(), user.User{UUID: userUUID})
 
 			logger := log.NewNoop()
-			mockUserSvc := new(mocks.UserService)
+			mockUserSvc := mocks.NewUserService(t)
 			mockSvc := mocks.NewAssetService(t)
 			if tc.Setup != nil {
 				tc.Setup(ctx, mockSvc)
@@ -480,7 +480,7 @@ func TestGroupAssets(t *testing.T) {
 			ctx := user.NewContext(context.Background(), user.User{UUID: userUUID})
 
 			logger := log.NewNoop()
-			mockUserSvc := new(mocks.UserService)
+			mockUserSvc := mocks.NewUserService(t)
 			mockSvc := mocks.NewAssetService(t)
 			if tc.Setup != nil {
 				tc.Setup(ctx, mockSvc)
