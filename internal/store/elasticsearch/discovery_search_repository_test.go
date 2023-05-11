@@ -310,11 +310,7 @@ func TestGroupAssets(t *testing.T) {
 		require.NoError(t, err)
 
 		repo := store.NewDiscoveryRepository(esClient, log.NewNoop())
-
-		type expectedRow struct {
-			GroupField []asset.GroupField
-			Asset      []asset.Asset
-		}
+		
 		type groupTest struct {
 			Description string
 			Config      asset.GroupConfig
