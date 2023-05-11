@@ -409,6 +409,8 @@ func TestGroupAssets(t *testing.T) {
 						},
 						Assets: []asset.Asset{
 							{Name: "tablename-1"},
+							{Name: "tablename-common"},
+							{Name: "tablename-mid"},
 						},
 					},
 					{
@@ -417,6 +419,8 @@ func TestGroupAssets(t *testing.T) {
 						},
 						Assets: []asset.Asset{
 							{Name: "order-topic"},
+							{Name: "purchase-topic"},
+							{Name: "consumer-topic"},
 						},
 					},
 				},
@@ -438,6 +442,7 @@ func TestGroupAssets(t *testing.T) {
 							{Name: "type", Value: "topic"}},
 						Assets: []asset.Asset{
 							{Name: "consumer-topic"},
+							{Name: "consumer-mq-2"},
 						},
 					},
 				},
