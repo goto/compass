@@ -20,7 +20,7 @@ type GroupConfig struct {
 	// IncludedFields specifies the fields to return in response
 	IncludedFields []string
 
-	// Groupby fields to group on
+	// GroupBy fields to group on
 	GroupBy []string
 
 	// Filters specifies document level values to look for.
@@ -68,13 +68,13 @@ type SearchResult struct {
 }
 
 type GroupResult struct {
-	GroupFields []GroupField `json:"group_fields"` // changed to proto form
-	Assets      []Asset      `json:"assets"`
+	Fields []GroupField
+	Assets []Asset
 }
 
 type GroupField struct {
-	GroupKey   string `json:"group_key"`
-	GroupValue string `json:"group_value"`
+	Name  string
+	Value string
 }
 
 // ToAsset returns search result as asset

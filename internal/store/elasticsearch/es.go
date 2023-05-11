@@ -63,26 +63,14 @@ type searchResponse struct {
 type groupResponse struct {
 	Aggregations struct {
 		CompositeAggregations struct {
-			Buckets []bucket `json:"buckets"`
+			Buckets []aggregationBucket `json:"buckets"`
 		} `json:"composite-group"`
 	} `json:"aggregations"`
 }
 
-type bucket struct {
+type aggregationBucket struct {
 	Key      map[string]string `json:"key"`
 	DocCount int               `json:"doc_count"`
-	Hits     struct {
-		Hits struct {
-			Hits []struct {
-				Source asset.Asset `json:"_source"`
-			} `json:"hits"`
-		} `json:"hits"`
-	} `json:"hits"`
-}
-
-type aggregationBucket struct {
-	Key      string `json:"key"`
-	DocCount int    `json:"doc_count"`
 	Hits     struct {
 		Hits struct {
 			Hits []groupHits `json:"hits"`

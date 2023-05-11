@@ -15,7 +15,7 @@ import (
 
 const (
 	defaultMaxResults                  = 200
-	defaultGroupSize                   = 10
+	defaultGroupsSize                  = 10
 	defaultMinScore                    = 0.01
 	defaultFunctionScoreQueryScoreMode = "sum"
 	suggesterName                      = "name-phrase-suggest"
@@ -221,16 +221,16 @@ func (repo *DiscoveryRepository) buildFilterTermQueries(filters map[string][]str
 	return filterQueries, true
 }
 
-func (repo *DiscoveryRepository) buildFilterExistsQueries(filters []string) ([]elastic.Query, bool) {
-	if len(filters) == 0 {
+func (repo *DiscoveryRepository) buildFilterExistsQueries(fields []string) ([]elastic.Query, bool) {
+	if len(fields) == 0 {
 		return nil, false
 	}
 
 	var filterQueries []elastic.Query
-	for _, filterString := range filters {
+	for _, field := range fields {
 		filterQueries = append(
 			filterQueries,
-			elastic.NewExistsQuery(fmt.Sprintf("%s.keyword", filterString)),
+			elastic.NewExistsQuery(fmt.Sprintf("%s.keyword", field)),
 		)
 	}
 
@@ -335,15 +335,19 @@ func (repo *DiscoveryRepository) GroupAssets(ctx context.Context, cfg asset.Grou
 	return results, nil
 }
 
-func (repo *DiscoveryRepository) toGroupResults(buckets []bucket) []asset.GroupResult {
+func (repo *DiscoveryRepository) toGroupResults(buckets []aggregationBucket) []asset.GroupResult {
 	groupResult := make([]asset.GroupResult, len(buckets))
 
 	for i, bucket := range buckets {
-		groupResult[i].Assets = []asset.Asset{bucket.Hits.Hits.Hits[0].Source}
-		groupResult[i].GroupFields = make([]asset.GroupField, len(bucket.Key))
+		groupResult[i].Assets = make([]asset.Asset, len(bucket.Hits.Hits.Hits))
+		for j, hit := range bucket.Hits.Hits.Hits {
+			groupResult[i].Assets[j] = hit.Source
+		}
+
+		groupResult[i].Fields = make([]asset.GroupField, len(bucket.Key))
 		j := 0
 		for key, value := range bucket.Key {
-			groupResult[i].GroupFields[j] = asset.GroupField{GroupKey: key, GroupValue: value}
+			groupResult[i].Fields[j] = asset.GroupField{Name: key, Value: value}
 			j++
 		}
 	}
@@ -351,7 +355,6 @@ func (repo *DiscoveryRepository) toGroupResults(buckets []bucket) []asset.GroupR
 }
 
 func (repo *DiscoveryRepository) buildGroupQuery(cfg asset.GroupConfig) (*strings.Reader, error) {
-
 	// This code takes care of creating filter term queries from the input filters mentioned in request.
 	var filterQueries []elastic.Query
 	if filterExistsQueries, ok := repo.buildFilterExistsQueries(cfg.GroupBy); ok {
@@ -363,7 +366,7 @@ func (repo *DiscoveryRepository) buildGroupQuery(cfg asset.GroupConfig) (*string
 
 	size := cfg.Size
 	if size <= 0 {
-		size = defaultGroupSize
+		size = defaultGroupsSize
 	}
 
 	// By default, the groupby fields would be part of the response hence added them in the input included fields list.
@@ -372,15 +375,14 @@ func (repo *DiscoveryRepository) buildGroupQuery(cfg asset.GroupConfig) (*string
 		includedFields = append(cfg.GroupBy, cfg.IncludedFields...)
 	}
 
-	//Done change the structuring of query to represent how it would be done in json form.
-	compositeAggSourceList := make([]elastic.CompositeAggregationValuesSource, len(cfg.GroupBy))
+	compositeAggSources := make([]elastic.CompositeAggregationValuesSource, len(cfg.GroupBy))
 	for i, group := range cfg.GroupBy {
-		compositeAggSourceList[i] = elastic.NewCompositeAggregationTermsValuesSource(group).
+		compositeAggSources[i] = elastic.NewCompositeAggregationTermsValuesSource(group).
 			Field(fmt.Sprintf("%s.keyword", group))
 	}
 
 	// Hits aggregation helps to return the specific parts of _source in response.
-	compositeAggregation := elastic.NewCompositeAggregation().Sources(compositeAggSourceList...).
+	compositeAggregation := elastic.NewCompositeAggregation().Sources(compositeAggSources...).
 		Size(size).
 		SubAggregation("hits", elastic.NewTopHitsAggregation().
 			SearchSource(elastic.NewSearchSource().
