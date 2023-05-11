@@ -344,11 +344,9 @@ func (repo *DiscoveryRepository) toGroupResults(buckets []aggregationBucket) []a
 			groupResult[i].Assets[j] = hit.Source
 		}
 
-		groupResult[i].Fields = make([]asset.GroupField, len(bucket.Key))
-		j := 0
+		groupResult[i].Fields = make([]asset.GroupField, 0, len(bucket.Key))
 		for key, value := range bucket.Key {
-			groupResult[i].Fields[j] = asset.GroupField{Name: key, Value: value}
-			j++
+			groupResult[i].Fields = append(groupResult[i].Fields, asset.GroupField{Name: key, Value: value})
 		}
 	}
 	return groupResult
