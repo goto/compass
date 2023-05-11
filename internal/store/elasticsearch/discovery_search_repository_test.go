@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"sort"
 	"testing"
 
 	"github.com/elastic/go-elasticsearch/v7"
@@ -310,7 +311,7 @@ func TestGroupAssets(t *testing.T) {
 		require.NoError(t, err)
 
 		repo := store.NewDiscoveryRepository(esClient, log.NewNoop())
-		
+
 		type groupTest struct {
 			Description string
 			Config      asset.GroupConfig
@@ -451,6 +452,17 @@ func TestGroupAssets(t *testing.T) {
 				for i, res := range test.Expected {
 					assert.Equal(t, len(res.Fields), len(results[i].Fields))
 					assert.Equal(t, len(res.Assets), len(results[i].Assets))
+					sort.SliceStable(res.Fields, func(i, j int) bool {
+						return res.Fields[i].Name > res.Fields[j].Name
+					})
+					resultFields := results[i].Fields
+					sort.SliceStable(resultFields, func(i, j int) bool {
+						return resultFields[i].Name > resultFields[j].Name
+					})
+					for j, field := range res.Fields {
+						assert.Equal(t, field.Name, resultFields[j].Name)
+						assert.Equal(t, field.Value, resultFields[j].Value)
+					}
 					for j, assetRes := range res.Assets {
 						assert.Equal(t, assetRes.Name, results[i].Assets[j].Name)
 					}
