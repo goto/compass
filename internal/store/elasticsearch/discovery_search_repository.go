@@ -387,7 +387,7 @@ func (repo *DiscoveryRepository) buildGroupQuery(cfg asset.GroupConfig) (*string
 				FetchSourceContext(
 					elastic.NewFetchSourceContext(true).
 						Include(includedFields...),
-				).Size(1),
+				),
 			))
 
 	body, err := elastic.NewSearchRequest().
