@@ -308,7 +308,7 @@ func TestSuggest(t *testing.T) {
 
 			logger := log.NewNoop()
 			mockUserSvc := new(mocks.UserService)
-			mockSvc := new(mocks.AssetService)
+			mockSvc := mocks.NewAssetService(t)
 			if tc.Setup != nil {
 				tc.Setup(ctx, mockSvc)
 			}
@@ -481,7 +481,7 @@ func TestGroupAssets(t *testing.T) {
 
 			logger := log.NewNoop()
 			mockUserSvc := new(mocks.UserService)
-			mockSvc := new(mocks.AssetService)
+			mockSvc := mocks.NewAssetService(t)
 			if tc.Setup != nil {
 				tc.Setup(ctx, mockSvc)
 			}
