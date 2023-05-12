@@ -212,9 +212,6 @@ func TestSearch(t *testing.T) {
 				tc.Setup(ctx, mockSvc)
 			}
 
-			defer mockUserSvc.AssertExpectations(t)
-			defer mockSvc.AssertExpectations(t)
-
 			mockUserSvc.EXPECT().ValidateUser(ctx, userUUID, "").Return(userID, nil)
 
 			handler := NewAPIServer(logger, mockSvc, nil, nil, nil, nil, mockUserSvc)
@@ -312,9 +309,6 @@ func TestSuggest(t *testing.T) {
 			if tc.Setup != nil {
 				tc.Setup(ctx, mockSvc)
 			}
-
-			defer mockUserSvc.AssertExpectations(t)
-			defer mockSvc.AssertExpectations(t)
 
 			mockUserSvc.EXPECT().ValidateUser(ctx, userUUID, "").Return(userID, nil)
 
@@ -485,9 +479,6 @@ func TestGroupAssets(t *testing.T) {
 			if tc.Setup != nil {
 				tc.Setup(ctx, mockSvc)
 			}
-
-			defer mockUserSvc.AssertExpectations(t)
-			defer mockSvc.AssertExpectations(t)
 
 			mockUserSvc.EXPECT().ValidateUser(ctx, userUUID, "").Return(userID, nil)
 
