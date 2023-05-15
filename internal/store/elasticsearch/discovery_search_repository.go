@@ -113,6 +113,7 @@ func (repo *DiscoveryRepository) buildQuery(cfg asset.SearchConfig) (io.Reader, 
 	}
 	query = repo.buildFilterMatchQueries(query, cfg.Queries)
 	query = repo.buildFunctionScoreQuery(query, cfg.RankBy, cfg.Text)
+	highLight := repo.buildHighLightQuery(cfg)
 
 	src, err := query.Source()
 	if err != nil {
@@ -124,6 +125,15 @@ func (repo *DiscoveryRepository) buildQuery(cfg asset.SearchConfig) (io.Reader, 
 		MinScore: defaultMinScore,
 		Query:    src,
 	}
+
+	if highLight != nil {
+		highlightQuerySrc, err := highLight.Source()
+		if err != nil {
+			return nil, err
+		}
+		q.HighLight = highlightQuerySrc
+	}
+
 	return payload, json.NewEncoder(payload).Encode(q)
 }
 
@@ -260,6 +270,13 @@ func (repo *DiscoveryRepository) buildFunctionScoreQuery(query elastic.Query, ra
 	return fsQuery
 }
 
+func (repo *DiscoveryRepository) buildHighLightQuery(cfg asset.SearchConfig) *elastic.Highlight {
+	if cfg.SearchFlags != nil && cfg.SearchFlags.EnableHighlight {
+		return elastic.NewHighlight().Field("*")
+	}
+	return nil
+}
+
 func (repo *DiscoveryRepository) toSearchResults(hits []searchHit) []asset.SearchResult {
 	results := make([]asset.SearchResult, len(hits))
 	for i, hit := range hits {
@@ -267,6 +284,10 @@ func (repo *DiscoveryRepository) toSearchResults(hits []searchHit) []asset.Searc
 		id := r.ID
 		if id == "" { // this is for backward compatibility for asset without ID
 			id = r.URN
+		}
+
+		if r.Data != nil {
+			r.Data["highlight"] = hit.HighLight
 		}
 		results[i] = asset.SearchResult{
 			Type:        r.Type.String(),
@@ -294,7 +315,6 @@ func (repo *DiscoveryRepository) toSuggestions(response searchResponse) (results
 			results = append(results, option.Text)
 		}
 	}
-
 	return
 }
 func (repo *DiscoveryRepository) GroupAssets(ctx context.Context, cfg asset.GroupConfig) ([]asset.GroupResult, error) {

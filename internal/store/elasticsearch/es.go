@@ -30,13 +30,19 @@ type Config struct {
 // since github.com/olivere/elastic generates the
 // <Q> in {"query": <Q>}
 type searchQuery struct {
-	Query    interface{} `json:"query"`
-	MinScore float32     `json:"min_score"`
+	Query     interface{} `json:"query"`
+	MinScore  float32     `json:"min_score"`
+	HighLight interface{} `json:"highlight,omitempty"`
 }
 
 type searchHit struct {
-	Index  string      `json:"_index"`
-	Source asset.Asset `json:"_source"`
+	Index     string                 `json:"_index"`
+	Source    asset.Asset            `json:"_source"`
+	HighLight map[string]interface{} `json:"highlight"`
+}
+
+type HighLight struct {
+	Fields map[string]interface{} `json:"fields"`
 }
 
 type searchResponse struct {
