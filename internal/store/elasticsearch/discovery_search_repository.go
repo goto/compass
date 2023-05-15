@@ -112,7 +112,7 @@ func (repo *DiscoveryRepository) buildQuery(cfg asset.SearchConfig) (io.Reader, 
 		query = elastic.NewBoolQuery().Should(query).Filter(filterQueries...)
 	}
 	query = repo.buildFilterMatchQueries(query, cfg.Queries)
-	query = repo.buildFunctionScoreQuery(query, cfg.RankBy)
+	query = repo.buildFunctionScoreQuery(query, cfg.RankBy, cfg.Text)
 
 	src, err := query.Source()
 	if err != nil {
@@ -237,7 +237,7 @@ func (repo *DiscoveryRepository) buildFilterExistsQueries(fields []string) ([]el
 	return filterQueries, true
 }
 
-func (repo *DiscoveryRepository) buildFunctionScoreQuery(query elastic.Query, rankBy string) elastic.Query {
+func (repo *DiscoveryRepository) buildFunctionScoreQuery(query elastic.Query, rankBy string, text string) elastic.Query {
 	if rankBy == "" {
 		return query
 	}
@@ -249,22 +249,25 @@ func (repo *DiscoveryRepository) buildFunctionScoreQuery(query elastic.Query, ra
 		Weight(1.0)
 
 	fsQuery := elastic.NewFunctionScoreQuery().
-		ScoreMode(defaultFunctionScoreQueryScoreMode).
+		Add(
+			elastic.NewTermQuery("name.keyword", text),
+			elastic.NewWeightFactorFunction(2),
+		).
 		AddScoreFunc(factorFunc).
-		Query(query)
-
+		Query(query).
+		ScoreMode(defaultFunctionScoreQueryScoreMode)
 	return fsQuery
 }
 
 func (repo *DiscoveryRepository) toSearchResults(hits []searchHit) []asset.SearchResult {
-	results := []asset.SearchResult{}
-	for _, hit := range hits {
+	results := make([]asset.SearchResult, len(hits))
+	for idx, hit := range hits {
 		r := hit.Source
 		id := r.ID
 		if id == "" { // this is for backward compatibility for asset without ID
 			id = r.URN
 		}
-		results = append(results, asset.SearchResult{
+		results[idx] = asset.SearchResult{
 			Type:        r.Type.String(),
 			ID:          id,
 			URN:         r.URN,
@@ -273,7 +276,7 @@ func (repo *DiscoveryRepository) toSearchResults(hits []searchHit) []asset.Searc
 			Service:     r.Service,
 			Labels:      r.Labels,
 			Data:        r.Data,
-		})
+		}
 	}
 	return results
 }
