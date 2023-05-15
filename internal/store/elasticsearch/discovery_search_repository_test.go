@@ -65,135 +65,135 @@ func TestSearcherSearch(t *testing.T) {
 			MatchTotalRows bool
 		}
 		tests := []searchTest{
-			//{
-			//	Description: "should fetch assets which has text in any of its fields",
-			//	Config: asset.SearchConfig{
-			//		Text: "topic",
-			//	},
-			//	Expected: []expectedRow{
-			//		{Type: "topic", AssetID: "consumer-topic"},
-			//		{Type: "topic", AssetID: "order-topic"},
-			//		{Type: "topic", AssetID: "purchase-topic"},
-			//		{Type: "topic", AssetID: "consumer-mq-2"},
-			//		{Type: "topic", AssetID: "transaction"},
-			//	},
-			//},
-			//{
-			//	Description: "should enable fuzzy search",
-			//	Config: asset.SearchConfig{
-			//		Text: "tpic",
-			//	},
-			//	Expected: []expectedRow{
-			//		{Type: "topic", AssetID: "consumer-topic"},
-			//		{Type: "topic", AssetID: "order-topic"},
-			//		{Type: "topic", AssetID: "purchase-topic"},
-			//		{Type: "topic", AssetID: "consumer-mq-2"},
-			//		{Type: "topic", AssetID: "transaction"},
-			//	},
-			//},
-			//{
-			//	Description: "should put more weight on id fields",
-			//	Config: asset.SearchConfig{
-			//		Text: "invoice",
-			//	},
-			//	Expected: []expectedRow{
-			//		{Type: "table", AssetID: "us1-apple-invoice"},
-			//		{Type: "table", AssetID: "au2-microsoft-invoice"},
-			//		{Type: "topic", AssetID: "transaction"},
-			//	},
-			//},
-			//{
-			//	Description: "should filter by service if given",
-			//	Config: asset.SearchConfig{
-			//		Text: "invoice",
-			//		Filters: map[string][]string{
-			//			"service": {"rabbitmq", "postgres"},
-			//		},
-			//	},
-			//	Expected: []expectedRow{
-			//		{Type: "table", AssetID: "au2-microsoft-invoice"},
-			//		{Type: "topic", AssetID: "transaction"},
-			//	},
-			//},
-			//{
-			//	Description: "should match documents based on filter criteria",
-			//	Config: asset.SearchConfig{
-			//		Text: "topic",
-			//		Filters: map[string][]string{
-			//			"data.company": {"gotocompany"},
-			//		},
-			//	},
-			//	Expected: []expectedRow{
-			//		{Type: "topic", AssetID: "consumer-topic"},
-			//		{Type: "topic", AssetID: "order-topic"},
-			//		{Type: "topic", AssetID: "consumer-mq-2"},
-			//		{Type: "topic", AssetID: "transaction"},
-			//	},
-			//},
-			//{
-			//	Description: "should not return assets without fields specified in filters",
-			//	Config: asset.SearchConfig{
-			//		Text: "invoice topic",
-			//		Filters: map[string][]string{
-			//			"data.country":     {"id"},
-			//			"data.environment": {"production"},
-			//			"data.company":     {"gotocompany"},
-			//		},
-			//	},
-			//	Expected: []expectedRow{
-			//		{Type: "topic", AssetID: "consumer-topic"},
-			//		{Type: "topic", AssetID: "consumer-mq-2"},
-			//	},
-			//},
-			//{
-			//	Description: "should return 'consumer-topic' if filter owner email with 'john.doe@email.com'",
-			//	Config: asset.SearchConfig{
-			//		Text: "topic",
-			//		Filters: map[string][]string{
-			//			"owners.email": {"john.doe@email.com"},
-			//		},
-			//	},
-			//	Expected: []expectedRow{
-			//		{Type: "topic", AssetID: "consumer-topic"},
-			//	},
-			//},
-			//{
-			//	Description: "should return a descendingly sorted based on usage count in search results if rank by usage in the config",
-			//	Config: asset.SearchConfig{
-			//		Text:   "bigquery",
-			//		RankBy: "data.profile.usage_count",
-			//	},
-			//	Expected: []expectedRow{
-			//		{Type: "table", AssetID: "bigquery::gcpproject/dataset/tablename-common"},
-			//		{Type: "table", AssetID: "bigquery::gcpproject/dataset/tablename-mid"},
-			//		{Type: "table", AssetID: "bigquery::gcpproject/dataset/tablename-1"},
-			//	},
-			//},
-			//{
-			//	Description: "should return consumer-topic if search by query description field with text 'rabbitmq' and owners name 'johndoe'",
-			//	Config: asset.SearchConfig{
-			//		Text: "consumer",
-			//		Queries: map[string]string{
-			//			"description":  "rabbitmq",
-			//			"owners.email": "john.doe",
-			//		},
-			//	},
-			//	Expected: []expectedRow{
-			//		{Type: "topic", AssetID: "consumer-topic"},
-			//	},
-			//},
-			//{
-			//	Description: "should return 'bigquery::gcpproject/dataset/tablename-common' resource on top if search by query table column name field with text 'tablename-common-column1'",
-			//	Config: asset.SearchConfig{
-			//		Text: "tablename",
-			//		Queries: map[string]string{
-			//			"data.schema.columns.name": "common",
-			//		},
-			//	},
-			//	Expected: []expectedRow{
-			//		{Type: "table", AssetID: "bigquery::gcpproject/dataset/tablename-common"},
-			//	},
-			//},
+			{
+				Description: "should fetch assets which has text in any of its fields",
+				Config: asset.SearchConfig{
+					Text: "topic",
+				},
+				Expected: []expectedRow{
+					{Type: "topic", AssetID: "consumer-topic"},
+					{Type: "topic", AssetID: "order-topic"},
+					{Type: "topic", AssetID: "purchase-topic"},
+					{Type: "topic", AssetID: "consumer-mq-2"},
+					{Type: "topic", AssetID: "transaction"},
+				},
+			},
+			{
+				Description: "should enable fuzzy search",
+				Config: asset.SearchConfig{
+					Text: "tpic",
+				},
+				Expected: []expectedRow{
+					{Type: "topic", AssetID: "consumer-topic"},
+					{Type: "topic", AssetID: "order-topic"},
+					{Type: "topic", AssetID: "purchase-topic"},
+					{Type: "topic", AssetID: "consumer-mq-2"},
+					{Type: "topic", AssetID: "transaction"},
+				},
+			},
+			{
+				Description: "should put more weight on id fields",
+				Config: asset.SearchConfig{
+					Text: "invoice",
+				},
+				Expected: []expectedRow{
+					{Type: "table", AssetID: "us1-apple-invoice"},
+					{Type: "table", AssetID: "au2-microsoft-invoice"},
+					{Type: "topic", AssetID: "transaction"},
+				},
+			},
+			{
+				Description: "should filter by service if given",
+				Config: asset.SearchConfig{
+					Text: "invoice",
+					Filters: map[string][]string{
+						"service": {"rabbitmq", "postgres"},
+					},
+				},
+				Expected: []expectedRow{
+					{Type: "table", AssetID: "au2-microsoft-invoice"},
+					{Type: "topic", AssetID: "transaction"},
+				},
+			},
+			{
+				Description: "should match documents based on filter criteria",
+				Config: asset.SearchConfig{
+					Text: "topic",
+					Filters: map[string][]string{
+						"data.company": {"gotocompany"},
+					},
+				},
+				Expected: []expectedRow{
+					{Type: "topic", AssetID: "consumer-topic"},
+					{Type: "topic", AssetID: "order-topic"},
+					{Type: "topic", AssetID: "consumer-mq-2"},
+					{Type: "topic", AssetID: "transaction"},
+				},
+			},
+			{
+				Description: "should not return assets without fields specified in filters",
+				Config: asset.SearchConfig{
+					Text: "invoice topic",
+					Filters: map[string][]string{
+						"data.country":     {"id"},
+						"data.environment": {"production"},
+						"data.company":     {"gotocompany"},
+					},
+				},
+				Expected: []expectedRow{
+					{Type: "topic", AssetID: "consumer-topic"},
+					{Type: "topic", AssetID: "consumer-mq-2"},
+				},
+			},
+			{
+				Description: "should return 'consumer-topic' if filter owner email with 'john.doe@email.com'",
+				Config: asset.SearchConfig{
+					Text: "topic",
+					Filters: map[string][]string{
+						"owners.email": {"john.doe@email.com"},
+					},
+				},
+				Expected: []expectedRow{
+					{Type: "topic", AssetID: "consumer-topic"},
+				},
+			},
+			{
+				Description: "should return a descendingly sorted based on usage count in search results if rank by usage in the config",
+				Config: asset.SearchConfig{
+					Text:   "bigquery",
+					RankBy: "data.profile.usage_count",
+				},
+				Expected: []expectedRow{
+					{Type: "table", AssetID: "bigquery::gcpproject/dataset/tablename-common"},
+					{Type: "table", AssetID: "bigquery::gcpproject/dataset/tablename-mid"},
+					{Type: "table", AssetID: "bigquery::gcpproject/dataset/tablename-1"},
+				},
+			},
+			{
+				Description: "should return consumer-topic if search by query description field with text 'rabbitmq' and owners name 'johndoe'",
+				Config: asset.SearchConfig{
+					Text: "consumer",
+					Queries: map[string]string{
+						"description":  "rabbitmq",
+						"owners.email": "john.doe",
+					},
+				},
+				Expected: []expectedRow{
+					{Type: "topic", AssetID: "consumer-topic"},
+				},
+			},
+			{
+				Description: "should return 'bigquery::gcpproject/dataset/tablename-common' resource on top if search by query table column name field with text 'tablename-common-column1'",
+				Config: asset.SearchConfig{
+					Text: "tablename",
+					Queries: map[string]string{
+						"data.schema.columns.name": "common",
+					},
+				},
+				Expected: []expectedRow{
+					{Type: "table", AssetID: "bigquery::gcpproject/dataset/tablename-common"},
+				},
+			},
 			{
 				Description: "should return 'bigquery::gcpproject/dataset/tablename-common' resource on top if searched for text 'tablename-common'",
 				Config: asset.SearchConfig{
