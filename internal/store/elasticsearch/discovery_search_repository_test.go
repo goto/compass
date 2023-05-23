@@ -167,6 +167,7 @@ func TestSearcherSearch(t *testing.T) {
 					{Type: "table", AssetID: "bigquery::gcpproject/dataset/tablename-common"},
 					{Type: "table", AssetID: "bigquery::gcpproject/dataset/tablename-mid"},
 					{Type: "table", AssetID: "bigquery::gcpproject/dataset/tablename-1"},
+					{Type: "table", AssetID: "bigquery::gcpproject/dataset/tablename-common-test"},
 				},
 			},
 			{
@@ -192,17 +193,20 @@ func TestSearcherSearch(t *testing.T) {
 				},
 				Expected: []expectedRow{
 					{Type: "table", AssetID: "bigquery::gcpproject/dataset/tablename-common"},
+					{Type: "table", AssetID: "bigquery::gcpproject/dataset/tablename-common-test"},
 				},
 			},
 			{
-				Description: "should return 'bigquery::gcpproject/dataset/tablename-common' resource on top if searched for text 'tablename-common'",
+				Description: "should return 'bigquery::gcpproject/dataset/tablename-common-test' resource on top if searched for text 'tablename-common-test'",
 				Config: asset.SearchConfig{
-					Text: "tablename-common",
+					Text:   "tablename-common-test",
+					RankBy: "data.profile.usage_count",
 				},
 				Expected: []expectedRow{
+					{Type: "table", AssetID: "bigquery::gcpproject/dataset/tablename-common-test"},
 					{Type: "table", AssetID: "bigquery::gcpproject/dataset/tablename-common"},
-					{Type: "table", AssetID: "bigquery::gcpproject/dataset/tablename-1"},
 					{Type: "table", AssetID: "bigquery::gcpproject/dataset/tablename-mid"},
+					{Type: "table", AssetID: "bigquery::gcpproject/dataset/tablename-1"},
 				},
 			},
 		}

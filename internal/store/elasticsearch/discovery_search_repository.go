@@ -238,36 +238,37 @@ func (repo *DiscoveryRepository) buildFilterExistsQueries(fields []string) ([]el
 }
 
 func (repo *DiscoveryRepository) buildFunctionScoreQuery(query elastic.Query, rankBy string, text string) elastic.Query {
-	if rankBy == "" {
-		return query
-	}
 
-	factorFunc := elastic.NewFieldValueFactorFunction().
-		Field(rankBy).
-		Modifier("log1p").
-		Missing(1.0).
-		Weight(1.0)
-
+	// Added exact match term query here so that exact match gets higher priority.
 	fsQuery := elastic.NewFunctionScoreQuery().
 		Add(
 			elastic.NewTermQuery("name.keyword", text),
 			elastic.NewWeightFactorFunction(2),
-		).
-		AddScoreFunc(factorFunc).
-		Query(query).
-		ScoreMode(defaultFunctionScoreQueryScoreMode)
+		)
+
+	if rankBy != "" {
+		fsQuery.AddScoreFunc(
+			elastic.NewFieldValueFactorFunction().
+				Field(rankBy).
+				Modifier("log1p").
+				Missing(1.0).
+				Weight(1.0),
+		)
+	}
+
+	fsQuery.Query(query).ScoreMode(defaultFunctionScoreQueryScoreMode)
 	return fsQuery
 }
 
 func (repo *DiscoveryRepository) toSearchResults(hits []searchHit) []asset.SearchResult {
 	results := make([]asset.SearchResult, len(hits))
-	for idx, hit := range hits {
+	for i, hit := range hits {
 		r := hit.Source
 		id := r.ID
 		if id == "" { // this is for backward compatibility for asset without ID
 			id = r.URN
 		}
-		results[idx] = asset.SearchResult{
+		results[i] = asset.SearchResult{
 			Type:        r.Type.String(),
 			ID:          id,
 			URN:         r.URN,
