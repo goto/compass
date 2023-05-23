@@ -338,6 +338,7 @@ func TestGroupAssets(t *testing.T) {
 
 				Config: asset.GroupConfig{
 					GroupBy: []string{"type", "name"},
+					Size:    15,
 				},
 				Expected: []asset.GroupResult{
 					{
@@ -366,6 +367,13 @@ func TestGroupAssets(t *testing.T) {
 							{Name: "name", Value: "tablename-common"},
 						},
 						Assets: []asset.Asset{{Name: "tablename-common"}},
+					},
+					{
+						Fields: []asset.GroupField{
+							{Name: "type", Value: "table"},
+							{Name: "name", Value: "tablename-common-test"},
+						},
+						Assets: []asset.Asset{{Name: "tablename-common-test"}},
 					},
 					{
 						Fields: []asset.GroupField{
@@ -425,7 +433,7 @@ func TestGroupAssets(t *testing.T) {
 						Assets: []asset.Asset{
 							{Name: "tablename-1"},
 							{Name: "tablename-common"},
-							{Name: "tablename-mid"},
+							{Name: "tablename-common-test"},
 						},
 					},
 					{
