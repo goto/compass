@@ -36,13 +36,9 @@ type searchQuery struct {
 }
 
 type searchHit struct {
-	Index     string                 `json:"_index"`
-	Source    asset.Asset            `json:"_source"`
-	HighLight map[string]interface{} `json:"highlight"`
-}
-
-type HighLight struct {
-	Fields map[string]interface{} `json:"fields"`
+	Index     string              `json:"_index"`
+	Source    asset.Asset         `json:"_source"`
+	HighLight map[string][]string `json:"highlight"`
 }
 
 type searchResponse struct {

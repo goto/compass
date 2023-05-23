@@ -286,7 +286,7 @@ func (repo *DiscoveryRepository) toSearchResults(hits []searchHit) []asset.Searc
 			id = r.URN
 		}
 
-		if r.Data != nil {
+		if r.Data != nil && hit.HighLight != nil {
 			r.Data["highlight"] = hit.HighLight
 		}
 		results[i] = asset.SearchResult{
