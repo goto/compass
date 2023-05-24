@@ -106,13 +106,12 @@ func (repo *DiscoveryRepository) Suggest(ctx context.Context, config asset.Searc
 
 func (repo *DiscoveryRepository) buildQuery(cfg asset.SearchConfig) (io.Reader, error) {
 	var query elastic.Query
+	boolQuery := elastic.NewBoolQuery()
 
-	query = repo.buildTextQuery(cfg.Text)
-	if filterQueries, ok := repo.buildFilterTermQueries(cfg.Filters); ok {
-		query = elastic.NewBoolQuery().Should(query).Filter(filterQueries...)
-	}
-	query = repo.buildFilterMatchQueries(query, cfg.Queries)
-	query = repo.buildFunctionScoreQuery(query, cfg.RankBy, cfg.Text)
+	repo.buildTextQuery(boolQuery, cfg.Text)
+	repo.buildFilterTermQueries(boolQuery, cfg.Filters)
+	repo.buildFilterMatchQueries(boolQuery, cfg.Queries)
+	query = repo.buildFunctionScoreQuery(boolQuery, cfg.RankBy, cfg.Text)
 	highLight := repo.buildHighLightQuery(cfg)
 
 	body, err := elastic.NewSearchRequest().
@@ -149,13 +148,13 @@ func (repo *DiscoveryRepository) buildSuggestQuery(cfg asset.SearchConfig) (io.R
 	return payload, err
 }
 
-func (repo *DiscoveryRepository) buildTextQuery(text string) elastic.Query {
+func (repo *DiscoveryRepository) buildTextQuery(query *elastic.BoolQuery, text string) {
 	boostedFields := []string{
 		"urn^10",
 		"name^5",
 	}
 
-	return elastic.NewBoolQuery().
+	query.
 		Should(
 			elastic.
 				NewMultiMatchQuery(
@@ -176,9 +175,9 @@ func (repo *DiscoveryRepository) buildTextQuery(text string) elastic.Query {
 		)
 }
 
-func (repo *DiscoveryRepository) buildFilterMatchQueries(query elastic.Query, queries map[string]string) elastic.Query {
+func (repo *DiscoveryRepository) buildFilterMatchQueries(query *elastic.BoolQuery, queries map[string]string) {
 	if len(queries) == 0 {
-		return query
+		return
 	}
 
 	esQueries := []elastic.Query{}
@@ -189,15 +188,13 @@ func (repo *DiscoveryRepository) buildFilterMatchQueries(query elastic.Query, qu
 				Fuzziness("AUTO"))
 	}
 
-	return elastic.NewBoolQuery().
-		Should(query).
-		Filter(esQueries...)
+	query.Filter(esQueries...)
 }
 
 //
-func (repo *DiscoveryRepository) buildFilterTermQueries(filters map[string][]string) ([]elastic.Query, bool) {
+func (repo *DiscoveryRepository) buildFilterTermQueries(boolQuery *elastic.BoolQuery, filters map[string][]string) {
 	if len(filters) == 0 {
-		return nil, false
+		return
 	}
 
 	var filterQueries []elastic.Query
@@ -218,12 +215,12 @@ func (repo *DiscoveryRepository) buildFilterTermQueries(filters map[string][]str
 		)
 	}
 
-	return filterQueries, true
+	boolQuery.Filter(filterQueries...)
 }
 
-func (repo *DiscoveryRepository) buildFilterExistsQueries(fields []string) ([]elastic.Query, bool) {
+func (repo *DiscoveryRepository) buildFilterExistsQueries(boolQuery *elastic.BoolQuery, fields []string) {
 	if len(fields) == 0 {
-		return nil, false
+		return
 	}
 
 	var filterQueries []elastic.Query
@@ -234,7 +231,7 @@ func (repo *DiscoveryRepository) buildFilterExistsQueries(fields []string) ([]el
 		)
 	}
 
-	return filterQueries, true
+	boolQuery.Filter(filterQueries...)
 }
 
 func (repo *DiscoveryRepository) buildFunctionScoreQuery(query elastic.Query, rankBy string, text string) elastic.Query {
@@ -373,14 +370,10 @@ func (repo *DiscoveryRepository) toGroupResults(buckets []aggregationBucket) []a
 }
 
 func (repo *DiscoveryRepository) buildGroupQuery(cfg asset.GroupConfig) (*strings.Reader, error) {
+	boolQuery := elastic.NewBoolQuery()
 	// This code takes care of creating filter term queries from the input filters mentioned in request.
-	var filterQueries []elastic.Query
-	if filterExistsQueries, ok := repo.buildFilterExistsQueries(cfg.GroupBy); ok {
-		filterQueries = append(filterQueries, filterExistsQueries...)
-	}
-	if filterTermQueries, ok := repo.buildFilterTermQueries(cfg.Filters); ok {
-		filterQueries = append(filterQueries, filterTermQueries...)
-	}
+	repo.buildFilterExistsQueries(boolQuery, cfg.GroupBy)
+	repo.buildFilterTermQueries(boolQuery, cfg.Filters)
 
 	size := cfg.Size
 	if size <= 0 {
@@ -411,7 +404,7 @@ func (repo *DiscoveryRepository) buildGroupQuery(cfg asset.GroupConfig) (*string
 			))
 
 	body, err := elastic.NewSearchRequest().
-		Query(elastic.NewBoolQuery().Filter(filterQueries...)).
+		Query(boolQuery).
 		Aggregation("composite-group", compositeAggregation).
 		Body()
 	if err != nil {
