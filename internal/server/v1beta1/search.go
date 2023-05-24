@@ -23,12 +23,12 @@ func (server *APIServer) SearchAssets(ctx context.Context, req *compassv1beta1.S
 	}
 
 	cfg := asset.SearchConfig{
-		Text:        text,
-		MaxResults:  int(req.GetSize()),
-		Filters:     filterConfigFromValues(req.GetFilter()),
-		RankBy:      req.GetRankby(),
-		Queries:     req.GetQuery(),
-		SearchFlags: getSearchFlagsFromFlags(req.GetFlags()),
+		Text:       text,
+		MaxResults: int(req.GetSize()),
+		Filters:    filterConfigFromValues(req.GetFilter()),
+		RankBy:     req.GetRankby(),
+		Queries:    req.GetQuery(),
+		Flags:      getSearchFlagsFromFlags(req.GetFlags()),
 	}
 
 	results, err := server.assetService.SearchAssets(ctx, cfg)
@@ -137,12 +137,8 @@ func filterConfigFromValues(fltMap map[string]string) map[string][]string {
 	return filter
 }
 
-func getSearchFlagsFromFlags(inputFlags *compassv1beta1.SearchFlags) *asset.SearchFlags {
-	if inputFlags != nil {
-		return &asset.SearchFlags{
-			EnableHighlight: inputFlags.EnableHighlight,
-		}
-	} else {
-		return nil
+func getSearchFlagsFromFlags(inputFlags *compassv1beta1.SearchFlags) asset.SearchFlags {
+	return asset.SearchFlags{
+		EnableHighlight: inputFlags.GetEnableHighlight(),
 	}
 }

@@ -26,19 +26,10 @@ type Config struct {
 	Brokers string `mapstructure:"brokers" default:"http://localhost:9200"`
 }
 
-// used as a utility for generating request payload
-// since github.com/olivere/elastic generates the
-// <Q> in {"query": <Q>}
-type searchQuery struct {
-	Query     interface{} `json:"query"`
-	MinScore  float32     `json:"min_score"`
-	HighLight interface{} `json:"highlight,omitempty"`
-}
-
 type searchHit struct {
-	Index     string              `json:"_index"`
-	Source    asset.Asset         `json:"_source"`
-	HighLight map[string][]string `json:"highlight"`
+	Index     string                 `json:"_index"`
+	Source    asset.Asset            `json:"_source"`
+	HighLight map[string]interface{} `json:"highlight"`
 }
 
 type searchResponse struct {

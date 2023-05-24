@@ -115,26 +115,16 @@ func (repo *DiscoveryRepository) buildQuery(cfg asset.SearchConfig) (io.Reader, 
 	query = repo.buildFunctionScoreQuery(query, cfg.RankBy, cfg.Text)
 	highLight := repo.buildHighLightQuery(cfg)
 
-	src, err := query.Source()
+	body, err := elastic.NewSearchRequest().
+		Query(query).
+		Highlight(highLight).
+		MinScore(defaultMinScore).
+		Body()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("build query: new search request: %w", err)
 	}
 
-	payload := new(bytes.Buffer)
-	q := &searchQuery{
-		MinScore: defaultMinScore,
-		Query:    src,
-	}
-
-	if highLight != nil {
-		highlightQuerySrc, err := highLight.Source()
-		if err != nil {
-			return nil, err
-		}
-		q.HighLight = highlightQuerySrc
-	}
-
-	return payload, json.NewEncoder(payload).Encode(q)
+	return strings.NewReader(body), nil
 }
 
 func (repo *DiscoveryRepository) buildSuggestQuery(cfg asset.SearchConfig) (io.Reader, error) {
@@ -271,7 +261,7 @@ func (repo *DiscoveryRepository) buildFunctionScoreQuery(query elastic.Query, ra
 }
 
 func (repo *DiscoveryRepository) buildHighLightQuery(cfg asset.SearchConfig) *elastic.Highlight {
-	if cfg.SearchFlags != nil && cfg.SearchFlags.EnableHighlight {
+	if cfg.Flags.EnableHighlight {
 		return elastic.NewHighlight().Field("*")
 	}
 	return nil
@@ -286,8 +276,14 @@ func (repo *DiscoveryRepository) toSearchResults(hits []searchHit) []asset.Searc
 			id = r.URN
 		}
 
-		if r.Data != nil && hit.HighLight != nil {
-			r.Data["highlight"] = hit.HighLight
+		data := r.Data
+
+		if data != nil && hit.HighLight != nil {
+			data["_highlight"] = hit.HighLight
+		} else if data == nil && hit.HighLight != nil {
+			data = map[string]interface{}{
+				"_highlight": hit.HighLight,
+			}
 		}
 		results[i] = asset.SearchResult{
 			Type:        r.Type.String(),
@@ -297,7 +293,7 @@ func (repo *DiscoveryRepository) toSearchResults(hits []searchHit) []asset.Searc
 			Title:       r.Name,
 			Service:     r.Service,
 			Labels:      r.Labels,
-			Data:        r.Data,
+			Data:        data,
 		}
 	}
 	return results

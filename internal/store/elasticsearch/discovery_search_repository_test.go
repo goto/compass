@@ -216,7 +216,7 @@ func TestSearcherSearch(t *testing.T) {
 				Config: asset.SearchConfig{
 					Text:   "order",
 					RankBy: "data.profile.usage_count",
-					SearchFlags: &asset.SearchFlags{
+					Flags: asset.SearchFlags{
 						EnableHighlight: true,
 					},
 				},
@@ -226,13 +226,12 @@ func TestSearcherSearch(t *testing.T) {
 						Type:    "topic",
 						AssetID: "order-topic",
 						Data: map[string]interface{}{
-							"highlight": map[string][]string{
-								"urn":              {"<em>order</em>-topic"},
-								"data.topic_name":  {"<em>order</em>-topic"},
-								"name":             {"<em>order</em>-topic"},
-								"description":      {"Topic for each submitted <em>order</em>"},
-								"id":               {"<em>order</em>-topic"},
-								"data.description": {"Topic for each submitted <em>order</em>"},
+							"_highlight": map[string]interface{}{"urn": []interface{}{"<em>order</em>-topic"},
+								"data.topic_name":  []interface{}{"<em>order</em>-topic"},
+								"name":             []interface{}{"<em>order</em>-topic"},
+								"description":      []interface{}{"Topic for each submitted <em>order</em>"},
+								"id":               []interface{}{"<em>order</em>-topic"},
+								"data.description": []interface{}{"Topic for each submitted <em>order</em>"},
 							},
 						},
 					},
@@ -248,11 +247,8 @@ func TestSearcherSearch(t *testing.T) {
 				for i, res := range test.Expected {
 					assert.Equal(t, res.Type, results[i].Type)
 					assert.Equal(t, res.AssetID, results[i].ID)
-					if test.Config.SearchFlags != nil && test.Config.SearchFlags.EnableHighlight {
-						actualHighlightMap := results[i].Data["highlight"].(map[string][]string)
-						for key, value := range res.Data["highlight"].(map[string][]string) {
-							assert.Equal(t, value, actualHighlightMap[key])
-						}
+					if test.Config.Flags.EnableHighlight {
+						assert.Equal(t, res.Data["_highlight"], results[i].Data["_highlight"])
 					}
 				}
 			})

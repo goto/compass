@@ -61,8 +61,8 @@ type SearchConfig struct {
 	// Queries is a param to search a resource based on asset's fields
 	Queries map[string]string
 
-	//SearchFlags flags to control the search behavior (e.g. column level search, disable fuzzy, etc)
-	SearchFlags *SearchFlags
+	// Flags flags to control the search behavior (e.g. column level search, disable fuzzy, etc)
+	Flags SearchFlags
 }
 
 // SearchResult represents an item/result in a list of search results
