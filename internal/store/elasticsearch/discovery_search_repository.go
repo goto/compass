@@ -159,6 +159,10 @@ func (repo *DiscoveryRepository) buildTextQuery(q *elastic.BoolQuery, cfg asset.
 		q.Should(
 			elastic.NewMultiMatchQuery(cfg.Text, boostedFields...),
 			elastic.NewMultiMatchQuery(cfg.Text),
+			elastic.NewMultiMatchQuery(cfg.Text, boostedFields...).
+				Operator("and"),
+			elastic.NewMatchPhraseQuery("message", cfg.Text),
+			elastic.NewMultiMatchQuery(cfg.Text),
 		)
 		return
 	}
@@ -169,6 +173,8 @@ func (repo *DiscoveryRepository) buildTextQuery(q *elastic.BoolQuery, cfg asset.
 			Fuzziness("AUTO"),
 		elastic.NewMultiMatchQuery(cfg.Text).
 			Fuzziness("AUTO"),
+		elastic.NewMultiMatchQuery(cfg.Text, boostedFields...).
+			Operator("and"),
 	)
 }
 
