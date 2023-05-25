@@ -66,6 +66,8 @@ type SearchConfig struct {
 
 	// Flags flags to control the search behavior (e.g. column level search, disable fuzzy, etc)
 	Flags SearchFlags
+
+	Offset int
 }
 
 // SearchResult represents an item/result in a list of search results
