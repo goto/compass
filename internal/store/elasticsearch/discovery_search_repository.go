@@ -157,7 +157,10 @@ func (repo *DiscoveryRepository) buildTextQuery(q *elastic.BoolQuery, cfg asset.
 
 	q.Should(
 		elastic.NewMultiMatchQuery(cfg.Text, boostedFields...),
-		elastic.NewMatchPhraseQuery("message", cfg.Text),
+		elastic.NewMultiMatchQuery(
+			cfg.Text,
+			boostedFields...,
+		).Type("phrase"),
 	)
 
 	if cfg.Flags.DisableFuzzy {
