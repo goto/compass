@@ -357,7 +357,7 @@
                         "filter_conditions": [
                             "WHERE t.column_5 = 'success' AND t.item_id = \"280481a2-2384-4b81-aa3e-214ac60b31db\" AND event_timestamp >= TIMESTAMP(\"2021-10-29\", \"UTC\") AND event_timestamp < TIMESTAMP(\"2021-11-22T02:01:06Z\")"
                         ],
-                        "usage_count": 10
+                        "usage_count": 1
                     },
                     "properties": {
                         "attributes": {
@@ -539,14 +539,14 @@
                                 "conditions": [
                                     "ON target.column_1 = source.column_1 and target.column_3 = source.column_3 and DATE(target.event_timestamp) = DATE(source.event_timestamp)"
                                 ],
-                                "count": 1,
+                                "count": 3,
                                 "urn": "bigquery::gcpproject/dataset/tablename-mid"
                             }
                         ],
                         "filter_conditions": [
                             "WHERE t.column_5 = 'success' AND t.item_id = \"280481a2-2384-4b81-aa3e-214ac60b31db\" AND event_timestamp >= TIMESTAMP(\"2021-10-29\", \"UTC\") AND event_timestamp < TIMESTAMP(\"2021-11-22T02:01:06Z\")"
                         ],
-                        "usage_count": 10
+                        "usage_count": 1
                     },
                     "properties": {
                         "attributes": {
@@ -595,7 +595,7 @@
                         ]
                     },
                     "resource": {
-                        "name": "abc-tablename-mid",
+                        "name": "abc-mid-test",
                         "service": "bigquery",
                         "urn": "bigquery::gcpproject/dataset/abc-tablename-mid"
                     }
@@ -644,7 +644,7 @@
                         "filter_conditions": [
                             "WHERE t.column_5 = 'success' AND t.item_id = \"280481a2-2384-4b81-aa3e-214ac60b31db\" AND event_timestamp >= TIMESTAMP(\"2021-10-29\", \"UTC\") AND event_timestamp < TIMESTAMP(\"2021-11-22T02:01:06Z\")"
                         ],
-                        "usage_count": 20
+                        "usage_count": 2
                     },
                     "properties": {
                         "attributes": {
