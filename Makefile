@@ -31,27 +31,22 @@ PROTON_COMMIT := "a6b2821e8ddd1127a63d3b376f860990d58931da"
 TOOLS_MOD_DIR = ./tools
 TOOLS_DIR = $(abspath ./.tools)
 
-$(TOOLS_DIR)/buf: $(TOOLS_MOD_DIR)/go.mod $(TOOLS_MOD_DIR)/go.sum $(TOOLS_MOD_DIR)/tools.go
+define build_tool
+$(TOOLS_DIR)/$(1): $(TOOLS_MOD_DIR)/go.mod $(TOOLS_MOD_DIR)/go.sum $(TOOLS_MOD_DIR)/tools.go
 	cd $(TOOLS_MOD_DIR) && \
-	go build -o $(TOOLS_DIR)/buf github.com/bufbuild/buf/cmd/buf
+	go build -o $(TOOLS_DIR)/$(1) $(2)
+endef
 
-$(TOOLS_DIR)/golangci-lint: $(TOOLS_MOD_DIR)/go.mod $(TOOLS_MOD_DIR)/go.sum $(TOOLS_MOD_DIR)/tools.go
-	cd $(TOOLS_MOD_DIR) && \
-	go build -o $(TOOLS_DIR)/golangci-lint github.com/golangci/golangci-lint/cmd/golangci-lint
-
-$(TOOLS_DIR)/mockery: $(TOOLS_MOD_DIR)/go.mod $(TOOLS_MOD_DIR)/go.sum $(TOOLS_MOD_DIR)/tools.go
-	cd $(TOOLS_MOD_DIR) && \
-	go build -o $(TOOLS_DIR)/mockery github.com/vektra/mockery/v2
-
-$(TOOLS_DIR)/gofumpt: $(TOOLS_MOD_DIR)/go.mod $(TOOLS_MOD_DIR)/go.sum $(TOOLS_MOD_DIR)/tools.go
-	cd $(TOOLS_MOD_DIR) && \
-	go build -o $(TOOLS_DIR)/gofumpt mvdan.cc/gofumpt
-
-$(TOOLS_DIR)/gci: $(TOOLS_MOD_DIR)/go.mod $(TOOLS_MOD_DIR)/go.sum $(TOOLS_MOD_DIR)/tools.go
-	cd $(TOOLS_MOD_DIR) && \
-	go build -o $(TOOLS_DIR)/gci github.com/daixiang0/gci
+$(eval $(call build_tool,buf,github.com/bufbuild/buf/cmd/buf))
+$(eval $(call build_tool,golangci-lint,github.com/golangci/golangci-lint/cmd/golangci-lint))
+$(eval $(call build_tool,mockery,github.com/vektra/mockery/v2))
+$(eval $(call build_tool,gofumpt,mvdan.cc/gofumpt))
+$(eval $(call build_tool,gci,github.com/daixiang0/gci))
 
 # DEV SETUP #############
+
+install: $(TOOLS_DIR)/buf $(TOOLS_DIR)/golangci-lint $(TOOLS_DIR)/mockery $(TOOLS_DIR)/gofumpt $(TOOLS_DIR)/gci
+	@echo "All tools installed successfully"
 
 imports: $(TOOLS_DIR)/gci ##@dev_setup does a goimports
 	$(TOOLS_DIR)/gci write ./ --section standard --section default --skip-generated
