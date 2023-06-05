@@ -31,14 +31,47 @@ func TestGetUserStarredAssets(t *testing.T) {
 		size     = 10
 	)
 	type testCase struct {
+		UserUUID     string
+		UserID       string
 		Description  string
 		ExpectStatus codes.Code
+		WantErr      error
 		Setup        func(context.Context, *mocks.StarService)
 		PostCheck    func(resp *compassv1beta1.GetUserStarredAssetsResponse) error
 	}
 
 	testCases := []testCase{
 		{
+			UserUUID:     "",
+			UserID:       "",
+			Description:  "should return no user information error",
+			ExpectStatus: codes.InvalidArgument,
+			WantErr:      user.ErrNoUserInformation,
+		},
+		{
+			UserUUID:     userUUID,
+			UserID:       userID,
+			Description:  "should return duplicate user error",
+			ExpectStatus: codes.AlreadyExists,
+			WantErr:      user.DuplicateRecordError{UUID: userUUID, Email: ""},
+		},
+		{
+			UserUUID:     "",
+			UserID:       "",
+			Description:  "should return internal error",
+			ExpectStatus: codes.Internal,
+			WantErr:      status.Errorf(codes.Internal, "some internal error"),
+		},
+		{
+			UserUUID:     userUUID,
+			UserID:       "",
+			Description:  "should return uuid returned by DB is empty error",
+			ExpectStatus: codes.InvalidArgument,
+			WantErr:      nil,
+		},
+		{
+			UserUUID:     userUUID,
+			UserID:       userID,
 			Description:  "should return internal server error if failed to fetch starred",
 			ExpectStatus: codes.Internal,
 			Setup: func(ctx context.Context, ss *mocks.StarService) {
@@ -46,6 +79,8 @@ func TestGetUserStarredAssets(t *testing.T) {
 			},
 		},
 		{
+			UserUUID:     userUUID,
+			UserID:       userID,
 			Description:  "should return invalid argument if star repository return invalid error",
 			ExpectStatus: codes.InvalidArgument,
 			Setup: func(ctx context.Context, ss *mocks.StarService) {
@@ -53,6 +88,8 @@ func TestGetUserStarredAssets(t *testing.T) {
 			},
 		},
 		{
+			UserUUID:     userUUID,
+			UserID:       userID,
 			Description:  "should return not found if starred not found",
 			ExpectStatus: codes.NotFound,
 			Setup: func(ctx context.Context, ss *mocks.StarService) {
@@ -60,6 +97,8 @@ func TestGetUserStarredAssets(t *testing.T) {
 			},
 		},
 		{
+			UserUUID:     userUUID,
+			UserID:       userID,
 			Description:  "should return starred assets of a user if no error",
 			ExpectStatus: codes.OK,
 			Setup: func(ctx context.Context, ss *mocks.StarService) {
@@ -99,7 +138,7 @@ func TestGetUserStarredAssets(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.Description, func(t *testing.T) {
-			ctx := user.NewContext(context.Background(), user.User{UUID: userUUID})
+			ctx := user.NewContext(context.Background(), user.User{UUID: tc.UserUUID})
 
 			logger := log.NewNoop()
 
@@ -111,12 +150,12 @@ func TestGetUserStarredAssets(t *testing.T) {
 			defer mockUserSvc.AssertExpectations(t)
 			defer mockStarSvc.AssertExpectations(t)
 
-			mockUserSvc.EXPECT().ValidateUser(ctx, userUUID, "").Return(userID, nil)
+			mockUserSvc.EXPECT().ValidateUser(ctx, tc.UserUUID, "").Return(tc.UserID, tc.WantErr)
 
 			handler := NewAPIServer(logger, nil, mockStarSvc, nil, nil, nil, mockUserSvc)
 
 			got, err := handler.GetUserStarredAssets(ctx, &compassv1beta1.GetUserStarredAssetsRequest{
-				UserId: userID,
+				UserId: tc.UserID,
 				Offset: uint32(offset),
 				Size:   uint32(size),
 			})
