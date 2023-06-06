@@ -559,6 +559,23 @@ func TestUpsertPatchAsset(t *testing.T) {
 				},
 			},
 		}
+		validPayloadWithoutStreams = &compassv1beta1.UpsertPatchAssetRequest{
+			Asset: &compassv1beta1.UpsertPatchAssetRequest_Asset{
+				Urn:     "test dagger",
+				Type:    "table",
+				Name:    wrapperspb.String("new-name"),
+				Service: "kafka",
+				Data:    &structpb.Struct{},
+				Url:     "https://sample-url.com",
+				Owners: []*compassv1beta1.User{
+					{Id: "id", Uuid: "1aecb8b3-23a9-4456-8ebd-3aafc746fff8", Email: "email@email.com", Provider: "provider"},
+					// the following users should get de-duplicated.
+					{Id: "id"},
+					{Uuid: "1aecb8b3-23a9-4456-8ebd-3aafc746fff8"},
+					{Email: "email@email.com"},
+				},
+			},
+		}
 		currentAsset = asset.Asset{
 			URN:       "test dagger",
 			Type:      asset.TypeTable,
@@ -567,6 +584,16 @@ func TestUpsertPatchAsset(t *testing.T) {
 			UpdatedBy: user.User{ID: userID},
 			Data:      map[string]interface{}{},
 			URL:       "https://sample-url-old.com",
+			Owners:    []user.User{{ID: "id", UUID: "1aecb8b3-23a9-4456-8ebd-3aafc746fff8", Email: "email@email.com", Provider: "provider"}},
+		}
+		currentAssetNew = asset.Asset{
+			URN:       "test dagger",
+			Type:      asset.TypeTable,
+			Name:      "new-name", // this value will be updated
+			Service:   "kafka",
+			UpdatedBy: user.User{ID: userID},
+			Data:      map[string]interface{}{},
+			URL:       "https://sample-url.com",
 			Owners:    []user.User{{ID: "id", UUID: "1aecb8b3-23a9-4456-8ebd-3aafc746fff8", Email: "email@email.com", Provider: "provider"}},
 		}
 	)
@@ -658,6 +685,24 @@ func TestUpsertPatchAsset(t *testing.T) {
 				as.EXPECT().UpsertAsset(ctx, mock.AnythingOfType("*asset.Asset"), mock.AnythingOfType("[]string"), mock.AnythingOfType("[]string")).Return("1234-5678", expectedErr)
 			},
 			Request:      validPayload,
+			ExpectStatus: codes.Internal,
+		},
+		{
+			Description: "should return invalid argument error when upserting asset without lineage failed, with invalid error",
+			Setup: func(ctx context.Context, as *mocks.AssetService) {
+				as.EXPECT().GetAssetByID(ctx, "test dagger").Return(currentAssetNew, nil)
+				as.EXPECT().UpsertAssetWithoutLineage(ctx, &currentAssetNew).Return("", asset.InvalidError{})
+			},
+			Request:      validPayloadWithoutStreams,
+			ExpectStatus: codes.InvalidArgument,
+		},
+		{
+			Description: "should return internal server error when upserting asset without asset failed, with discovery error ",
+			Setup: func(ctx context.Context, as *mocks.AssetService) {
+				as.EXPECT().GetAssetByID(ctx, "test dagger").Return(currentAssetNew, nil)
+				as.EXPECT().UpsertAssetWithoutLineage(ctx, &currentAssetNew).Return("", asset.DiscoveryError{Err: errors.New("discovery error")})
+			},
+			Request:      validPayloadWithoutStreams,
 			ExpectStatus: codes.Internal,
 		},
 		{
