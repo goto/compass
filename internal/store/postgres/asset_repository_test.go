@@ -226,6 +226,14 @@ func (r *AssetRepositoryTestSuite) TestBuildFilterQuery() {
 func (r *AssetRepositoryTestSuite) TestGetAll() {
 	assets := r.insertRecord()
 
+	r.Run("should return error if SortBy key is invalid", func() {
+		_, err := r.repository.GetAll(r.ctx, asset.Filter{
+			SortBy: "wrong key name",
+		})
+		r.Require().NotNil(err)
+		r.Require().ErrorContains(err, "error getting asset list")
+	})
+
 	r.Run("should return all assets without filtering based on size", func() {
 		expectedSize := 12
 
