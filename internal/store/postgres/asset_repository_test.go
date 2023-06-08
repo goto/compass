@@ -947,6 +947,39 @@ func (r *AssetRepositoryTestSuite) TestVersions() {
 		}
 		r.Equal(expected, assetVersions)
 	})
+
+	r.Run("should return asset count equal to defaultGetMaxSize if Size is set to 0", func() {
+		assetURN := uuid.NewString() + "urn-u-3-version"
+		// v0.1
+		ast := asset.Asset{
+			URN:       assetURN,
+			Type:      "table",
+			Service:   "bigquery",
+			UpdatedBy: r.users[1],
+		}
+		id, err := r.repository.Upsert(r.ctx, &ast)
+		r.Require().NoError(err)
+		r.Require().NotEmpty(id)
+		ast.ID = id
+
+		for i := 2; i < 100; i++ {
+			ast.Description = "new description in v0." + strconv.Itoa(i)
+			id, err = r.repository.Upsert(r.ctx, &ast)
+			r.Require().NoError(err)
+			r.Require().Equal(id, ast.ID)
+		}
+
+		assetVersions, err := r.repository.GetVersionHistory(r.ctx, asset.Filter{Size: 0, Offset: 86}, ast.ID)
+		r.NoError(err)
+		r.Equal(defaultGetMaxSize, len(assetVersions))
+	})
+
+	r.Run("should return error is invalid uuid is passed", func() {
+		assetURN := "invalid uuid"
+		_, err := r.repository.GetVersionHistory(r.ctx, asset.Filter{Size: 3, Offset: 86}, assetURN)
+		r.NotNil(err)
+		r.Equal(asset.InvalidError{AssetID: assetURN}, err)
+	})
 }
 
 func (r *AssetRepositoryTestSuite) TestUpsert() {
