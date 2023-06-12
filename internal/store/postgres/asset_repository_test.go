@@ -794,6 +794,11 @@ func (r *AssetRepositoryTestSuite) TestVersions() {
 		r.Len(astOwners, 2)
 	})
 
+	r.Run("should return invalid if invalid uuid is set", func() {
+		_, err := r.repository.GetByVersionWithID(r.ctx, "invalid uuid", "0.5")
+		r.ErrorIs(err, asset.InvalidError{AssetID: "invalid uuid"})
+	})
+
 	r.Run("should return current version of an assets with by version", func() {
 		expected := asset.Asset{
 			ID:          astVersioning.ID,
