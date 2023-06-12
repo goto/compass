@@ -159,10 +159,10 @@ func (server *APIServer) DeleteTagTemplate(ctx context.Context, req *compassv1be
 	}
 
 	err = server.tagTemplateService.DeleteTemplate(ctx, req.GetTemplateUrn())
-	if errors.As(err, new(tag.TemplateNotFoundError)) {
-		return nil, status.Error(codes.NotFound, err.Error())
-	}
 	if err != nil {
+		if errors.As(err, new(tag.TemplateNotFoundError)) {
+			return nil, status.Error(codes.NotFound, err.Error())
+		}
 		return nil, internalServerError(server.logger, fmt.Sprintf("error deleting a template: %s", err.Error()))
 	}
 	return &compassv1beta1.DeleteTagTemplateResponse{}, nil
