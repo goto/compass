@@ -31,43 +31,43 @@ func TestGetUserStarredAssets(t *testing.T) {
 		size     = 10
 	)
 	type testCase struct {
-		UserUUID     string
-		UserID       string
-		Description  string
-		ExpectStatus codes.Code
-		WantErr      error
-		Setup        func(context.Context, *mocks.StarService)
-		PostCheck    func(resp *compassv1beta1.GetUserStarredAssetsResponse) error
+		UserUUID      string
+		UserID        string
+		Description   string
+		ValidationErr error
+		ExpectStatus  codes.Code
+		Setup         func(context.Context, *mocks.StarService)
+		PostCheck     func(resp *compassv1beta1.GetUserStarredAssetsResponse) error
 	}
 
 	testCases := []testCase{
 		{
-			UserUUID:     "",
-			UserID:       "",
-			Description:  "should return no user information error",
-			ExpectStatus: codes.InvalidArgument,
-			WantErr:      user.ErrNoUserInformation,
+			UserUUID:      "",
+			UserID:        "",
+			Description:   "should return no user information error",
+			ValidationErr: user.ErrNoUserInformation,
+			ExpectStatus:  codes.InvalidArgument,
 		},
 		{
-			UserUUID:     userUUID,
-			UserID:       userID,
-			Description:  "should return duplicate user error",
-			ExpectStatus: codes.AlreadyExists,
-			WantErr:      user.DuplicateRecordError{UUID: userUUID, Email: ""},
+			UserUUID:      userUUID,
+			UserID:        userID,
+			Description:   "should return duplicate user error",
+			ValidationErr: user.DuplicateRecordError{UUID: userUUID, Email: ""},
+			ExpectStatus:  codes.AlreadyExists,
 		},
 		{
-			UserUUID:     "",
-			UserID:       "",
-			Description:  "should return internal error",
-			ExpectStatus: codes.Internal,
-			WantErr:      status.Errorf(codes.Internal, "some internal error"),
+			UserUUID:      "",
+			UserID:        "",
+			Description:   "should return internal error",
+			ValidationErr: status.Errorf(codes.Internal, "some internal error"),
+			ExpectStatus:  codes.Internal,
 		},
 		{
-			UserUUID:     userUUID,
-			UserID:       "",
-			Description:  "should return uuid returned by DB is empty error",
-			ExpectStatus: codes.InvalidArgument,
-			WantErr:      nil,
+			UserUUID:      userUUID,
+			UserID:        "",
+			Description:   "should return uuid returned by DB is empty error",
+			ValidationErr: nil,
+			ExpectStatus:  codes.InvalidArgument,
 		},
 		{
 			UserUUID:     userUUID,
@@ -150,7 +150,7 @@ func TestGetUserStarredAssets(t *testing.T) {
 			defer mockUserSvc.AssertExpectations(t)
 			defer mockStarSvc.AssertExpectations(t)
 
-			mockUserSvc.EXPECT().ValidateUser(ctx, tc.UserUUID, "").Return(tc.UserID, tc.WantErr)
+			mockUserSvc.EXPECT().ValidateUser(ctx, tc.UserUUID, "").Return(tc.UserID, tc.ValidationErr)
 
 			handler := NewAPIServer(logger, nil, mockStarSvc, nil, nil, nil, mockUserSvc)
 
