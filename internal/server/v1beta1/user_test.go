@@ -31,9 +31,9 @@ func TestGetUserStarredAssets(t *testing.T) {
 		size     = 10
 	)
 	type testCase struct {
+		Description   string
 		UserUUID      string
 		UserID        string
-		Description   string
 		ValidationErr error
 		ExpectStatus  codes.Code
 		Setup         func(context.Context, *mocks.StarService)
@@ -42,64 +42,64 @@ func TestGetUserStarredAssets(t *testing.T) {
 
 	testCases := []testCase{
 		{
+			Description:   "should return no user information error",
 			UserUUID:      "",
 			UserID:        "",
-			Description:   "should return no user information error",
 			ValidationErr: user.ErrNoUserInformation,
 			ExpectStatus:  codes.InvalidArgument,
 		},
 		{
+			Description:   "should return duplicate user error",
 			UserUUID:      userUUID,
 			UserID:        userID,
-			Description:   "should return duplicate user error",
 			ValidationErr: user.DuplicateRecordError{UUID: userUUID, Email: ""},
 			ExpectStatus:  codes.AlreadyExists,
 		},
 		{
+			Description:   "should return internal error",
 			UserUUID:      "",
 			UserID:        "",
-			Description:   "should return internal error",
 			ValidationErr: status.Errorf(codes.Internal, "some internal error"),
 			ExpectStatus:  codes.Internal,
 		},
 		{
+			Description:   "should return uuid returned by DB is empty error",
 			UserUUID:      userUUID,
 			UserID:        "",
-			Description:   "should return uuid returned by DB is empty error",
 			ValidationErr: nil,
 			ExpectStatus:  codes.InvalidArgument,
 		},
 		{
+			Description:  "should return internal server error if failed to fetch starred",
 			UserUUID:     userUUID,
 			UserID:       userID,
-			Description:  "should return internal server error if failed to fetch starred",
 			ExpectStatus: codes.Internal,
 			Setup: func(ctx context.Context, ss *mocks.StarService) {
 				ss.EXPECT().GetStarredAssetsByUserID(ctx, star.Filter{Offset: offset, Size: size}, userID).Return(nil, errors.New("failed to fetch starred"))
 			},
 		},
 		{
+			Description:  "should return invalid argument if star repository return invalid error",
 			UserUUID:     userUUID,
 			UserID:       userID,
-			Description:  "should return invalid argument if star repository return invalid error",
 			ExpectStatus: codes.InvalidArgument,
 			Setup: func(ctx context.Context, ss *mocks.StarService) {
 				ss.EXPECT().GetStarredAssetsByUserID(ctx, star.Filter{Offset: offset, Size: size}, userID).Return(nil, star.InvalidError{})
 			},
 		},
 		{
+			Description:  "should return not found if starred not found",
 			UserUUID:     userUUID,
 			UserID:       userID,
-			Description:  "should return not found if starred not found",
 			ExpectStatus: codes.NotFound,
 			Setup: func(ctx context.Context, ss *mocks.StarService) {
 				ss.EXPECT().GetStarredAssetsByUserID(ctx, star.Filter{Offset: offset, Size: size}, userID).Return(nil, star.NotFoundError{})
 			},
 		},
 		{
+			Description:  "should return starred assets of a user if no error",
 			UserUUID:     userUUID,
 			UserID:       userID,
-			Description:  "should return starred assets of a user if no error",
 			ExpectStatus: codes.OK,
 			Setup: func(ctx context.Context, ss *mocks.StarService) {
 				ss.EXPECT().GetStarredAssetsByUserID(ctx, star.Filter{Offset: offset, Size: size}, userID).Return([]asset.Asset{
