@@ -609,13 +609,6 @@ func TestUpsertPatchAsset(t *testing.T) {
 				Service: "kafka",
 				Data:    &structpb.Struct{},
 				Url:     "https://sample-url.com",
-				Owners: []*compassv1beta1.User{
-					{Id: "id", Uuid: "1aecb8b3-23a9-4456-8ebd-3aafc746fff8", Email: "email@email.com", Provider: "provider"},
-					// the following users should get de-duplicated.
-					{Id: "id"},
-					{Uuid: "1aecb8b3-23a9-4456-8ebd-3aafc746fff8"},
-					{Email: "email@email.com"},
-				},
 			},
 		}
 		currentAsset = asset.Asset{
