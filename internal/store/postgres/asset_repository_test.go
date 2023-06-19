@@ -979,7 +979,7 @@ func (r *AssetRepositoryTestSuite) TestVersions() {
 		r.Equal(defaultGetMaxSize, len(assetVersions))
 	})
 
-	r.Run("should return error is invalid uuid is passed", func() {
+	r.Run("should return error if invalid uuid is passed", func() {
 		assetURN := "invalid uuid"
 		_, err := r.repository.GetVersionHistory(r.ctx, asset.Filter{Size: 3, Offset: 86}, assetURN)
 		r.NotNil(err)
