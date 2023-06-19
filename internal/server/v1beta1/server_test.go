@@ -55,8 +55,8 @@ func TestValidateUserInCtx(t *testing.T) {
 
 			logger := log.NewNoop()
 
-			mockUserSvc := mocks.NewUserService()
-			mockStarSvc := mocks.NewStarService()
+			mockUserSvc := new(mocks.UserService)
+			mockStarSvc := new(mocks.StarService)
 			if tc.Setup != nil {
 				tc.Setup(ctx, mockUserSvc)
 			}
