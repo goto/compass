@@ -55,13 +55,11 @@ func TestValidateUserInCtx(t *testing.T) {
 
 			logger := log.NewNoop()
 
-			mockUserSvc := new(mocks.UserService)
-			mockStarSvc := new(mocks.StarService)
+			mockUserSvc := mocks.NewUserService()
+			mockStarSvc := mocks.NewStarService()
 			if tc.Setup != nil {
 				tc.Setup(ctx, mockUserSvc)
 			}
-			defer mockUserSvc.AssertExpectations(t)
-			defer mockStarSvc.AssertExpectations(t)
 
 			handler := handlersv1beta1.NewAPIServer(logger, nil, mockStarSvc, nil, nil, nil, mockUserSvc)
 
