@@ -7,5 +7,5 @@ type Config struct {
 	Prefix              string  `mapstructure:"prefix" default:"compassApi"`
 	SamplingRate        float64 `mapstructure:"sampling_rate" default:"1"`
 	Separator           string  `mapstructure:"separator" default:"."`
-	WithInfluxTagFormat bool    `mapstructure:"with_influx_tag_format" default:"true"`
+	WithInfluxTagFormat bool    `mapstructure:"with_influx_tag_format" default:"false"`
 }

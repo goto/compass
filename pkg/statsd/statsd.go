@@ -24,7 +24,8 @@ func Init(logger log.Logger, cfg Config) (*Reporter, error) {
 
 	client, err := std.New(cfg.Address,
 		std.WithNamespace(cfg.Prefix),
-		std.WithoutTelemetry())
+		std.WithoutTelemetry(),
+		std.WithoutOriginDetection())
 	if err != nil {
 		return nil, err
 	}
@@ -38,7 +39,7 @@ func Init(logger log.Logger, cfg Config) (*Reporter, error) {
 // Close closes statsd connection
 func (sd *Reporter) Close() {
 	if sd != nil && sd.client != nil {
-		sd.Close()
+		sd.client.Close()
 	}
 }
 

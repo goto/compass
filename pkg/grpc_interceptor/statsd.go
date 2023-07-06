@@ -23,7 +23,7 @@ func StatsD(statsdReporter StatsDClient) grpc.UnaryServerInterceptor {
 		resp, err := handler(ctx, req)
 		code := status.Code(err)
 		statsdReporter.Histogram("responseTime", float64(time.Since(start)/time.Millisecond)).
-			Tag("method", info.FullMethod).
+			Tag("method", info.FullMethod[1:]).
 			Tag("status", code.String()).
 			Publish()
 		return resp, err

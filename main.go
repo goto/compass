@@ -21,6 +21,7 @@ func main() {
 
 func run() error {
 	cliConfig, err := cli.LoadConfig()
+	fmt.Printf("StatsD config: %#v\n", cliConfig.StatsD)
 	if err != nil {
 		fmt.Println(err)
 	}
