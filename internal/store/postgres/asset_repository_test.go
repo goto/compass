@@ -231,6 +231,52 @@ func (r *AssetRepositoryTestSuite) TestGetAll() {
 		}
 	})
 
+	r.Run("should return when user has selected some fields", func() {
+		results, err := r.repository.GetAll(r.ctx, asset.Filter{
+			Data: map[string][]string{
+				"properties.dependencies": {"_nonempty"},
+				"entity":                  {"gotocompany"},
+				"urn":                     {"j-xcvcx"},
+				"country":                 {"vn"},
+			},
+			IncludeFields: []string{"urn"},
+		})
+		r.Require().NoError(err)
+
+		expectedURNs := []string{"nine-mock"}
+
+		r.Equal(len(expectedURNs), len(results))
+		for i := range results {
+			r.Equal(expectedURNs[i], results[i].URN)
+			r.NotEmpty(results[i].ID)
+			r.Equal("", results[i].Name)
+		}
+	})
+
+	r.Run("should return when user info is reequired in response with selected fields", func() {
+		results, err := r.repository.GetAll(r.ctx, asset.Filter{
+			Data: map[string][]string{
+				"properties.dependencies": {"_nonempty"},
+				"entity":                  {"gotocompany"},
+				"urn":                     {"j-xcvcx"},
+				"country":                 {"vn"},
+			},
+			IncludeFields:   []string{"urn"},
+			IncludeUserInfo: true,
+		})
+		r.Require().NoError(err)
+		expectedURNs := []string{"nine-mock"}
+		r.Equal(len(expectedURNs), len(results))
+		for i := range results {
+			r.Equal(expectedURNs[i], results[i].URN)
+			r.NotEmpty(results[i].ID)
+			r.Equal("", results[i].Name)
+			r.Equal(assets[8].UpdatedBy.ID, results[i].UpdatedBy.ID)
+			r.Equal(assets[8].UpdatedBy.UUID, results[i].UpdatedBy.UUID)
+			r.Equal(assets[8].UpdatedBy.Email, results[i].UpdatedBy.Email)
+		}
+	})
+
 	r.Run("should override default size using GetConfig.Size", func() {
 		size := 6
 

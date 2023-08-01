@@ -125,6 +125,7 @@ func TestGetAllAssets(t *testing.T) {
 		{
 			Description:  "should return status OK along with list of assets",
 			ExpectStatus: codes.OK,
+			Request:      &compassv1beta1.GetAllAssetsRequest{},
 			Setup: func(ctx context.Context, as *mocks.AssetService, _ *mocks.UserService) {
 				as.EXPECT().GetAllAssets(ctx, asset.Filter{}, false).Return([]asset.Asset{
 					{ID: "testid-1"},
