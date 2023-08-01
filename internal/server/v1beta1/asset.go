@@ -64,6 +64,8 @@ func (server *APIServer) GetAllAssets(ctx context.Context, req *compassv1beta1.G
 		SortBy(req.GetSort()).
 		SortDirection(req.GetDirection()).
 		Data(req.GetData()).
+		IncludeFields(req.IncludeFields).
+		IncludeUserInfo(req.IncludeUserInfo).
 		Build()
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, bodyParserErrorMsg(err))

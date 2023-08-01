@@ -7,15 +7,17 @@ import (
 )
 
 type Filter struct {
-	Types         []Type
-	Services      []string
-	Size          int
-	Offset        int
-	SortBy        string `validate:"omitempty,oneof=name type service created_at updated_at"`
-	SortDirection string `validate:"omitempty,oneof=asc desc"`
-	QueryFields   []string
-	Query         string
-	Data          map[string][]string
+	Types           []Type
+	Services        []string
+	Size            int
+	Offset          int
+	SortBy          string `validate:"omitempty,oneof=name type service created_at updated_at"`
+	SortDirection   string `validate:"omitempty,oneof=asc desc"`
+	QueryFields     []string
+	Query           string
+	Data            map[string][]string
+	IncludeFields   []string
+	IncludeUserInfo bool
 }
 
 func (f *Filter) Validate() error {
@@ -23,15 +25,17 @@ func (f *Filter) Validate() error {
 }
 
 type filterBuilder struct {
-	types         string
-	services      string
-	q             string
-	qFields       string
-	data          map[string]string
-	size          int
-	offset        int
-	sortBy        string
-	sortDirection string
+	types           string
+	services        string
+	q               string
+	qFields         string
+	data            map[string]string
+	size            int
+	offset          int
+	sortBy          string
+	sortDirection   string
+	includeFields   []string
+	includeUserInfo bool
 }
 
 func NewFilterBuilder() *filterBuilder {
@@ -83,13 +87,25 @@ func (fb *filterBuilder) SortDirection(sortDirection string) *filterBuilder {
 	return fb
 }
 
+func (fb *filterBuilder) IncludeFields(includeFields []string) *filterBuilder {
+	fb.includeFields = includeFields
+	return fb
+}
+
+func (fb *filterBuilder) IncludeUserInfo(includeUserInfo bool) *filterBuilder {
+	fb.includeUserInfo = includeUserInfo
+	return fb
+}
+
 func (fb *filterBuilder) Build() (Filter, error) {
 	flt := Filter{
-		Size:          fb.size,
-		Offset:        fb.offset,
-		SortBy:        fb.sortBy,
-		SortDirection: fb.sortDirection,
-		Query:         fb.q,
+		Size:            fb.size,
+		Offset:          fb.offset,
+		SortBy:          fb.sortBy,
+		SortDirection:   fb.sortDirection,
+		Query:           fb.q,
+		IncludeFields:   fb.includeFields,
+		IncludeUserInfo: fb.includeUserInfo,
 	}
 
 	if len(fb.data) != 0 {
