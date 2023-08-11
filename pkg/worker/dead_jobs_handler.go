@@ -4,11 +4,13 @@ import (
 	"context"
 	_ "embed"
 	"encoding/json"
+	"fmt"
 	"html/template"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
@@ -63,6 +65,52 @@ func DeadJobManagementHandler(mgr DeadJobManager) http.Handler {
 			})),
 		),
 	)
+	mux.HandleFunc("/enqueue-slow-jobs", func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		durn, err := time.ParseDuration(r.Form.Get("duration"))
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		count, err := strconv.Atoi(r.Form.Get("job_count"))
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		var jobs []Job
+		for i := 0; i < count; i++ {
+			j, err := NewJob(JobSpec{
+				Type:    "slow-noop",
+				Payload: ([]byte)(durn.String()),
+			})
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			jobs = append(jobs, j)
+		}
+
+		p, ok := mgr.(JobProcessor)
+		if !ok {
+			e := fmt.Sprintf("unexpected type: %T", mgr)
+			http.Error(w, e, http.StatusInternalServerError)
+			return
+		}
+
+		if err := p.Enqueue(r.Context(), jobs...); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		writeJSONResponse(w, http.StatusOK, map[string]bool{"success": true})
+	})
 	return mux
 }
 

@@ -112,6 +112,7 @@ func (m *Manager) init() error {
 	jobHandlers := map[string]worker.JobHandler{
 		jobIndexAsset:  m.indexAssetHandler(),
 		jobDeleteAsset: m.deleteAssetHandler(),
+		"slow-noop":    m.slowNoopHandler(),
 	}
 	for typ, h := range jobHandlers {
 		if err := m.worker.Register(typ, h); err != nil {
@@ -168,6 +169,26 @@ func (m *Manager) registerStatsCallback(jobTypes []string) error {
 	)
 
 	return err
+}
+
+func (m *Manager) slowNoopHandler() worker.JobHandler {
+	return worker.JobHandler{
+		Handle: m.slowNoop,
+		JobOpts: worker.JobOptions{
+			MaxAttempts: 1,
+			Timeout:     10 * time.Minute,
+		},
+	}
+}
+
+func (m *Manager) slowNoop(_ context.Context, job worker.JobSpec) error {
+	durn, err := time.ParseDuration((string)(job.Payload))
+	if err != nil {
+		return err
+	}
+
+	time.Sleep(durn)
+	return nil
 }
 
 func keys(handlers map[string]worker.JobHandler) []string {
