@@ -35,7 +35,7 @@ func TestSearcherSearch(t *testing.T) {
 		err = loadTestFixture(cli, esClient, "./testdata/search-test-fixture.json")
 		require.NoError(t, err)
 
-		repo := store.NewDiscoveryRepository(esClient, log.NewNoop())
+		repo := store.NewDiscoveryRepository(esClient, log.NewNoop(), 10)
 
 		type expectedRow struct {
 			Type    string
@@ -387,7 +387,7 @@ func TestSearcherSuggest(t *testing.T) {
 	err = loadTestFixture(cli, esClient, "./testdata/suggest-test-fixture.json")
 	require.NoError(t, err)
 
-	repo := store.NewDiscoveryRepository(esClient, log.NewNoop())
+	repo := store.NewDiscoveryRepository(esClient, log.NewNoop(), 10)
 
 	t.Run("fixtures", func(t *testing.T) {
 		testCases := []struct {
@@ -424,7 +424,7 @@ func loadTestFixture(cli *elasticsearch.Client, esClient *store.Client, filePath
 
 	ctx := context.TODO()
 	for _, testdata := range data {
-		repo := store.NewDiscoveryRepository(esClient, log.NewNoop())
+		repo := store.NewDiscoveryRepository(esClient, log.NewNoop(), 10)
 		for _, ast := range testdata.Assets {
 			if err := repo.Upsert(ctx, ast); err != nil {
 				return err
@@ -452,7 +452,7 @@ func TestGroupAssets(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		repo := store.NewDiscoveryRepository(esClient, log.NewNoop())
+		repo := store.NewDiscoveryRepository(esClient, log.NewNoop(), 10)
 		_, err = repo.GroupAssets(ctx, asset.GroupConfig{
 			GroupBy: []string{""},
 		})
@@ -473,7 +473,7 @@ func TestGroupAssets(t *testing.T) {
 		err = loadTestFixture(cli, esClient, "./testdata/search-test-fixture.json")
 		require.NoError(t, err)
 
-		repo := store.NewDiscoveryRepository(esClient, log.NewNoop())
+		repo := store.NewDiscoveryRepository(esClient, log.NewNoop(), 10)
 
 		type groupTest struct {
 			Description string
