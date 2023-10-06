@@ -20,10 +20,10 @@ import (
 type DiscoveryRepository struct {
 	cli            *Client
 	logger         log.Logger
-	requestTimeout int
+	requestTimeout time.Duration
 }
 
-func NewDiscoveryRepository(cli *Client, logger log.Logger, requestTimeout int) *DiscoveryRepository {
+func NewDiscoveryRepository(cli *Client, logger log.Logger, requestTimeout time.Duration) *DiscoveryRepository {
 	return &DiscoveryRepository{
 		cli:            cli,
 		logger:         logger,

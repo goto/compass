@@ -27,8 +27,8 @@ const (
 )
 
 type Config struct {
-	Brokers                 string `mapstructure:"brokers" default:"http://localhost:9200"`
-	RequestTimeoutInSeconds int    `mapstructure:"request_timeout_in_seconds" default:"10"`
+	Brokers        string        `mapstructure:"brokers" default:"http://localhost:9200"`
+	RequestTimeout time.Duration `mapstructure:"request_timeout" default:"10s"`
 }
 
 type searchHit struct {

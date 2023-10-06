@@ -68,7 +68,7 @@ func (repo *DiscoveryRepository) Search(ctx context.Context, cfg asset.SearchCon
 		search.WithIgnoreUnavailable(true),
 		search.WithSourceIncludes(returnedAssetFieldsResult...),
 		search.WithContext(ctx),
-		search.WithTimeout(time.Duration(repo.requestTimeout)*time.Second),
+		search.WithTimeout(repo.requestTimeout),
 	)
 	if err != nil {
 		return nil, asset.DiscoveryError{Op: "Search", Err: fmt.Errorf("execute search: %w", err)}
