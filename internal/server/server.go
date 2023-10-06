@@ -37,8 +37,8 @@ type Config struct {
 	BaseUrl string `mapstructure:"baseurl" default:"localhost:8080"`
 
 	// User Identity
-	Identity       IdentityConfig `mapstructure:"identity"`
-	RequestTimeout int            `mapstructure:"request_timeout"`
+	Identity                IdentityConfig `mapstructure:"identity"`
+	RequestTimeoutInSeconds int            `mapstructure:"request_timeout_in_seconds" default:"10"`
 	// GRPC Config
 	GRPC GRPCConfig `mapstructure:"grpc"`
 }
@@ -55,10 +55,10 @@ type IdentityConfig struct {
 }
 
 type GRPCConfig struct {
-	Port           int `yaml:"port" mapstructure:"port" default:"8081"`
-	RequestTimeout int `yaml:"request_timeout" mapstructure:"request_timeout"`
-	MaxRecvMsgSize int `yaml:"max_recv_msg_size" mapstructure:"max_recv_msg_size" default:"33554432"`
-	MaxSendMsgSize int `yaml:"max_send_msg_size" mapstructure:"max_send_msg_size" default:"33554432"`
+	Port                    int `yaml:"port" mapstructure:"port" default:"8081"`
+	RequestTimeoutInSeconds int `yaml:"request_timeout_in_seconds" mapstructure:"request_timeout_in_seconds" default:"5"`
+	MaxRecvMsgSize          int `yaml:"max_recv_msg_size" mapstructure:"max_recv_msg_size" default:"33554432"`
+	MaxSendMsgSize          int `yaml:"max_send_msg_size" mapstructure:"max_send_msg_size" default:"33554432"`
 }
 
 func Serve(
@@ -105,12 +105,8 @@ func Serve(
 	compassv1beta1.RegisterCompassServiceServer(grpcServer, v1beta1Handler)
 	grpc_health_v1.RegisterHealthServer(grpcServer, healthHandler)
 
-	grpcRequestTimeout := config.GRPC.RequestTimeout
-	if grpcRequestTimeout == 0 {
-		grpcRequestTimeout = 5
-	}
 	// init http proxy
-	grpcDialCtx, grpcDialCancel := context.WithTimeout(ctx, time.Second*time.Duration(grpcRequestTimeout))
+	grpcDialCtx, grpcDialCancel := context.WithTimeout(ctx, time.Second*time.Duration(config.GRPC.RequestTimeoutInSeconds))
 	defer grpcDialCancel()
 
 	headerMatcher := makeHeaderMatcher(config)
@@ -161,17 +157,12 @@ func Serve(
 
 	logger.Info("Starting server", "http_port", config.addr(), "grpc_port", config.grpcAddr())
 
-	httpRequestTimeout := config.RequestTimeout
-	if httpRequestTimeout == 0 {
-		httpRequestTimeout = 10
-	}
-
 	if err := mux.Serve(
 		ctx,
 		mux.WithHTTPTarget(config.addr(), &http.Server{
 			Handler:      gwmux,
 			ReadTimeout:  5 * time.Second,
-			WriteTimeout: time.Duration(httpRequestTimeout) * time.Second,
+			WriteTimeout: time.Duration(config.RequestTimeoutInSeconds) * time.Second,
 			IdleTimeout:  120 * time.Second,
 		}),
 		mux.WithGRPCTarget(config.grpcAddr(), grpcServer),

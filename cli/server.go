@@ -131,11 +131,7 @@ func runServer(ctx context.Context, cfg *Config) error {
 	if err != nil {
 		return fmt.Errorf("create new asset repository: %w", err)
 	}
-	esTimeout := cfg.Elasticsearch.RequestTimeout
-	if cfg.Elasticsearch.RequestTimeout == 0 {
-		esTimeout = 10
-	}
-	discoveryRepository := esStore.NewDiscoveryRepository(esClient, logger, esTimeout)
+	discoveryRepository := esStore.NewDiscoveryRepository(esClient, logger, cfg.Elasticsearch.RequestTimeoutInSeconds)
 	lineageRepository, err := postgres.NewLineageRepository(pgClient)
 	if err != nil {
 		return fmt.Errorf("create new lineage repository: %w", err)
