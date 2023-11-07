@@ -8,6 +8,7 @@ const (
 	TypeFeatureTable Type = "feature_table"
 	TypeApplication  Type = "application"
 	TypeModel        Type = "model"
+	TypeQuery        Type = "query"
 )
 
 // AllSupportedTypes holds a list of all supported types struct
@@ -19,6 +20,7 @@ var AllSupportedTypes = []Type{
 	TypeFeatureTable,
 	TypeApplication,
 	TypeModel,
+	TypeQuery,
 }
 
 // Type specifies a supported type name
@@ -33,7 +35,7 @@ func (t Type) String() string {
 func (t Type) IsValid() bool {
 	switch t {
 	case TypeTable, TypeJob, TypeDashboard, TypeTopic,
-		TypeFeatureTable, TypeApplication, TypeModel:
+		TypeFeatureTable, TypeApplication, TypeModel, TypeQuery:
 		return true
 	}
 	return false
