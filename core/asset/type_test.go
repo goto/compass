@@ -15,6 +15,7 @@ func TestTypeString(t *testing.T) {
 		TypeFeatureTable: "feature_table",
 		TypeApplication:  "application",
 		TypeModel:        "model",
+		TypeQuery:        "query",
 	} {
 		t.Run((string)(typ), func(t *testing.T) {
 			assert.Equal(t, expected, typ.String())
@@ -24,7 +25,7 @@ func TestTypeString(t *testing.T) {
 
 func TestTypeIsValid(t *testing.T) {
 	for _, typ := range []Type{
-		"dashboard", "job", "table", "topic", "feature_table", "application", "model",
+		"dashboard", "job", "table", "topic", "feature_table", "application", "model", "query",
 	} {
 		t.Run((string)(typ), func(t *testing.T) {
 			assert.Truef(t, typ.IsValid(), "%s should be valid", typ)
