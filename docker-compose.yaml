@@ -8,7 +8,7 @@ services:
     networks:
       - storage
     volumes:
-      - ./temp/esdata:/usr/share/elasticsearch/data
+      - esdata:/usr/share/elasticsearch/data
 
   postgres:
     ports:
@@ -21,7 +21,11 @@ services:
     networks:
       - storage
     volumes:
-      - ./temp/pgdata:/var/lib/postgresql/data
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
+  esdata:
 
 networks:
   storage:
