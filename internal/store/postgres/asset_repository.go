@@ -279,35 +279,45 @@ func (r *AssetRepository) getByVersion(
 // It updates if asset does exist.
 // Checking existence is done using "urn", "type", and "service" fields.
 func (r *AssetRepository) Upsert(ctx context.Context, ast *asset.Asset) (string, error) {
-	fetchedAsset, err := r.GetByURN(ctx, ast.URN)
-	if errors.As(err, new(asset.NotFoundError)) {
-		err = nil
-	}
-	if err != nil {
-		return "", fmt.Errorf("error getting asset by URN: %w", err)
-	}
-
-	if fetchedAsset.ID == "" {
-		// insert flow
-		id, err := r.insert(ctx, ast)
-		if err != nil {
-			return "", fmt.Errorf("error inserting asset to DB: %w", err)
+	var id string
+	err := r.client.RunWithinTx(ctx, func(tx *sqlx.Tx) error {
+		fetchedAsset, err := r.GetByURN(ctx, ast.URN)
+		if errors.As(err, new(asset.NotFoundError)) {
+			err = nil
 		}
-		return id, nil
-	}
+		if err != nil {
+			return fmt.Errorf("error getting asset by URN: %w", err)
+		}
 
-	// update flow
-	changelog, err := fetchedAsset.Diff(ast)
+		if fetchedAsset.ID == "" {
+			// insert flow
+			id, err = r.insert(ctx, ast)
+			if err != nil {
+				return fmt.Errorf("error inserting asset to DB: %w", err)
+			}
+			return nil
+		}
+
+		// update flow
+		changelog, err := fetchedAsset.Diff(ast)
+		if err != nil {
+			return fmt.Errorf("error diffing two assets: %w", err)
+		}
+
+		err = r.update(ctx, fetchedAsset.ID, ast, &fetchedAsset, changelog)
+		if err != nil {
+			return fmt.Errorf("error updating asset to DB: %w", err)
+		}
+		id = fetchedAsset.ID
+
+		return nil
+	})
+
 	if err != nil {
-		return "", fmt.Errorf("error diffing two assets: %w", err)
+		return "", err
 	}
 
-	err = r.update(ctx, fetchedAsset.ID, ast, &fetchedAsset, changelog)
-	if err != nil {
-		return "", fmt.Errorf("error updating asset to DB: %w", err)
-	}
-
-	return fetchedAsset.ID, nil
+	return id, nil
 }
 
 // DeleteByID removes asset using its ID
