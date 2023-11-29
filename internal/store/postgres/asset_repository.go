@@ -26,20 +26,57 @@ type AssetRepository struct {
 
 // GetAll retrieves list of assets with filters
 func (r *AssetRepository) GetAll(ctx context.Context, flt asset.Filter) ([]asset.Asset, error) {
-	builder := r.getAssetSQL().Offset(uint64(flt.Offset))
-	size := flt.Size
+	fields := flt.IncludeFields
 
-	if size > 0 {
-		builder = r.getAssetSQL().Limit(uint64(size)).Offset(uint64(flt.Offset))
+	var builder sq.SelectBuilder
+	if len(fields) == 0 {
+		builder = r.getAssetSQL().Offset(uint64(flt.Offset))
+	} else {
+		updatedFields := make([]string, len(fields))
+		ifIDNotIncluded := true
+		for i, field := range fields {
+			if strings.ToLower(field) == "id" {
+				ifIDNotIncluded = false
+			} else {
+				updatedFields[i] = "a." + field
+			}
+		}
+
+		if ifIDNotIncluded {
+			updatedFields = append(updatedFields, "a.id")
+		}
+
+		if flt.IncludeUserInfo {
+			userFields := []string{
+				"u.id as \"updated_by.id\"",
+				"u.uuid as \"updated_by.uuid\"",
+				"u.email as \"updated_by.email\"",
+				"u.provider as \"updated_by.provider\"",
+				"u.created_at as \"updated_by.created_at\"",
+				"u.updated_at as \"updated_by.updated_at\"",
+			}
+			updatedFields = append(updatedFields, userFields...)
+		}
+
+		builder = sq.Select(updatedFields...).From("assets as a").
+			LeftJoin("users u ON a.updated_by = u.id").
+			Offset(uint64(flt.Offset))
 	}
+
+	if flt.Size > 0 {
+		builder = builder.Limit(uint64(flt.Size))
+	}
+
 	builder = r.BuildFilterQuery(builder, flt)
 	builder = r.buildOrderQuery(builder, flt)
+
 	query, args, err := builder.PlaceholderFormat(sq.Dollar).ToSql()
 	if err != nil {
 		return nil, fmt.Errorf("error building query: %w", err)
 	}
 
 	var ams []*AssetModel
+
 	err = r.client.db.SelectContext(ctx, &ams, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("error getting asset list: %w", err)

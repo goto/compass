@@ -4192,6 +4192,33 @@ func (m *GetAllAssetsRequest) validate(all bool) error {
 
 	// no validation rules for WithTotal
 
+	if len(m.GetIncludeFields()) > 0 {
+
+		_GetAllAssetsRequest_IncludeFields_Unique := make(map[string]struct{}, len(m.GetIncludeFields()))
+
+		for idx, item := range m.GetIncludeFields() {
+			_, _ = idx, item
+
+			if _, exists := _GetAllAssetsRequest_IncludeFields_Unique[item]; exists {
+				err := GetAllAssetsRequestValidationError{
+					field:  fmt.Sprintf("IncludeFields[%v]", idx),
+					reason: "repeated value must contain unique items",
+				}
+				if !all {
+					return err
+				}
+				errors = append(errors, err)
+			} else {
+				_GetAllAssetsRequest_IncludeFields_Unique[item] = struct{}{}
+			}
+
+			// no validation rules for IncludeFields[idx]
+		}
+
+	}
+
+	// no validation rules for IncludeUserInfo
+
 	if len(errors) > 0 {
 		return GetAllAssetsRequestMultiError(errors)
 	}

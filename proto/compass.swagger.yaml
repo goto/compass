@@ -94,6 +94,18 @@ paths:
           in: query
           required: false
           type: boolean
+        - name: include_fields
+          in: query
+          required: false
+          type: array
+          items:
+            type: string
+          collectionFormat: multi
+        - name: include_user_info
+          description: if true user information will be added in the response else not
+          in: query
+          required: false
+          type: boolean
       tags:
         - Asset
     put:
