@@ -108,6 +108,8 @@ func (p *Processor) Process(ctx context.Context, types []string, fn worker.JobEx
 			return fmt.Errorf("pickup job: %w", err)
 		}
 
+		// check for dupes, only for sync asset jobs
+
 		resultJob := fn(ctx, job)
 		switch resultJob.Status {
 		case worker.StatusDone:

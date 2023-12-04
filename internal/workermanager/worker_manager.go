@@ -8,6 +8,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/goto/compass/core/asset"
+	"github.com/goto/compass/core/job"
 	"github.com/goto/compass/pkg/worker"
 	"github.com/goto/compass/pkg/worker/pgq"
 	"github.com/goto/compass/pkg/worker/workermw"
@@ -23,6 +25,8 @@ type Manager struct {
 	worker         Worker
 	jobManagerPort int
 	discoveryRepo  DiscoveryRepository
+	assetRepo      asset.Repository
+	jobRepo        job.Repository
 	logger         log.Logger
 }
 
@@ -46,6 +50,8 @@ type Config struct {
 type Deps struct {
 	Config        Config
 	DiscoveryRepo DiscoveryRepository
+	AssetRepo     asset.Repository
+	JobRepo       job.Repository
 	Logger        log.Logger
 }
 
@@ -71,6 +77,8 @@ func New(ctx context.Context, deps Deps) (*Manager, error) {
 		worker:         w,
 		jobManagerPort: cfg.JobManagerPort,
 		discoveryRepo:  deps.DiscoveryRepo,
+		assetRepo:      deps.AssetRepo,
+		jobRepo:        deps.JobRepo,
 		logger:         deps.Logger,
 	}, nil
 }
@@ -112,6 +120,7 @@ func (m *Manager) init() error {
 	jobHandlers := map[string]worker.JobHandler{
 		jobIndexAsset:  m.indexAssetHandler(),
 		jobDeleteAsset: m.deleteAssetHandler(),
+		jobSyncAsset:   m.syncAssetHandler(),
 	}
 	for typ, h := range jobHandlers {
 		if err := m.worker.Register(typ, h); err != nil {

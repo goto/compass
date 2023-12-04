@@ -6484,6 +6484,210 @@ var _ interface {
 	ErrorName() string
 } = CreateAssetProbeResponseValidationError{}
 
+// Validate checks the field values on SyncAssetsRequest with the rules defined
+// in the proto definition for this message. If any rules are violated, the
+// first error encountered is returned, or nil if there are no violations.
+func (m *SyncAssetsRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on SyncAssetsRequest with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// SyncAssetsRequestMultiError, or nil if none found.
+func (m *SyncAssetsRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *SyncAssetsRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if len(errors) > 0 {
+		return SyncAssetsRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// SyncAssetsRequestMultiError is an error wrapping multiple validation errors
+// returned by SyncAssetsRequest.ValidateAll() if the designated constraints
+// aren't met.
+type SyncAssetsRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m SyncAssetsRequestMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m SyncAssetsRequestMultiError) AllErrors() []error { return m }
+
+// SyncAssetsRequestValidationError is the validation error returned by
+// SyncAssetsRequest.Validate if the designated constraints aren't met.
+type SyncAssetsRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e SyncAssetsRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e SyncAssetsRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e SyncAssetsRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e SyncAssetsRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e SyncAssetsRequestValidationError) ErrorName() string {
+	return "SyncAssetsRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e SyncAssetsRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sSyncAssetsRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = SyncAssetsRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = SyncAssetsRequestValidationError{}
+
+// Validate checks the field values on SyncAssetsResponse with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *SyncAssetsResponse) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on SyncAssetsResponse with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// SyncAssetsResponseMultiError, or nil if none found.
+func (m *SyncAssetsResponse) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *SyncAssetsResponse) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if len(errors) > 0 {
+		return SyncAssetsResponseMultiError(errors)
+	}
+
+	return nil
+}
+
+// SyncAssetsResponseMultiError is an error wrapping multiple validation errors
+// returned by SyncAssetsResponse.ValidateAll() if the designated constraints
+// aren't met.
+type SyncAssetsResponseMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m SyncAssetsResponseMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m SyncAssetsResponseMultiError) AllErrors() []error { return m }
+
+// SyncAssetsResponseValidationError is the validation error returned by
+// SyncAssetsResponse.Validate if the designated constraints aren't met.
+type SyncAssetsResponseValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e SyncAssetsResponseValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e SyncAssetsResponseValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e SyncAssetsResponseValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e SyncAssetsResponseValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e SyncAssetsResponseValidationError) ErrorName() string {
+	return "SyncAssetsResponseValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e SyncAssetsResponseValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sSyncAssetsResponse.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = SyncAssetsResponseValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = SyncAssetsResponseValidationError{}
+
 // Validate checks the field values on GetUserStarredAssetsRequest with the
 // rules defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.

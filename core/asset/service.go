@@ -24,6 +24,7 @@ type Service struct {
 type Worker interface {
 	EnqueueIndexAssetJob(ctx context.Context, ast Asset) error
 	EnqueueDeleteAssetJob(ctx context.Context, urn string) error
+	EnqueueSyncAssetJob(ctx context.Context, service string) error
 	Close() error
 }
 
@@ -227,6 +228,13 @@ func (s *Service) GroupAssets(ctx context.Context, cfg GroupConfig) (results []G
 
 func (s *Service) SuggestAssets(ctx context.Context, cfg SearchConfig) (suggestions []string, err error) {
 	return s.discoveryRepository.Suggest(ctx, cfg)
+}
+
+func (s *Service) SyncAssets(ctx context.Context, services []string) error {
+	for _, service := range services {
+		s.worker.EnqueueSyncAssetJob(ctx, service)
+	}
+	return nil
 }
 
 func (s *Service) instrumentAssetOp(ctx context.Context, op, id string, err error) {

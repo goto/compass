@@ -150,6 +150,49 @@ func (_c *Worker_EnqueueIndexAssetJob_Call) RunAndReturn(run func(context.Contex
 	return _c
 }
 
+// EnqueueSyncAssetJob provides a mock function with given fields: ctx, service
+func (_m *Worker) EnqueueSyncAssetJob(ctx context.Context, service string) error {
+	ret := _m.Called(ctx, service)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) error); ok {
+		r0 = rf(ctx, service)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// Worker_EnqueueSyncAssetJob_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'EnqueueSyncAssetJob'
+type Worker_EnqueueSyncAssetJob_Call struct {
+	*mock.Call
+}
+
+// EnqueueSyncAssetJob is a helper method to define mock.On call
+//   - ctx context.Context
+//   - service string
+func (_e *Worker_Expecter) EnqueueSyncAssetJob(ctx interface{}, service interface{}) *Worker_EnqueueSyncAssetJob_Call {
+	return &Worker_EnqueueSyncAssetJob_Call{Call: _e.mock.On("EnqueueSyncAssetJob", ctx, service)}
+}
+
+func (_c *Worker_EnqueueSyncAssetJob_Call) Run(run func(ctx context.Context, service string)) *Worker_EnqueueSyncAssetJob_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *Worker_EnqueueSyncAssetJob_Call) Return(_a0 error) *Worker_EnqueueSyncAssetJob_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *Worker_EnqueueSyncAssetJob_Call) RunAndReturn(run func(context.Context, string) error) *Worker_EnqueueSyncAssetJob_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 type mockConstructorTestingTNewWorker interface {
 	mock.TestingT
 	Cleanup(func())

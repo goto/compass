@@ -12,6 +12,10 @@ type DiscoveryRepository interface {
 	Search(ctx context.Context, cfg SearchConfig) (results []SearchResult, err error)
 	Suggest(ctx context.Context, cfg SearchConfig) (suggestions []string, err error)
 	GroupAssets(ctx context.Context, cfg GroupConfig) (results []GroupResult, err error)
+	Clone(ctx context.Context, indexName, clonedIndexName string) error
+	UpdateAlias(ctx context.Context, indexName, alias string) error
+	DeleteByIndexName(ctx context.Context, indexName string) error
+	UpdateIndexSettings(ctx context.Context, indexName string, body string) error
 }
 
 // GroupConfig represents a group query along

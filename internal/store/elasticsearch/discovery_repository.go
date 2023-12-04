@@ -65,6 +65,45 @@ func (repo *DiscoveryRepository) Upsert(ctx context.Context, ast asset.Asset) er
 	return repo.indexAsset(ctx, ast)
 }
 
+func (repo *DiscoveryRepository) Clone(ctx context.Context, indexName string, clonedIndexName string) error {
+	err := repo.UpdateIndexSettings(ctx, indexName, `{"settings":{"index.blocks.write":false}}`)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		err := repo.UpdateIndexSettings(ctx, indexName, `{"settings":{"index.blocks.write":true}}`)
+		if err != nil {
+
+		}
+	}()
+
+	cloneFn := repo.cli.client.Indices.Clone
+	_, err = cloneFn(indexName, clonedIndexName, cloneFn.WithContext(ctx))
+
+	return err
+}
+
+func (repo *DiscoveryRepository) UpdateAlias(ctx context.Context, indexName, alias string) error {
+	_, err := repo.cli.client.Indices.PutAlias([]string{indexName}, alias)
+	return err
+}
+
+func (repo *DiscoveryRepository) DeleteByIndexName(ctx context.Context, indexName string) error {
+	deleteFn := repo.cli.client.Indices.Delete
+	_, err := deleteFn([]string{indexName}, deleteFn.WithContext(ctx))
+	return err
+}
+
+func (repo *DiscoveryRepository) UpdateIndexSettings(ctx context.Context, indexName string, body string) error {
+	putSettings := repo.cli.client.Indices.PutSettings
+
+	_, err := putSettings(strings.NewReader(body),
+		putSettings.WithIndex(indexName),
+		putSettings.WithContext(ctx))
+
+	return err
+}
+
 func (repo *DiscoveryRepository) DeleteByID(ctx context.Context, assetID string) error {
 	if assetID == "" {
 		return asset.ErrEmptyID
