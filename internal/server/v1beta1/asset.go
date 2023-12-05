@@ -347,10 +347,11 @@ func (server *APIServer) CreateAssetProbe(ctx context.Context, req *compassv1bet
 }
 
 func (server *APIServer) SyncAssets(ctx context.Context, req *compassv1beta1.SyncAssetsRequest) (*compassv1beta1.SyncAssetsResponse, error) {
+	if err := server.assetService.SyncAssets(ctx, req.GetServices()); err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
 
-	server.assetService.SyncAssets(ctx, req.GetServices())
-
-	return nil, nil
+	return &compassv1beta1.SyncAssetsResponse{}, nil
 }
 
 func (server *APIServer) upsertAsset(

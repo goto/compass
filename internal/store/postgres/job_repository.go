@@ -3,8 +3,10 @@ package postgres
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/goto/compass/core/job"
+	"github.com/oklog/ulid/v2"
 )
 
 // JobRepository is a type that manages jobs queue operation ot the primary database
@@ -20,6 +22,32 @@ func (r *JobRepository) GetSyncJobsByService(ctx context.Context, service string
 	}
 
 	return res.toJobQueues(), nil
+}
+
+func (r *JobRepository) Insert(ctx context.Context, jobType string, payload []byte, runAt time.Time) (string, error) {
+	var jobID string
+	query := `
+		INSERT INTO
+			jobs_queue
+			(id, type, payload, run_at)
+		VALUES
+			($1, $2, $3, $4)
+		RETURNING id
+		`
+	if err := r.client.db.QueryRowContext(ctx, query, ulid.Make().String(), jobType, payload, runAt).Scan(&jobID); err != nil {
+		return "", fmt.Errorf("insert job queue: %w", err)
+	}
+
+	return jobID, nil
+}
+
+func (r *JobRepository) Delete(ctx context.Context, jobID string) error {
+	query := `DELETE FROM jobs_queue WHERE id = $1`
+	if _, err := r.client.db.ExecContext(ctx, query, jobID); err != nil {
+		return fmt.Errorf("delete job queue: %w", err)
+	}
+
+	return nil
 }
 
 // NewJobRepository initializes jobs queue repository

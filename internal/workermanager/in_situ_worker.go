@@ -3,6 +3,7 @@ package workermanager
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/goto/compass/core/asset"
 	"github.com/goto/compass/core/job"
@@ -17,6 +18,8 @@ type InSituWorker struct {
 func NewInSituWorker(deps Deps) *InSituWorker {
 	return &InSituWorker{
 		discoveryRepo: deps.DiscoveryRepo,
+		jobRepo:       deps.JobRepo,
+		assetRepo:     deps.AssetRepo,
 	}
 }
 
@@ -41,30 +44,17 @@ func (m *InSituWorker) EnqueueSyncAssetJob(ctx context.Context, service string) 
 		return fmt.Errorf("sync asset: get sync jobs by service: %w", err)
 	}
 
-	if len(jobs) > 1 {
-		for _, job := range jobs {
-			if job.RunAt.Before(job.RunAt) {
-				return nil // mark job as done if there's earlier job with same service
-			}
-		}
+	if len(jobs) > 0 {
+		return nil // mark job as done if there's earlier job with same service
 	}
 
-	backupIndexName := fmt.Sprintf("%+v-bak", service)
-
-	err = m.discoveryRepo.Clone(ctx, service, backupIndexName)
+	jobID, err := m.jobRepo.Insert(ctx, jobSyncAsset, ([]byte)(service), time.Now().UTC())
 	if err != nil {
-		return fmt.Errorf("sync asset: clone index: %w", err)
+		return fmt.Errorf("sync asset: insert job queue: %w", err)
 	}
-
-	err = m.discoveryRepo.UpdateAlias(ctx, backupIndexName, "universe")
-	if err != nil {
-		return fmt.Errorf("sync asset: update alias: %w", err)
-	}
-
-	err = m.discoveryRepo.DeleteByIndexName(ctx, service)
-	if err != nil {
-		return fmt.Errorf("sync asset: delete index: %w", err)
-	}
+	defer func() {
+		_ = m.jobRepo.Delete(ctx, jobID)
+	}()
 
 	assets, err := m.assetRepo.GetAll(ctx, asset.Filter{
 		Services: []string{service},
@@ -73,24 +63,7 @@ func (m *InSituWorker) EnqueueSyncAssetJob(ctx context.Context, service string) 
 		return fmt.Errorf("sync asset: get assets: %w", err)
 	}
 
-	for _, asset := range assets {
-		err = m.discoveryRepo.Upsert(ctx, asset)
-		if err != nil {
-			return fmt.Errorf("sync asset: upsert assets in ES: %w", err)
-		}
-	}
-
-	err = m.discoveryRepo.DeleteByIndexName(ctx, backupIndexName)
-	if err != nil {
-		return fmt.Errorf("sync asset: delete index: %w", err)
-	}
-
-	err = m.discoveryRepo.UpdateIndexSettings(ctx, service, `{"settings":{"index.blocks.write":false}}`)
-	if err != nil {
-		return fmt.Errorf("sync asset: update index settings: %w", err)
-	}
-
-	return nil
+	return m.discoveryRepo.SyncAssets(ctx, service, assets)
 }
 
 func (*InSituWorker) Close() error { return nil }

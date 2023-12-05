@@ -23,93 +23,6 @@ func (_m *DiscoveryRepository) EXPECT() *DiscoveryRepository_Expecter {
 	return &DiscoveryRepository_Expecter{mock: &_m.Mock}
 }
 
-// Clone provides a mock function with given fields: ctx, indexName, clonedIndexName
-func (_m *DiscoveryRepository) Clone(ctx context.Context, indexName string, clonedIndexName string) error {
-	ret := _m.Called(ctx, indexName, clonedIndexName)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
-		r0 = rf(ctx, indexName, clonedIndexName)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// DiscoveryRepository_Clone_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'Clone'
-type DiscoveryRepository_Clone_Call struct {
-	*mock.Call
-}
-
-// Clone is a helper method to define mock.On call
-//   - ctx context.Context
-//   - indexName string
-//   - clonedIndexName string
-func (_e *DiscoveryRepository_Expecter) Clone(ctx interface{}, indexName interface{}, clonedIndexName interface{}) *DiscoveryRepository_Clone_Call {
-	return &DiscoveryRepository_Clone_Call{Call: _e.mock.On("Clone", ctx, indexName, clonedIndexName)}
-}
-
-func (_c *DiscoveryRepository_Clone_Call) Run(run func(ctx context.Context, indexName string, clonedIndexName string)) *DiscoveryRepository_Clone_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string))
-	})
-	return _c
-}
-
-func (_c *DiscoveryRepository_Clone_Call) Return(_a0 error) *DiscoveryRepository_Clone_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *DiscoveryRepository_Clone_Call) RunAndReturn(run func(context.Context, string, string) error) *DiscoveryRepository_Clone_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// DeleteByIndexName provides a mock function with given fields: ctx, indexName
-func (_m *DiscoveryRepository) DeleteByIndexName(ctx context.Context, indexName string) error {
-	ret := _m.Called(ctx, indexName)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) error); ok {
-		r0 = rf(ctx, indexName)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// DiscoveryRepository_DeleteByIndexName_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteByIndexName'
-type DiscoveryRepository_DeleteByIndexName_Call struct {
-	*mock.Call
-}
-
-// DeleteByIndexName is a helper method to define mock.On call
-//   - ctx context.Context
-//   - indexName string
-func (_e *DiscoveryRepository_Expecter) DeleteByIndexName(ctx interface{}, indexName interface{}) *DiscoveryRepository_DeleteByIndexName_Call {
-	return &DiscoveryRepository_DeleteByIndexName_Call{Call: _e.mock.On("DeleteByIndexName", ctx, indexName)}
-}
-
-func (_c *DiscoveryRepository_DeleteByIndexName_Call) Run(run func(ctx context.Context, indexName string)) *DiscoveryRepository_DeleteByIndexName_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string))
-	})
-	return _c
-}
-
-func (_c *DiscoveryRepository_DeleteByIndexName_Call) Return(_a0 error) *DiscoveryRepository_DeleteByIndexName_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *DiscoveryRepository_DeleteByIndexName_Call) RunAndReturn(run func(context.Context, string) error) *DiscoveryRepository_DeleteByIndexName_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
 // DeleteByURN provides a mock function with given fields: ctx, assetURN
 func (_m *DiscoveryRepository) DeleteByURN(ctx context.Context, assetURN string) error {
 	ret := _m.Called(ctx, assetURN)
@@ -153,13 +66,13 @@ func (_c *DiscoveryRepository_DeleteByURN_Call) RunAndReturn(run func(context.Co
 	return _c
 }
 
-// UpdateAlias provides a mock function with given fields: ctx, indexName, alias
-func (_m *DiscoveryRepository) UpdateAlias(ctx context.Context, indexName string, alias string) error {
-	ret := _m.Called(ctx, indexName, alias)
+// SyncAssets provides a mock function with given fields: ctx, indexName, assets
+func (_m *DiscoveryRepository) SyncAssets(ctx context.Context, indexName string, assets []asset.Asset) error {
+	ret := _m.Called(ctx, indexName, assets)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
-		r0 = rf(ctx, indexName, alias)
+	if rf, ok := ret.Get(0).(func(context.Context, string, []asset.Asset) error); ok {
+		r0 = rf(ctx, indexName, assets)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -167,76 +80,32 @@ func (_m *DiscoveryRepository) UpdateAlias(ctx context.Context, indexName string
 	return r0
 }
 
-// DiscoveryRepository_UpdateAlias_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateAlias'
-type DiscoveryRepository_UpdateAlias_Call struct {
+// DiscoveryRepository_SyncAssets_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SyncAssets'
+type DiscoveryRepository_SyncAssets_Call struct {
 	*mock.Call
 }
 
-// UpdateAlias is a helper method to define mock.On call
+// SyncAssets is a helper method to define mock.On call
 //   - ctx context.Context
 //   - indexName string
-//   - alias string
-func (_e *DiscoveryRepository_Expecter) UpdateAlias(ctx interface{}, indexName interface{}, alias interface{}) *DiscoveryRepository_UpdateAlias_Call {
-	return &DiscoveryRepository_UpdateAlias_Call{Call: _e.mock.On("UpdateAlias", ctx, indexName, alias)}
+//   - assets []asset.Asset
+func (_e *DiscoveryRepository_Expecter) SyncAssets(ctx interface{}, indexName interface{}, assets interface{}) *DiscoveryRepository_SyncAssets_Call {
+	return &DiscoveryRepository_SyncAssets_Call{Call: _e.mock.On("SyncAssets", ctx, indexName, assets)}
 }
 
-func (_c *DiscoveryRepository_UpdateAlias_Call) Run(run func(ctx context.Context, indexName string, alias string)) *DiscoveryRepository_UpdateAlias_Call {
+func (_c *DiscoveryRepository_SyncAssets_Call) Run(run func(ctx context.Context, indexName string, assets []asset.Asset)) *DiscoveryRepository_SyncAssets_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string))
+		run(args[0].(context.Context), args[1].(string), args[2].([]asset.Asset))
 	})
 	return _c
 }
 
-func (_c *DiscoveryRepository_UpdateAlias_Call) Return(_a0 error) *DiscoveryRepository_UpdateAlias_Call {
+func (_c *DiscoveryRepository_SyncAssets_Call) Return(_a0 error) *DiscoveryRepository_SyncAssets_Call {
 	_c.Call.Return(_a0)
 	return _c
 }
 
-func (_c *DiscoveryRepository_UpdateAlias_Call) RunAndReturn(run func(context.Context, string, string) error) *DiscoveryRepository_UpdateAlias_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// UpdateIndexSettings provides a mock function with given fields: ctx, indexName, body
-func (_m *DiscoveryRepository) UpdateIndexSettings(ctx context.Context, indexName string, body string) error {
-	ret := _m.Called(ctx, indexName, body)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
-		r0 = rf(ctx, indexName, body)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// DiscoveryRepository_UpdateIndexSettings_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpdateIndexSettings'
-type DiscoveryRepository_UpdateIndexSettings_Call struct {
-	*mock.Call
-}
-
-// UpdateIndexSettings is a helper method to define mock.On call
-//   - ctx context.Context
-//   - indexName string
-//   - body string
-func (_e *DiscoveryRepository_Expecter) UpdateIndexSettings(ctx interface{}, indexName interface{}, body interface{}) *DiscoveryRepository_UpdateIndexSettings_Call {
-	return &DiscoveryRepository_UpdateIndexSettings_Call{Call: _e.mock.On("UpdateIndexSettings", ctx, indexName, body)}
-}
-
-func (_c *DiscoveryRepository_UpdateIndexSettings_Call) Run(run func(ctx context.Context, indexName string, body string)) *DiscoveryRepository_UpdateIndexSettings_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string))
-	})
-	return _c
-}
-
-func (_c *DiscoveryRepository_UpdateIndexSettings_Call) Return(_a0 error) *DiscoveryRepository_UpdateIndexSettings_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *DiscoveryRepository_UpdateIndexSettings_Call) RunAndReturn(run func(context.Context, string, string) error) *DiscoveryRepository_UpdateIndexSettings_Call {
+func (_c *DiscoveryRepository_SyncAssets_Call) RunAndReturn(run func(context.Context, string, []asset.Asset) error) *DiscoveryRepository_SyncAssets_Call {
 	_c.Call.Return(run)
 	return _c
 }

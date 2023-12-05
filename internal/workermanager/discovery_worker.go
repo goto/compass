@@ -15,10 +15,7 @@ import (
 type DiscoveryRepository interface {
 	Upsert(context.Context, asset.Asset) error
 	DeleteByURN(ctx context.Context, assetURN string) error
-	Clone(ctx context.Context, indexName, clonedIndexName string) error
-	UpdateAlias(ctx context.Context, indexName, alias string) error
-	DeleteByIndexName(ctx context.Context, indexName string) error
-	UpdateIndexSettings(ctx context.Context, indexName string, body string) error
+	SyncAssets(ctx context.Context, indexName string, assets []asset.Asset) error
 }
 
 func (m *Manager) EnqueueIndexAssetJob(ctx context.Context, ast asset.Asset) error {
@@ -75,10 +72,7 @@ func (m *Manager) IndexAsset(ctx context.Context, job worker.JobSpec) error {
 }
 
 func (m *Manager) SyncAssets(ctx context.Context, job worker.JobSpec) error {
-	var service string
-	if err := json.Unmarshal(job.Payload, &service); err != nil {
-		return fmt.Errorf("sync asset: deserialise payload: %w", err)
-	}
+	service := string(job.Payload)
 
 	jobs, err := m.jobRepo.GetSyncJobsByService(ctx, service)
 	if err != nil {
@@ -93,23 +87,6 @@ func (m *Manager) SyncAssets(ctx context.Context, job worker.JobSpec) error {
 		}
 	}
 
-	backupIndexName := fmt.Sprintf("%+v-bak", service)
-
-	err = m.discoveryRepo.Clone(ctx, service, backupIndexName)
-	if err != nil {
-		return fmt.Errorf("sync asset: clone index: %w", err)
-	}
-
-	err = m.discoveryRepo.UpdateAlias(ctx, backupIndexName, "universe")
-	if err != nil {
-		return fmt.Errorf("sync asset: update alias: %w", err)
-	}
-
-	err = m.discoveryRepo.DeleteByIndexName(ctx, service)
-	if err != nil {
-		return fmt.Errorf("sync asset: delete index: %w", err)
-	}
-
 	assets, err := m.assetRepo.GetAll(ctx, asset.Filter{
 		Services: []string{service},
 	})
@@ -117,24 +94,7 @@ func (m *Manager) SyncAssets(ctx context.Context, job worker.JobSpec) error {
 		return fmt.Errorf("sync asset: get assets: %w", err)
 	}
 
-	for _, asset := range assets {
-		err = m.discoveryRepo.Upsert(ctx, asset)
-		if err != nil {
-			return fmt.Errorf("sync asset: upsert assets in ES: %w", err)
-		}
-	}
-
-	err = m.discoveryRepo.DeleteByIndexName(ctx, backupIndexName)
-	if err != nil {
-		return fmt.Errorf("sync asset: delete index: %w", err)
-	}
-
-	err = m.discoveryRepo.UpdateIndexSettings(ctx, service, `{"settings":{"index.blocks.write":false}}`)
-	if err != nil {
-		return fmt.Errorf("sync asset: update index settings: %w", err)
-	}
-
-	return nil
+	return m.discoveryRepo.SyncAssets(ctx, service, assets)
 }
 
 func (m *Manager) EnqueueDeleteAssetJob(ctx context.Context, urn string) error {

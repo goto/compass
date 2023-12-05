@@ -65,43 +65,47 @@ func (repo *DiscoveryRepository) Upsert(ctx context.Context, ast asset.Asset) er
 	return repo.indexAsset(ctx, ast)
 }
 
-func (repo *DiscoveryRepository) Clone(ctx context.Context, indexName string, clonedIndexName string) error {
-	err := repo.UpdateIndexSettings(ctx, indexName, `{"settings":{"index.blocks.write":false}}`)
+func (repo *DiscoveryRepository) SyncAssets(ctx context.Context, indexName string, asts []asset.Asset) error {
+	backupIndexName := fmt.Sprintf("%+v-bak", indexName)
+
+	err := repo.updateIndexSettings(ctx, indexName, `{"settings":{"index.blocks.write":true}}`)
 	if err != nil {
 		return err
 	}
-	defer func() {
-		err := repo.UpdateIndexSettings(ctx, indexName, `{"settings":{"index.blocks.write":true}}`)
+
+	err = repo.clone(ctx, indexName, backupIndexName)
+	if err != nil {
+		return err
+	}
+
+	err = repo.updateAlias(ctx, backupIndexName, "universe")
+	if err != nil {
+		return err
+	}
+
+	err = repo.deleteByIndexName(ctx, indexName)
+	if err != nil {
+		return err
+	}
+
+	for _, ast := range asts {
+		err = repo.Upsert(ctx, ast)
 		if err != nil {
-
+			return err
 		}
-	}()
+	}
 
-	cloneFn := repo.cli.client.Indices.Clone
-	_, err = cloneFn(indexName, clonedIndexName, cloneFn.WithContext(ctx))
+	err = repo.deleteByIndexName(ctx, backupIndexName)
+	if err != nil {
+		return err
+	}
 
-	return err
-}
+	err = repo.updateIndexSettings(ctx, indexName, `{"settings":{"index.blocks.write":false}}`)
+	if err != nil {
+		return err
+	}
 
-func (repo *DiscoveryRepository) UpdateAlias(ctx context.Context, indexName, alias string) error {
-	_, err := repo.cli.client.Indices.PutAlias([]string{indexName}, alias)
-	return err
-}
-
-func (repo *DiscoveryRepository) DeleteByIndexName(ctx context.Context, indexName string) error {
-	deleteFn := repo.cli.client.Indices.Delete
-	_, err := deleteFn([]string{indexName}, deleteFn.WithContext(ctx))
-	return err
-}
-
-func (repo *DiscoveryRepository) UpdateIndexSettings(ctx context.Context, indexName string, body string) error {
-	putSettings := repo.cli.client.Indices.PutSettings
-
-	_, err := putSettings(strings.NewReader(body),
-		putSettings.WithIndex(indexName),
-		putSettings.WithContext(ctx))
-
-	return err
+	return nil
 }
 
 func (repo *DiscoveryRepository) DeleteByID(ctx context.Context, assetID string) error {
@@ -217,4 +221,102 @@ func createUpsertBody(ast asset.Asset) (io.Reader, error) {
 	}
 
 	return &buf, nil
+}
+
+func (repo *DiscoveryRepository) clone(ctx context.Context, indexName, clonedIndexName string) error {
+	cloneFn := repo.cli.client.Indices.Clone
+	resp, err := cloneFn(indexName, clonedIndexName, cloneFn.WithContext(ctx))
+	if err != nil {
+		return asset.DiscoveryError{
+			Op:    "CloneDoc",
+			Index: indexName,
+			Err:   err,
+		}
+	}
+
+	if resp.IsError() {
+		code, reason := errorCodeAndReason(resp)
+		return asset.DiscoveryError{
+			Op:     "CloneDoc",
+			Index:  indexName,
+			ESCode: code,
+			Err:    errors.New(reason),
+		}
+	}
+
+	return nil
+}
+
+func (repo *DiscoveryRepository) updateAlias(ctx context.Context, indexName, alias string) error {
+	putAliasFn := repo.cli.client.Indices.PutAlias
+	resp, err := putAliasFn([]string{indexName}, alias, putAliasFn.WithContext(ctx))
+	if err != nil {
+		return asset.DiscoveryError{
+			Op:    "UpdateAlias",
+			Index: indexName,
+			Err:   err,
+		}
+	}
+
+	if resp.IsError() {
+		code, reason := errorCodeAndReason(resp)
+		return asset.DiscoveryError{
+			Op:     "UpdateAlias",
+			Index:  indexName,
+			ESCode: code,
+			Err:    errors.New(reason),
+		}
+	}
+	return nil
+}
+
+func (repo *DiscoveryRepository) deleteByIndexName(ctx context.Context, indexName string) error {
+	deleteFn := repo.cli.client.Indices.Delete
+	resp, err := deleteFn([]string{indexName}, deleteFn.WithContext(ctx))
+	if err != nil {
+		return asset.DiscoveryError{
+			Op:    "DeleteIndex",
+			Index: indexName,
+			Err:   err,
+		}
+	}
+
+	if resp.IsError() {
+		code, reason := errorCodeAndReason(resp)
+		return asset.DiscoveryError{
+			Op:     "DeleteIndex",
+			Index:  indexName,
+			ESCode: code,
+			Err:    errors.New(reason),
+		}
+	}
+
+	return nil
+}
+
+func (repo *DiscoveryRepository) updateIndexSettings(ctx context.Context, indexName, body string) error {
+	putSettings := repo.cli.client.Indices.PutSettings
+
+	resp, err := putSettings(strings.NewReader(body),
+		putSettings.WithIndex(indexName),
+		putSettings.WithContext(ctx))
+	if err != nil {
+		return asset.DiscoveryError{
+			Op:    "UpdateSettings",
+			Index: indexName,
+			Err:   err,
+		}
+	}
+
+	if resp.IsError() {
+		code, reason := errorCodeAndReason(resp)
+		return asset.DiscoveryError{
+			Op:     "UpdateSettings",
+			Index:  indexName,
+			ESCode: code,
+			Err:    errors.New(reason),
+		}
+	}
+
+	return err
 }
