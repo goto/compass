@@ -170,7 +170,7 @@ func (c *Client) Init() (string, error) {
 	return fmt.Sprintf("%q (server version %s)", info.ClusterName, info.Version.Number), nil
 }
 
-func (c *Client) CreateIdx(ctx context.Context, discoveryOp, indexName string) (err error) {
+func (c *Client) CreateIdx(ctx context.Context, discoveryOp, indexName, alias string) (err error) {
 	defer func(start time.Time) {
 		const op = "create_index"
 		c.instrumentOp(ctx, instrumentParams{
@@ -181,7 +181,7 @@ func (c *Client) CreateIdx(ctx context.Context, discoveryOp, indexName string) (
 		})
 	}(time.Now())
 
-	indexSettings := buildTypeIndexSettings()
+	indexSettings := buildTypeIndexSettings(alias)
 	res, err := c.client.Indices.Create(
 		indexName,
 		c.client.Indices.Create.WithBody(strings.NewReader(indexSettings)),
@@ -207,8 +207,16 @@ func (c *Client) CreateIdx(ctx context.Context, discoveryOp, indexName string) (
 	return nil
 }
 
-func buildTypeIndexSettings() string {
-	return fmt.Sprintf(indexSettingsTemplate, serviceIndexMapping, defaultSearchIndex)
+func buildTypeIndexSettings(alias string) string {
+	var aliasObj string
+
+	if len(alias) > 0 {
+		aliasObj = fmt.Sprintf(`"aliases": {
+			%q: {}
+		},`, alias)
+	}
+
+	return fmt.Sprintf(indexSettingsTemplate, serviceIndexMapping, aliasObj)
 }
 
 // checks for the existence of an index

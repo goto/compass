@@ -12,7 +12,7 @@ type DiscoveryRepository interface {
 	Search(ctx context.Context, cfg SearchConfig) (results []SearchResult, err error)
 	Suggest(ctx context.Context, cfg SearchConfig) (suggestions []string, err error)
 	GroupAssets(ctx context.Context, cfg GroupConfig) (results []GroupResult, err error)
-	SyncAssets(ctx context.Context, indexName string, assets []Asset) error
+	SyncAssets(ctx context.Context, indexName string) (cleanup func() error, err error)
 }
 
 // GroupConfig represents a group query along

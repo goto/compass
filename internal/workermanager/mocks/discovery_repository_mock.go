@@ -66,18 +66,30 @@ func (_c *DiscoveryRepository_DeleteByURN_Call) RunAndReturn(run func(context.Co
 	return _c
 }
 
-// SyncAssets provides a mock function with given fields: ctx, indexName, assets
-func (_m *DiscoveryRepository) SyncAssets(ctx context.Context, indexName string, assets []asset.Asset) error {
-	ret := _m.Called(ctx, indexName, assets)
+// SyncAssets provides a mock function with given fields: ctx, indexName
+func (_m *DiscoveryRepository) SyncAssets(ctx context.Context, indexName string) (func() error, error) {
+	ret := _m.Called(ctx, indexName)
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, []asset.Asset) error); ok {
-		r0 = rf(ctx, indexName, assets)
+	var r0 func() error
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (func() error, error)); ok {
+		return rf(ctx, indexName)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) func() error); ok {
+		r0 = rf(ctx, indexName)
 	} else {
-		r0 = ret.Error(0)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(func() error)
+		}
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, indexName)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // DiscoveryRepository_SyncAssets_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SyncAssets'
@@ -88,24 +100,23 @@ type DiscoveryRepository_SyncAssets_Call struct {
 // SyncAssets is a helper method to define mock.On call
 //   - ctx context.Context
 //   - indexName string
-//   - assets []asset.Asset
-func (_e *DiscoveryRepository_Expecter) SyncAssets(ctx interface{}, indexName interface{}, assets interface{}) *DiscoveryRepository_SyncAssets_Call {
-	return &DiscoveryRepository_SyncAssets_Call{Call: _e.mock.On("SyncAssets", ctx, indexName, assets)}
+func (_e *DiscoveryRepository_Expecter) SyncAssets(ctx interface{}, indexName interface{}) *DiscoveryRepository_SyncAssets_Call {
+	return &DiscoveryRepository_SyncAssets_Call{Call: _e.mock.On("SyncAssets", ctx, indexName)}
 }
 
-func (_c *DiscoveryRepository_SyncAssets_Call) Run(run func(ctx context.Context, indexName string, assets []asset.Asset)) *DiscoveryRepository_SyncAssets_Call {
+func (_c *DiscoveryRepository_SyncAssets_Call) Run(run func(ctx context.Context, indexName string)) *DiscoveryRepository_SyncAssets_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].([]asset.Asset))
+		run(args[0].(context.Context), args[1].(string))
 	})
 	return _c
 }
 
-func (_c *DiscoveryRepository_SyncAssets_Call) Return(_a0 error) *DiscoveryRepository_SyncAssets_Call {
-	_c.Call.Return(_a0)
+func (_c *DiscoveryRepository_SyncAssets_Call) Return(cleanup func() error, err error) *DiscoveryRepository_SyncAssets_Call {
+	_c.Call.Return(cleanup, err)
 	return _c
 }
 
-func (_c *DiscoveryRepository_SyncAssets_Call) RunAndReturn(run func(context.Context, string, []asset.Asset) error) *DiscoveryRepository_SyncAssets_Call {
+func (_c *DiscoveryRepository_SyncAssets_Call) RunAndReturn(run func(context.Context, string) (func() error, error)) *DiscoveryRepository_SyncAssets_Call {
 	_c.Call.Return(run)
 	return _c
 }

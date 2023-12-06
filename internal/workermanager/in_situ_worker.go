@@ -57,49 +57,36 @@ func (m *InSituWorker) EnqueueSyncAssetJob(ctx context.Context, service string) 
 		_ = m.jobRepo.Delete(ctx, jobID)
 	}()
 
-	// need to limit this
-	assets, err := m.assetRepo.GetAll(ctx, asset.Filter{
-		Services: []string{service},
-		Size:     batchSize,
-		SortBy:   "name",
-	})
+	cleanup, err := m.discoveryRepo.SyncAssets(ctx, service)
 	if err != nil {
-		return fmt.Errorf("sync asset: get assets: %w", err)
-	}
-
-	if err := m.discoveryRepo.SyncAssets(ctx, service, assets); err != nil {
 		return err
 	}
 
-	if len(assets) == batchSize { // do remaining upsert after first batch completed
-		it := 1
-
-		for {
-			assets, err := m.assetRepo.GetAll(ctx, asset.Filter{
-				Services: []string{service},
-				Size:     batchSize,
-				Offset:   it * batchSize,
-				SortBy:   "name",
-			})
-			if err != nil {
-				return fmt.Errorf("sync asset: get assets: %w", err)
-			}
-
-			for _, ast := range assets {
-				if err := m.discoveryRepo.Upsert(ctx, ast); err != nil {
-					return err
-				}
-			}
-
-			if len(assets) != batchSize {
-				break
-			}
-			it++
+	it := 0
+	for {
+		assets, err := m.assetRepo.GetAll(ctx, asset.Filter{
+			Services: []string{service},
+			Size:     batchSize,
+			Offset:   it * batchSize,
+			SortBy:   "name",
+		})
+		if err != nil {
+			return fmt.Errorf("sync asset: get assets: %w", err)
 		}
 
+		for _, ast := range assets {
+			if err := m.discoveryRepo.Upsert(ctx, ast); err != nil {
+				return err
+			}
+		}
+
+		if len(assets) != batchSize {
+			break
+		}
+		it++
 	}
 
-	return nil
+	return cleanup()
 }
 
 func (*InSituWorker) Close() error { return nil }

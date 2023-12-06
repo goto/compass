@@ -34,6 +34,29 @@ func NewDiscoveryRepository(cli *Client, logger log.Logger, requestTimeout time.
 	}
 }
 
+func (repo *DiscoveryRepository) createIndex(ctx context.Context, discoveryOp, indexName, alias string) error {
+	idxExists, err := repo.cli.indexExists(ctx, discoveryOp, indexName)
+	if err != nil {
+		return asset.DiscoveryError{
+			Op:    "IndexExists",
+			Index: indexName,
+			Err:   err,
+		}
+	}
+
+	if !idxExists {
+		if err := repo.cli.CreateIdx(ctx, discoveryOp, indexName, alias); err != nil {
+			return asset.DiscoveryError{
+				Op:    "CreateIndex",
+				Index: indexName,
+				Err:   err,
+			}
+		}
+	}
+
+	return nil
+}
+
 func (repo *DiscoveryRepository) Upsert(ctx context.Context, ast asset.Asset) error {
 	if ast.ID == "" {
 		return asset.ErrEmptyID
@@ -42,71 +65,60 @@ func (repo *DiscoveryRepository) Upsert(ctx context.Context, ast asset.Asset) er
 		return asset.ErrUnknownType
 	}
 
-	idxExists, err := repo.cli.indexExists(ctx, "Upsert", ast.Service)
-	if err != nil {
-		return asset.DiscoveryError{
-			Op:    "IndexExists",
-			ID:    ast.ID,
-			Index: ast.Service,
-			Err:   err,
-		}
-	}
-
-	if !idxExists {
-		if err := repo.cli.CreateIdx(ctx, "Upsert", ast.Service); err != nil {
-			return asset.DiscoveryError{
-				Op:    "CreateIndex",
-				ID:    ast.ID,
-				Index: ast.Service,
-				Err:   err,
-			}
-		}
+	if err := repo.createIndex(ctx, "Upsert", ast.Service, defaultSearchIndex); err != nil {
+		return err
 	}
 
 	return repo.indexAsset(ctx, ast)
 }
 
-func (repo *DiscoveryRepository) SyncAssets(ctx context.Context, indexName string, asts []asset.Asset) error {
+func (repo *DiscoveryRepository) SyncAssets(ctx context.Context, indexName string) (func() error, error) {
 	backupIndexName := fmt.Sprintf("%+v-bak", indexName)
 
 	err := repo.updateIndexSettings(ctx, indexName, `{"settings":{"index.blocks.write":true}}`)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	err = repo.clone(ctx, indexName, backupIndexName)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	err = repo.updateAlias(ctx, backupIndexName, "universe")
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	err = repo.deleteByIndexName(ctx, indexName)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	for _, ast := range asts {
-		err = repo.Upsert(ctx, ast)
+	err = repo.createIndex(ctx, "SyncAssets", indexName, "")
+	if err != nil {
+		return nil, err
+	}
+
+	cleanup := func() error {
+		err = repo.updateAlias(ctx, indexName, "universe")
 		if err != nil {
 			return err
 		}
+
+		err = repo.deleteByIndexName(ctx, backupIndexName)
+		if err != nil {
+			return err
+		}
+
+		err = repo.updateIndexSettings(ctx, indexName, `{"settings":{"index.blocks.write":false}}`)
+		if err != nil {
+			return err
+		}
+		return nil
 	}
 
-	err = repo.deleteByIndexName(ctx, backupIndexName)
-	if err != nil {
-		return err
-	}
-
-	err = repo.updateIndexSettings(ctx, indexName, `{"settings":{"index.blocks.write":false}}`)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return cleanup, err
 }
 
 func (repo *DiscoveryRepository) DeleteByID(ctx context.Context, assetID string) error {

@@ -398,27 +398,6 @@ func TestDiscoveryRepository_SyncAssets(t *testing.T) {
 			indexName = "bigquery-test"
 		)
 
-		ast1 := asset.Asset{
-			ID:      "id1",
-			Type:    asset.TypeTable,
-			Service: indexName,
-			URN:     "urn1",
-		}
-		ast2 := asset.Asset{
-			ID:      "id2",
-			Type:    asset.TypeTable,
-			Service: indexName,
-			URN:     "urn2",
-		}
-		ast3 := asset.Asset{
-			ID:      "id3",
-			Type:    asset.TypeTable,
-			Service: indexName,
-			URN:     "urn3",
-		}
-
-		assets := []asset.Asset{ast1, ast2, ast3}
-
 		cli, err := esTestServer.NewClient()
 		require.NoError(t, err)
 
@@ -434,7 +413,11 @@ func TestDiscoveryRepository_SyncAssets(t *testing.T) {
 
 		repo := store.NewDiscoveryRepository(esClient, log.NewNoop(), time.Second*10, []string{"number", "id"})
 
-		err = repo.SyncAssets(ctx, indexName, assets)
+		_, err = repo.SyncAssets(ctx, indexName)
 		require.NoError(t, err)
+
+		alias := cli.Indices.GetAlias
+		resp, _ := alias(alias.WithIndex(indexName))
+		require.NotEmpty(t, resp)
 	})
 }
