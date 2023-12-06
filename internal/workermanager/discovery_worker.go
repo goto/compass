@@ -50,8 +50,8 @@ func (m *Manager) syncAssetHandler() worker.JobHandler {
 	return worker.JobHandler{
 		Handle: m.SyncAssets,
 		JobOpts: worker.JobOptions{
-			MaxAttempts:     3,
-			Timeout:         5 * time.Second,
+			MaxAttempts:     1,
+			Timeout:         5 * time.Minute,
 			BackoffStrategy: worker.DefaultExponentialBackoff,
 		},
 	}
@@ -72,6 +72,7 @@ func (m *Manager) IndexAsset(ctx context.Context, job worker.JobSpec) error {
 }
 
 func (m *Manager) SyncAssets(ctx context.Context, job worker.JobSpec) error {
+	const batchSize = 1000
 	service := string(job.Payload)
 
 	jobs, err := m.jobRepo.GetSyncJobsByService(ctx, service)
@@ -82,19 +83,52 @@ func (m *Manager) SyncAssets(ctx context.Context, job worker.JobSpec) error {
 	if len(jobs) > 1 {
 		for _, job := range jobs {
 			if job.RunAt.Before(job.RunAt) {
-				return nil // mark job as done if there's earlier job with same service
+				return nil // mark job as done if there's earlier job with same service to prevent race conditions
 			}
 		}
 	}
 
 	assets, err := m.assetRepo.GetAll(ctx, asset.Filter{
 		Services: []string{service},
+		Size:     batchSize,
+		SortBy:   "name",
 	})
 	if err != nil {
 		return fmt.Errorf("sync asset: get assets: %w", err)
 	}
 
-	return m.discoveryRepo.SyncAssets(ctx, service, assets)
+	if err := m.discoveryRepo.SyncAssets(ctx, service, assets); err != nil {
+		return err
+	}
+
+	if len(assets) == batchSize { // do remaining upsert after first batch completed
+		it := 1
+
+		for {
+			assets, err := m.assetRepo.GetAll(ctx, asset.Filter{
+				Services: []string{service},
+				Size:     batchSize,
+				Offset:   it * batchSize,
+				SortBy:   "name",
+			})
+			if err != nil {
+				return fmt.Errorf("sync asset: get assets: %w", err)
+			}
+
+			for _, ast := range assets {
+				if err := m.discoveryRepo.Upsert(ctx, ast); err != nil {
+					return err
+				}
+			}
+
+			if len(assets) != batchSize {
+				break
+			}
+			it++
+		}
+
+	}
+	return nil
 }
 
 func (m *Manager) EnqueueDeleteAssetJob(ctx context.Context, urn string) error {

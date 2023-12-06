@@ -232,7 +232,9 @@ func (s *Service) SuggestAssets(ctx context.Context, cfg SearchConfig) (suggesti
 
 func (s *Service) SyncAssets(ctx context.Context, services []string) error {
 	for _, service := range services {
-		s.worker.EnqueueSyncAssetJob(ctx, service)
+		if err := s.worker.EnqueueSyncAssetJob(ctx, service); err != nil {
+			return err
+		}
 	}
 	return nil
 }

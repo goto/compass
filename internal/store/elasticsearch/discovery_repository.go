@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"net/url"
 	"strings"
 	"time"
@@ -224,6 +225,12 @@ func createUpsertBody(ast asset.Asset) (io.Reader, error) {
 }
 
 func (repo *DiscoveryRepository) clone(ctx context.Context, indexName, clonedIndexName string) error {
+	indexExistsFn := repo.cli.client.Indices.Exists
+	resp, _ := indexExistsFn([]string{clonedIndexName})
+	if resp.StatusCode == http.StatusOK {
+		return nil // skip clone when backup already created
+	}
+
 	cloneFn := repo.cli.client.Indices.Clone
 	resp, err := cloneFn(indexName, clonedIndexName, cloneFn.WithContext(ctx))
 	if err != nil {
