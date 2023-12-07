@@ -15,7 +15,7 @@ import (
 type DiscoveryRepository interface {
 	Upsert(context.Context, asset.Asset) error
 	DeleteByURN(ctx context.Context, assetURN string) error
-	SyncAssets(ctx context.Context, indexName string) (cleanup func() error, err error)
+	SyncAssets(ctx context.Context, indexName string) (cleanupFn func() error, err error)
 }
 
 func (m *Manager) EnqueueIndexAssetJob(ctx context.Context, ast asset.Asset) error {
@@ -88,7 +88,7 @@ func (m *Manager) SyncAssets(ctx context.Context, job worker.JobSpec) error {
 		}
 	}
 
-	cleanup, err := m.discoveryRepo.SyncAssets(ctx, service)
+	cleanupFn, err := m.discoveryRepo.SyncAssets(ctx, service)
 	if err != nil {
 		return err
 	}
@@ -118,7 +118,7 @@ func (m *Manager) SyncAssets(ctx context.Context, job worker.JobSpec) error {
 		it++
 	}
 
-	return cleanup()
+	return cleanupFn()
 }
 
 func (m *Manager) EnqueueDeleteAssetJob(ctx context.Context, urn string) error {

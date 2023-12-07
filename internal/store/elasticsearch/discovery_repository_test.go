@@ -413,14 +413,14 @@ func TestDiscoveryRepository_SyncAssets(t *testing.T) {
 
 		repo := store.NewDiscoveryRepository(esClient, log.NewNoop(), time.Second*10, []string{"number", "id"})
 
-		cleanup, err := repo.SyncAssets(ctx, indexName)
+		cleanupFn, err := repo.SyncAssets(ctx, indexName)
 		require.NoError(t, err)
 
 		alias := cli.Indices.GetAlias
 		resp, _ := alias(alias.WithIndex(indexName))
 		require.NotEmpty(t, resp)
 
-		err = cleanup()
+		err = cleanupFn()
 		require.NoError(t, err)
 
 		res, err := cli.Indices.Exists([]string{"bigquery-test"})

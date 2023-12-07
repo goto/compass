@@ -42,7 +42,7 @@ func (m *InSituWorker) EnqueueSyncAssetJob(ctx context.Context, service string) 
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
-	cleanup, err := m.discoveryRepo.SyncAssets(ctx, service)
+	cleanupFn, err := m.discoveryRepo.SyncAssets(ctx, service)
 	if err != nil {
 		return err
 	}
@@ -71,7 +71,7 @@ func (m *InSituWorker) EnqueueSyncAssetJob(ctx context.Context, service string) 
 		it++
 	}
 
-	return cleanup()
+	return cleanupFn()
 }
 
 func (*InSituWorker) Close() error { return nil }

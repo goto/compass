@@ -99,7 +99,7 @@ func (repo *DiscoveryRepository) SyncAssets(ctx context.Context, indexName strin
 		return nil, err
 	}
 
-	cleanup := func() error {
+	cleanupFn := func() error {
 		err = repo.updateAlias(ctx, indexName, defaultSearchIndex)
 		if err != nil {
 			return err
@@ -117,7 +117,7 @@ func (repo *DiscoveryRepository) SyncAssets(ctx context.Context, indexName strin
 		return nil
 	}
 
-	return cleanup, err
+	return cleanupFn, err
 }
 
 func (repo *DiscoveryRepository) DeleteByID(ctx context.Context, assetID string) error {
