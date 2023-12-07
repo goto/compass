@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"net/http"
 	"net/url"
 	"strings"
 	"time"
@@ -85,7 +84,7 @@ func (repo *DiscoveryRepository) SyncAssets(ctx context.Context, indexName strin
 		return nil, err
 	}
 
-	err = repo.updateAlias(ctx, backupIndexName, "universe")
+	err = repo.updateAlias(ctx, backupIndexName, defaultSearchIndex)
 	if err != nil {
 		return nil, err
 	}
@@ -101,7 +100,7 @@ func (repo *DiscoveryRepository) SyncAssets(ctx context.Context, indexName strin
 	}
 
 	cleanup := func() error {
-		err = repo.updateAlias(ctx, indexName, "universe")
+		err = repo.updateAlias(ctx, indexName, defaultSearchIndex)
 		if err != nil {
 			return err
 		}
@@ -237,9 +236,15 @@ func createUpsertBody(ast asset.Asset) (io.Reader, error) {
 }
 
 func (repo *DiscoveryRepository) clone(ctx context.Context, indexName, clonedIndexName string) error {
-	indexExistsFn := repo.cli.client.Indices.Exists
-	resp, _ := indexExistsFn([]string{clonedIndexName})
-	if resp.StatusCode == http.StatusOK {
+	idxExists, err := repo.cli.indexExists(ctx, "CloneIndex", clonedIndexName)
+	if err != nil {
+		return asset.DiscoveryError{
+			Op:    "IndexExists",
+			Index: indexName,
+			Err:   err,
+		}
+	}
+	if idxExists {
 		return nil // skip clone when backup already created
 	}
 
@@ -247,7 +252,7 @@ func (repo *DiscoveryRepository) clone(ctx context.Context, indexName, clonedInd
 	resp, err := cloneFn(indexName, clonedIndexName, cloneFn.WithContext(ctx))
 	if err != nil {
 		return asset.DiscoveryError{
-			Op:    "CloneDoc",
+			Op:    "CloneIndex",
 			Index: indexName,
 			Err:   err,
 		}
@@ -256,7 +261,7 @@ func (repo *DiscoveryRepository) clone(ctx context.Context, indexName, clonedInd
 	if resp.IsError() {
 		code, reason := errorCodeAndReason(resp)
 		return asset.DiscoveryError{
-			Op:     "CloneDoc",
+			Op:     "CloneIndex",
 			Index:  indexName,
 			ESCode: code,
 			Err:    errors.New(reason),

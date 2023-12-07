@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/goto/compass/core/asset"
-	"github.com/goto/compass/core/job"
 	"github.com/goto/compass/pkg/worker"
 	"github.com/goto/compass/pkg/worker/pgq"
 	"github.com/goto/compass/pkg/worker/workermw"
@@ -26,7 +25,6 @@ type Manager struct {
 	jobManagerPort int
 	discoveryRepo  DiscoveryRepository
 	assetRepo      asset.Repository
-	jobRepo        job.Repository
 	logger         log.Logger
 }
 
@@ -36,6 +34,7 @@ type Worker interface {
 	Register(typ string, h worker.JobHandler) error
 	Run(ctx context.Context) error
 	Enqueue(ctx context.Context, jobs ...worker.JobSpec) error
+	GetSyncJobsByService(ctx context.Context, service string) ([]worker.Job, error)
 }
 
 type Config struct {
@@ -51,7 +50,6 @@ type Deps struct {
 	Config        Config
 	DiscoveryRepo DiscoveryRepository
 	AssetRepo     asset.Repository
-	JobRepo       job.Repository
 	Logger        log.Logger
 }
 
@@ -78,7 +76,6 @@ func New(ctx context.Context, deps Deps) (*Manager, error) {
 		jobManagerPort: cfg.JobManagerPort,
 		discoveryRepo:  deps.DiscoveryRepo,
 		assetRepo:      deps.AssetRepo,
-		jobRepo:        deps.JobRepo,
 		logger:         deps.Logger,
 	}, nil
 }

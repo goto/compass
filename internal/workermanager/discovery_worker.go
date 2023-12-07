@@ -75,7 +75,7 @@ func (m *Manager) SyncAssets(ctx context.Context, job worker.JobSpec) error {
 	const batchSize = 1000
 	service := string(job.Payload)
 
-	jobs, err := m.jobRepo.GetSyncJobsByService(ctx, service)
+	jobs, err := m.worker.GetSyncJobsByService(ctx, service)
 	if err != nil {
 		return fmt.Errorf("sync asset: get sync jobs by service: %w", err)
 	}

@@ -91,6 +91,10 @@ func (mw JobProcessorInstrumentation) Stats(ctx context.Context) ([]worker.JobTy
 	return mw.next.Stats(ctx)
 }
 
+func (mw JobProcessorInstrumentation) GetSyncJobsByService(ctx context.Context, service string) ([]worker.Job, error) {
+	return mw.next.GetSyncJobsByService(ctx, service)
+}
+
 func jobTypes(jobs []worker.Job) []string {
 	var types []string
 	for _, j := range jobs {

@@ -83,6 +83,10 @@ func (w *Worker) Enqueue(ctx context.Context, jobs ...JobSpec) error {
 	return w.processor.Enqueue(ctx, execs...)
 }
 
+func (w *Worker) GetSyncJobsByService(ctx context.Context, service string) ([]Job, error) {
+	return w.processor.GetSyncJobsByService(ctx, service)
+}
+
 // Run starts the worker threads that dequeue and process ready jobs. Run blocks
 // until all workers exit or context is canceled. Context cancellation will do
 // graceful shutdown of the worker threads.

@@ -132,16 +132,10 @@ func runServer(ctx context.Context, cfg *Config) error {
 		return fmt.Errorf("create new lineage repository: %w", err)
 	}
 
-	jobRepository, err := postgres.NewJobRepository(pgClient)
-	if err != nil {
-		return fmt.Errorf("create new job repository: %w", err)
-	}
-
 	wrkr, err := initAssetWorker(ctx, workermanager.Deps{
 		Config:        cfg.Worker,
 		DiscoveryRepo: discoveryRepository,
 		AssetRepo:     assetRepository,
-		JobRepo:       jobRepository,
 		Logger:        logger,
 	})
 	if err != nil {

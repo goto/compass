@@ -3,22 +3,20 @@ package workermanager
 import (
 	"context"
 	"fmt"
-	"time"
+	"sync"
 
 	"github.com/goto/compass/core/asset"
-	"github.com/goto/compass/core/job"
 )
 
 type InSituWorker struct {
 	discoveryRepo DiscoveryRepository
-	jobRepo       job.Repository
 	assetRepo     asset.Repository
+	mutex         sync.Mutex
 }
 
 func NewInSituWorker(deps Deps) *InSituWorker {
 	return &InSituWorker{
 		discoveryRepo: deps.DiscoveryRepo,
-		jobRepo:       deps.JobRepo,
 		assetRepo:     deps.AssetRepo,
 	}
 }
@@ -40,22 +38,9 @@ func (m *InSituWorker) EnqueueDeleteAssetJob(ctx context.Context, urn string) er
 
 func (m *InSituWorker) EnqueueSyncAssetJob(ctx context.Context, service string) error {
 	const batchSize = 1000
-	jobs, err := m.jobRepo.GetSyncJobsByService(ctx, service)
-	if err != nil {
-		return fmt.Errorf("sync asset: get sync jobs by service: %w", err)
-	}
 
-	if len(jobs) > 0 {
-		return nil // mark job as done if there's earlier job with same service
-	}
-
-	jobID, err := m.jobRepo.Insert(ctx, jobSyncAsset, ([]byte)(service), time.Now().UTC())
-	if err != nil {
-		return fmt.Errorf("sync asset: insert job queue: %w", err)
-	}
-	defer func() {
-		_ = m.jobRepo.Delete(ctx, jobID)
-	}()
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
 
 	cleanup, err := m.discoveryRepo.SyncAssets(ctx, service)
 	if err != nil {

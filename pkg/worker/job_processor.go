@@ -21,6 +21,9 @@ type JobProcessor interface {
 	// Stats returns the job statistics by job type. It includes the number of
 	// active and dead jobs.
 	Stats(ctx context.Context) ([]JobTypeStats, error)
+
+	//
+	GetSyncJobsByService(ctx context.Context, service string) ([]Job, error)
 }
 
 // JobTypeStats is the statistics for the job type with number of active and

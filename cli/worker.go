@@ -78,17 +78,11 @@ func runWorker(ctx context.Context, cfg *Config) error {
 		return fmt.Errorf("create new asset repository: %w", err)
 	}
 
-	jobRepository, err := postgres.NewJobRepository(pgClient)
-	if err != nil {
-		return fmt.Errorf("create new job repository: %w", err)
-	}
-
 	mgr, err := workermanager.New(ctx, workermanager.Deps{
 		Config: cfg.Worker,
 		DiscoveryRepo: elasticsearch.NewDiscoveryRepository(esClient, logger, cfg.Elasticsearch.RequestTimeout,
 			strings.Split(cfg.ColSearchExclusionKeywords, ",")),
 		AssetRepo: assetRepository,
-		JobRepo:   jobRepository,
 		Logger:    logger,
 	})
 	if err != nil {
