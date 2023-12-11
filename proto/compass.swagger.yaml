@@ -420,6 +420,44 @@ paths:
           type: string
       tags:
         - Asset
+  /v1beta1/assets/sync:
+    post:
+      summary: Syncs assets in elasticsearch
+      description: Synchronize all assets in DB to elasticsearch
+      operationId: CompassService_SyncAssets
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            $ref: '#/definitions/SyncAssetsResponse'
+        "400":
+          description: Returned when the data that user input is wrong.
+          schema:
+            $ref: '#/definitions/Status'
+        "404":
+          description: Returned when the resource does not exist.
+          schema:
+            $ref: '#/definitions/Status'
+        "409":
+          description: Returned when the resource already exist.
+          schema:
+            $ref: '#/definitions/Status'
+        "500":
+          description: Returned when theres is something wrong on the server side.
+          schema:
+            $ref: '#/definitions/Status'
+        default:
+          description: An unexpected error response.
+          schema:
+            $ref: '#/definitions/Status'
+      parameters:
+        - name: body
+          in: body
+          required: true
+          schema:
+            $ref: '#/definitions/SyncAssetsRequest'
+      tags:
+        - Asset
   /v1beta1/discussions:
     get:
       summary: Get all discussions
@@ -2291,6 +2329,16 @@ definitions:
         type: array
         items:
           type: string
+  SyncAssetsRequest:
+    type: object
+    properties:
+      services:
+        type: array
+        items:
+          type: string
+        description: filter by multiple services
+  SyncAssetsResponse:
+    type: object
   TagTemplate:
     type: object
     properties:

@@ -3,17 +3,21 @@ package workermanager
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/goto/compass/core/asset"
 )
 
 type InSituWorker struct {
 	discoveryRepo DiscoveryRepository
+	assetRepo     asset.Repository
+	mutex         sync.Mutex
 }
 
 func NewInSituWorker(deps Deps) *InSituWorker {
 	return &InSituWorker{
 		discoveryRepo: deps.DiscoveryRepo,
+		assetRepo:     deps.AssetRepo,
 	}
 }
 
@@ -30,6 +34,44 @@ func (m *InSituWorker) EnqueueDeleteAssetJob(ctx context.Context, urn string) er
 		return fmt.Errorf("delete asset from discovery repo: %w: urn '%s'", err, urn)
 	}
 	return nil
+}
+
+func (m *InSituWorker) EnqueueSyncAssetJob(ctx context.Context, service string) error {
+	const batchSize = 1000
+
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	cleanupFn, err := m.discoveryRepo.SyncAssets(ctx, service)
+	if err != nil {
+		return err
+	}
+
+	it := 0
+	for {
+		assets, err := m.assetRepo.GetAll(ctx, asset.Filter{
+			Services: []string{service},
+			Size:     batchSize,
+			Offset:   it * batchSize,
+			SortBy:   "name",
+		})
+		if err != nil {
+			return fmt.Errorf("sync asset: get assets: %w", err)
+		}
+
+		for _, ast := range assets {
+			if err := m.discoveryRepo.Upsert(ctx, ast); err != nil {
+				return err
+			}
+		}
+
+		if len(assets) != batchSize {
+			break
+		}
+		it++
+	}
+
+	return cleanupFn()
 }
 
 func (*InSituWorker) Close() error { return nil }

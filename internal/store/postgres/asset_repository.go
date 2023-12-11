@@ -312,7 +312,6 @@ func (r *AssetRepository) Upsert(ctx context.Context, ast *asset.Asset) (string,
 
 		return nil
 	})
-
 	if err != nil {
 		return "", err
 	}

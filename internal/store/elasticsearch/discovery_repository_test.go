@@ -390,3 +390,45 @@ func TestDiscoveryRepositoryDeleteByURN(t *testing.T) {
 		assert.NoError(t, err)
 	})
 }
+
+func TestDiscoveryRepository_SyncAssets(t *testing.T) {
+	t.Run("should return success", func(t *testing.T) {
+		var (
+			ctx       = context.Background()
+			indexName = "bigquery-test"
+		)
+
+		cli, err := esTestServer.NewClient()
+		require.NoError(t, err)
+
+		_, err = cli.Indices.Create(indexName)
+		require.NoError(t, err)
+
+		esClient, err := store.NewClient(
+			log.NewNoop(),
+			store.Config{},
+			store.WithClient(cli),
+		)
+		require.NoError(t, err)
+
+		repo := store.NewDiscoveryRepository(esClient, log.NewNoop(), time.Second*10, []string{"number", "id"})
+
+		cleanupFn, err := repo.SyncAssets(ctx, indexName)
+		require.NoError(t, err)
+
+		alias := cli.Indices.GetAlias
+		resp, _ := alias(alias.WithIndex(indexName))
+		require.NotEmpty(t, resp)
+
+		err = cleanupFn()
+		require.NoError(t, err)
+
+		res, err := cli.Indices.Exists([]string{"bigquery-test"})
+		require.Equal(t, res.StatusCode, 200)
+		require.NoError(t, err)
+
+		res, err = cli.Indices.Exists([]string{"bigquery-test-bak"})
+		require.Equal(t, res.StatusCode, 404)
+		require.NoError(t, err)
+	})
+}

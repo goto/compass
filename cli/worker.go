@@ -8,6 +8,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/goto/compass/internal/store/elasticsearch"
+	"github.com/goto/compass/internal/store/postgres"
 	"github.com/goto/compass/internal/workermanager"
 	"github.com/goto/compass/pkg/telemetry"
 	"github.com/spf13/cobra"
@@ -67,11 +68,22 @@ func runWorker(ctx context.Context, cfg *Config) error {
 		return err
 	}
 
+	pgClient, err := initPostgres(ctx, logger, cfg)
+	if err != nil {
+		return err
+	}
+
+	assetRepository, err := postgres.NewAssetRepository(pgClient, nil, 0, cfg.Service.Identity.ProviderDefaultName)
+	if err != nil {
+		return fmt.Errorf("create new asset repository: %w", err)
+	}
+
 	mgr, err := workermanager.New(ctx, workermanager.Deps{
 		Config: cfg.Worker,
 		DiscoveryRepo: elasticsearch.NewDiscoveryRepository(esClient, logger, cfg.Elasticsearch.RequestTimeout,
 			strings.Split(cfg.ColSearchExclusionKeywords, ",")),
-		Logger: logger,
+		AssetRepo: assetRepository,
+		Logger:    logger,
 	})
 	if err != nil {
 		return err

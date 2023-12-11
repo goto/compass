@@ -79,6 +79,61 @@ func (_c *JobProcessor_Enqueue_Call) RunAndReturn(run func(context.Context, ...w
 	return _c
 }
 
+// GetSyncJobsByService provides a mock function with given fields: ctx, service
+func (_m *JobProcessor) GetSyncJobsByService(ctx context.Context, service string) ([]worker.Job, error) {
+	ret := _m.Called(ctx, service)
+
+	var r0 []worker.Job
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) ([]worker.Job, error)); ok {
+		return rf(ctx, service)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) []worker.Job); ok {
+		r0 = rf(ctx, service)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]worker.Job)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, service)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// JobProcessor_GetSyncJobsByService_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetSyncJobsByService'
+type JobProcessor_GetSyncJobsByService_Call struct {
+	*mock.Call
+}
+
+// GetSyncJobsByService is a helper method to define mock.On call
+//   - ctx context.Context
+//   - service string
+func (_e *JobProcessor_Expecter) GetSyncJobsByService(ctx interface{}, service interface{}) *JobProcessor_GetSyncJobsByService_Call {
+	return &JobProcessor_GetSyncJobsByService_Call{Call: _e.mock.On("GetSyncJobsByService", ctx, service)}
+}
+
+func (_c *JobProcessor_GetSyncJobsByService_Call) Run(run func(ctx context.Context, service string)) *JobProcessor_GetSyncJobsByService_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *JobProcessor_GetSyncJobsByService_Call) Return(_a0 []worker.Job, _a1 error) *JobProcessor_GetSyncJobsByService_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *JobProcessor_GetSyncJobsByService_Call) RunAndReturn(run func(context.Context, string) ([]worker.Job, error)) *JobProcessor_GetSyncJobsByService_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Process provides a mock function with given fields: ctx, types, fn
 func (_m *JobProcessor) Process(ctx context.Context, types []string, fn worker.JobExecutorFunc) error {
 	ret := _m.Called(ctx, types, fn)

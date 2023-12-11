@@ -135,6 +135,7 @@ func runServer(ctx context.Context, cfg *Config) error {
 	wrkr, err := initAssetWorker(ctx, workermanager.Deps{
 		Config:        cfg.Worker,
 		DiscoveryRepo: discoveryRepository,
+		AssetRepo:     assetRepository,
 		Logger:        logger,
 	})
 	if err != nil {

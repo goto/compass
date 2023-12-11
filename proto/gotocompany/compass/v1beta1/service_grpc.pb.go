@@ -42,6 +42,7 @@ const (
 	CompassService_GetAssetVersionHistory_FullMethodName   = "/gotocompany.compass.v1beta1.CompassService/GetAssetVersionHistory"
 	CompassService_GetAssetByVersion_FullMethodName        = "/gotocompany.compass.v1beta1.CompassService/GetAssetByVersion"
 	CompassService_CreateAssetProbe_FullMethodName         = "/gotocompany.compass.v1beta1.CompassService/CreateAssetProbe"
+	CompassService_SyncAssets_FullMethodName               = "/gotocompany.compass.v1beta1.CompassService/SyncAssets"
 	CompassService_GetUserStarredAssets_FullMethodName     = "/gotocompany.compass.v1beta1.CompassService/GetUserStarredAssets"
 	CompassService_GetMyStarredAssets_FullMethodName       = "/gotocompany.compass.v1beta1.CompassService/GetMyStarredAssets"
 	CompassService_GetMyStarredAsset_FullMethodName        = "/gotocompany.compass.v1beta1.CompassService/GetMyStarredAsset"
@@ -90,6 +91,7 @@ type CompassServiceClient interface {
 	GetAssetVersionHistory(ctx context.Context, in *GetAssetVersionHistoryRequest, opts ...grpc.CallOption) (*GetAssetVersionHistoryResponse, error)
 	GetAssetByVersion(ctx context.Context, in *GetAssetByVersionRequest, opts ...grpc.CallOption) (*GetAssetByVersionResponse, error)
 	CreateAssetProbe(ctx context.Context, in *CreateAssetProbeRequest, opts ...grpc.CallOption) (*CreateAssetProbeResponse, error)
+	SyncAssets(ctx context.Context, in *SyncAssetsRequest, opts ...grpc.CallOption) (*SyncAssetsResponse, error)
 	// Domain: User * Star
 	GetUserStarredAssets(ctx context.Context, in *GetUserStarredAssetsRequest, opts ...grpc.CallOption) (*GetUserStarredAssetsResponse, error)
 	GetMyStarredAssets(ctx context.Context, in *GetMyStarredAssetsRequest, opts ...grpc.CallOption) (*GetMyStarredAssetsResponse, error)
@@ -325,6 +327,15 @@ func (c *compassServiceClient) CreateAssetProbe(ctx context.Context, in *CreateA
 	return out, nil
 }
 
+func (c *compassServiceClient) SyncAssets(ctx context.Context, in *SyncAssetsRequest, opts ...grpc.CallOption) (*SyncAssetsResponse, error) {
+	out := new(SyncAssetsResponse)
+	err := c.cc.Invoke(ctx, CompassService_SyncAssets_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *compassServiceClient) GetUserStarredAssets(ctx context.Context, in *GetUserStarredAssetsRequest, opts ...grpc.CallOption) (*GetUserStarredAssetsResponse, error) {
 	out := new(GetUserStarredAssetsResponse)
 	err := c.cc.Invoke(ctx, CompassService_GetUserStarredAssets_FullMethodName, in, out, opts...)
@@ -499,6 +510,7 @@ type CompassServiceServer interface {
 	GetAssetVersionHistory(context.Context, *GetAssetVersionHistoryRequest) (*GetAssetVersionHistoryResponse, error)
 	GetAssetByVersion(context.Context, *GetAssetByVersionRequest) (*GetAssetByVersionResponse, error)
 	CreateAssetProbe(context.Context, *CreateAssetProbeRequest) (*CreateAssetProbeResponse, error)
+	SyncAssets(context.Context, *SyncAssetsRequest) (*SyncAssetsResponse, error)
 	// Domain: User * Star
 	GetUserStarredAssets(context.Context, *GetUserStarredAssetsRequest) (*GetUserStarredAssetsResponse, error)
 	GetMyStarredAssets(context.Context, *GetMyStarredAssetsRequest) (*GetMyStarredAssetsResponse, error)
@@ -592,6 +604,9 @@ func (UnimplementedCompassServiceServer) GetAssetByVersion(context.Context, *Get
 }
 func (UnimplementedCompassServiceServer) CreateAssetProbe(context.Context, *CreateAssetProbeRequest) (*CreateAssetProbeResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateAssetProbe not implemented")
+}
+func (UnimplementedCompassServiceServer) SyncAssets(context.Context, *SyncAssetsRequest) (*SyncAssetsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SyncAssets not implemented")
 }
 func (UnimplementedCompassServiceServer) GetUserStarredAssets(context.Context, *GetUserStarredAssetsRequest) (*GetUserStarredAssetsResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetUserStarredAssets not implemented")
@@ -1068,6 +1083,24 @@ func _CompassService_CreateAssetProbe_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CompassService_SyncAssets_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SyncAssetsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CompassServiceServer).SyncAssets(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CompassService_SyncAssets_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CompassServiceServer).SyncAssets(ctx, req.(*SyncAssetsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _CompassService_GetUserStarredAssets_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetUserStarredAssetsRequest)
 	if err := dec(in); err != nil {
@@ -1454,6 +1487,10 @@ var CompassService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CreateAssetProbe",
 			Handler:    _CompassService_CreateAssetProbe_Handler,
+		},
+		{
+			MethodName: "SyncAssets",
+			Handler:    _CompassService_SyncAssets_Handler,
 		},
 		{
 			MethodName: "GetUserStarredAssets",

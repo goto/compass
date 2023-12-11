@@ -15,6 +15,7 @@ import (
 type DiscoveryRepository interface {
 	Upsert(context.Context, asset.Asset) error
 	DeleteByURN(ctx context.Context, assetURN string) error
+	SyncAssets(ctx context.Context, indexName string) (cleanupFn func() error, err error)
 }
 
 func (m *Manager) EnqueueIndexAssetJob(ctx context.Context, ast asset.Asset) error {
@@ -45,6 +46,17 @@ func (m *Manager) indexAssetHandler() worker.JobHandler {
 	}
 }
 
+func (m *Manager) syncAssetHandler() worker.JobHandler {
+	return worker.JobHandler{
+		Handle: m.SyncAssets,
+		JobOpts: worker.JobOptions{
+			MaxAttempts:     1,
+			Timeout:         5 * time.Minute,
+			BackoffStrategy: worker.DefaultExponentialBackoff,
+		},
+	}
+}
+
 func (m *Manager) IndexAsset(ctx context.Context, job worker.JobSpec) error {
 	var ast asset.Asset
 	if err := json.Unmarshal(job.Payload, &ast); err != nil {
@@ -57,6 +69,56 @@ func (m *Manager) IndexAsset(ctx context.Context, job worker.JobSpec) error {
 		}
 	}
 	return nil
+}
+
+func (m *Manager) SyncAssets(ctx context.Context, job worker.JobSpec) error {
+	const batchSize = 1000
+	service := string(job.Payload)
+
+	jobs, err := m.worker.GetSyncJobsByService(ctx, service)
+	if err != nil {
+		return fmt.Errorf("sync asset: get sync jobs by service: %w", err)
+	}
+
+	if len(jobs) > 1 {
+		for _, job := range jobs {
+			if job.RunAt.Before(job.RunAt) {
+				return nil // mark job as done if there's earlier job with same service to prevent race conditions
+			}
+		}
+	}
+
+	cleanupFn, err := m.discoveryRepo.SyncAssets(ctx, service)
+	if err != nil {
+		return err
+	}
+
+	it := 0
+
+	for {
+		assets, err := m.assetRepo.GetAll(ctx, asset.Filter{
+			Services: []string{service},
+			Size:     batchSize,
+			Offset:   it * batchSize,
+			SortBy:   "name",
+		})
+		if err != nil {
+			return fmt.Errorf("sync asset: get assets: %w", err)
+		}
+
+		for _, ast := range assets {
+			if err := m.discoveryRepo.Upsert(ctx, ast); err != nil {
+				return err
+			}
+		}
+
+		if len(assets) != batchSize {
+			break
+		}
+		it++
+	}
+
+	return cleanupFn()
 }
 
 func (m *Manager) EnqueueDeleteAssetJob(ctx context.Context, urn string) error {
@@ -89,5 +151,17 @@ func (m *Manager) DeleteAsset(ctx context.Context, job worker.JobSpec) error {
 			Cause: fmt.Errorf("delete asset from discovery repo: %w: urn '%s'", err, urn),
 		}
 	}
+	return nil
+}
+
+func (m *Manager) EnqueueSyncAssetJob(ctx context.Context, service string) error {
+	err := m.worker.Enqueue(ctx, worker.JobSpec{
+		Type:    jobSyncAsset,
+		Payload: ([]byte)(service),
+	})
+	if err != nil {
+		return fmt.Errorf("enqueue sync asset job: %w: service '%s'", err, service)
+	}
+
 	return nil
 }

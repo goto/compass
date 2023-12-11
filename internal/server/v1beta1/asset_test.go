@@ -1684,3 +1684,64 @@ func newStructpb(t *testing.T, v map[string]interface{}) *structpb.Struct {
 
 	return res
 }
+
+func TestSyncAssets(t *testing.T) {
+	type testCase struct {
+		Description  string
+		Request      *compassv1beta1.SyncAssetsRequest
+		ExpectStatus codes.Code
+		Setup        func(context.Context, *mocks.AssetService)
+		PostCheck    func(resp *compassv1beta1.SyncAssetsResponse) error
+	}
+
+	testCases := []testCase{
+		{
+			Description:  "should return internal server error",
+			ExpectStatus: codes.Internal,
+			Request: &compassv1beta1.SyncAssetsRequest{
+				Services: []string{"bigquery"},
+			},
+			Setup: func(ctx context.Context, as *mocks.AssetService) {
+				as.EXPECT().SyncAssets(mock.Anything, []string{"bigquery"}).Return(errors.New("any error"))
+			},
+		},
+
+		{
+			Description:  "should return success",
+			ExpectStatus: codes.OK,
+			Request: &compassv1beta1.SyncAssetsRequest{
+				Services: []string{"bigquery"},
+			},
+			Setup: func(ctx context.Context, as *mocks.AssetService) {
+				as.EXPECT().SyncAssets(mock.Anything, []string{"bigquery"}).Return(nil)
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.Description, func(t *testing.T) {
+			ctx := context.Background()
+
+			logger := log.NewNoop()
+			mockAssetSvc := mocks.NewAssetService(t)
+			if tc.Setup != nil {
+				tc.Setup(ctx, mockAssetSvc)
+			}
+
+			handler := NewAPIServer(APIServerDeps{AssetSvc: mockAssetSvc, Logger: logger})
+
+			got, err := handler.SyncAssets(ctx, tc.Request)
+			code := status.Code(err)
+			if code != tc.ExpectStatus {
+				t.Errorf("expected handler to return Code %s, returned Code %sinstead", tc.ExpectStatus.String(), code.String())
+				return
+			}
+			if tc.PostCheck != nil {
+				if err := tc.PostCheck(got); err != nil {
+					t.Error(err)
+					return
+				}
+			}
+		})
+	}
+}

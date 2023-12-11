@@ -39,6 +39,8 @@ type AssetService interface {
 	SuggestAssets(ctx context.Context, cfg asset.SearchConfig) (suggestions []string, err error)
 
 	AddProbe(ctx context.Context, assetURN string, probe *asset.Probe) error
+
+	SyncAssets(ctx context.Context, services []string) error
 }
 
 func (server *APIServer) GetAllAssets(ctx context.Context, req *compassv1beta1.GetAllAssetsRequest) (*compassv1beta1.GetAllAssetsResponse, error) {
@@ -342,6 +344,14 @@ func (server *APIServer) CreateAssetProbe(ctx context.Context, req *compassv1bet
 	return &compassv1beta1.CreateAssetProbeResponse{
 		Id: probe.ID,
 	}, nil
+}
+
+func (server *APIServer) SyncAssets(ctx context.Context, req *compassv1beta1.SyncAssetsRequest) (*compassv1beta1.SyncAssetsResponse, error) {
+	if err := server.assetService.SyncAssets(ctx, req.GetServices()); err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	return &compassv1beta1.SyncAssetsResponse{}, nil
 }
 
 func (server *APIServer) upsertAsset(

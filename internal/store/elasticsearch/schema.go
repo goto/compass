@@ -5,9 +5,7 @@ package elasticsearch
 // and sets up the camelcase analyzer
 var indexSettingsTemplate = `{
 	"mappings": %s,
-	"aliases": {
-		%q: {}
-	},
+	%s
 	"settings": {
 		"similarity": {
 			"my_bm25_without_length_normalization": {

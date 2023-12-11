@@ -274,6 +274,61 @@ func (_c *DiscoveryRepository_Suggest_Call) RunAndReturn(run func(context.Contex
 	return _c
 }
 
+// SyncAssets provides a mock function with given fields: ctx, indexName
+func (_m *DiscoveryRepository) SyncAssets(ctx context.Context, indexName string) (func() error, error) {
+	ret := _m.Called(ctx, indexName)
+
+	var r0 func() error
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (func() error, error)); ok {
+		return rf(ctx, indexName)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) func() error); ok {
+		r0 = rf(ctx, indexName)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(func() error)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, indexName)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// DiscoveryRepository_SyncAssets_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SyncAssets'
+type DiscoveryRepository_SyncAssets_Call struct {
+	*mock.Call
+}
+
+// SyncAssets is a helper method to define mock.On call
+//   - ctx context.Context
+//   - indexName string
+func (_e *DiscoveryRepository_Expecter) SyncAssets(ctx interface{}, indexName interface{}) *DiscoveryRepository_SyncAssets_Call {
+	return &DiscoveryRepository_SyncAssets_Call{Call: _e.mock.On("SyncAssets", ctx, indexName)}
+}
+
+func (_c *DiscoveryRepository_SyncAssets_Call) Run(run func(ctx context.Context, indexName string)) *DiscoveryRepository_SyncAssets_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *DiscoveryRepository_SyncAssets_Call) Return(cleanup func() error, err error) *DiscoveryRepository_SyncAssets_Call {
+	_c.Call.Return(cleanup, err)
+	return _c
+}
+
+func (_c *DiscoveryRepository_SyncAssets_Call) RunAndReturn(run func(context.Context, string) (func() error, error)) *DiscoveryRepository_SyncAssets_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Upsert provides a mock function with given fields: _a0, _a1
 func (_m *DiscoveryRepository) Upsert(_a0 context.Context, _a1 asset.Asset) error {
 	ret := _m.Called(_a0, _a1)

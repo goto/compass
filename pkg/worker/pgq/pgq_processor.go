@@ -98,6 +98,58 @@ func (p *Processor) Enqueue(ctx context.Context, jobs ...worker.Job) error {
 	return nil
 }
 
+func (p *Processor) GetSyncJobsByService(ctx context.Context, service string) ([]worker.Job, error) {
+	query := sq.Select().
+		From(jobsTable).
+		Columns(
+			"id", "type", "run_at", "payload", "created_at",
+			"updated_at", "attempts_done", "last_attempt_at", "last_error",
+		).
+		Where(sq.Eq{"type": "sync-asset"}).
+		Where(sq.Eq{"payload::text": service})
+
+	rows, err := query.PlaceholderFormat(sq.Dollar).
+		RunWith(p.db).
+		QueryContext(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("list sync jobs by service: run query: %w", err)
+	}
+	defer rows.Close()
+
+	var result []worker.Job
+	for rows.Next() {
+		var (
+			job           worker.Job
+			id            string
+			lastErr       sql.NullString
+			lastAttemptAt sql.NullTime
+		)
+		err := rows.Scan(
+			&id, &job.Type, &job.Payload, &job.CreatedAt,
+			&job.UpdatedAt, &job.AttemptsDone, &lastAttemptAt, &lastErr,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("list sync jobs by service: scan row: %w", err)
+		}
+
+		uid, err := ulid.ParseStrict(id)
+		if err != nil {
+			return nil, fmt.Errorf("list sync jobs by service: scan row: parse ULID: %w", err)
+		}
+
+		job.ID = uid
+		job.LastAttemptAt = lastAttemptAt.Time
+		job.LastError = lastErr.String
+
+		result = append(result, job)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("list sync jobs by service: scan rows: %w", err)
+	}
+
+	return result, nil
+}
+
 func (p *Processor) Process(ctx context.Context, types []string, fn worker.JobExecutorFunc) error {
 	err := p.withTx(ctx, func(ctx context.Context, tx *sql.Tx) error {
 		job, err := p.pickupJob(ctx, tx, types)
