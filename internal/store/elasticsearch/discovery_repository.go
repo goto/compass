@@ -33,7 +33,7 @@ func NewDiscoveryRepository(cli *Client, logger log.Logger, requestTimeout time.
 	}
 }
 
-func (repo *DiscoveryRepository) createIndex(ctx context.Context, discoveryOp, indexName, alias string) error {
+func (repo *DiscoveryRepository) createIndexIfNotExists(ctx context.Context, discoveryOp, indexName, alias string) error {
 	idxExists, err := repo.cli.indexExists(ctx, discoveryOp, indexName)
 	if err != nil {
 		return asset.DiscoveryError{
@@ -45,6 +45,14 @@ func (repo *DiscoveryRepository) createIndex(ctx context.Context, discoveryOp, i
 
 	if !idxExists {
 		if err := repo.cli.CreateIdx(ctx, discoveryOp, indexName, alias); err != nil {
+			var de asset.DiscoveryError
+			if ok := errors.As(err, &de); ok {
+				if de.ESCode == "resource_already_exists_exception" {
+					repo.logger.Warn(de.Err.Error())
+					return nil
+				}
+			}
+
 			return asset.DiscoveryError{
 				Op:    "CreateIndex",
 				Index: indexName,
@@ -64,7 +72,7 @@ func (repo *DiscoveryRepository) Upsert(ctx context.Context, ast asset.Asset) er
 		return asset.ErrUnknownType
 	}
 
-	if err := repo.createIndex(ctx, "Upsert", ast.Service, defaultSearchIndex); err != nil {
+	if err := repo.createIndexIfNotExists(ctx, "Upsert", ast.Service, defaultSearchIndex); err != nil {
 		return err
 	}
 
@@ -94,7 +102,7 @@ func (repo *DiscoveryRepository) SyncAssets(ctx context.Context, indexName strin
 		return nil, err
 	}
 
-	err = repo.createIndex(ctx, "SyncAssets", indexName, "")
+	err = repo.createIndexIfNotExists(ctx, "SyncAssets", indexName, "")
 	if err != nil {
 		return nil, err
 	}
