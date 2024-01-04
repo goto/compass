@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/goto/compass/core/asset"
@@ -108,6 +109,10 @@ func (m *Manager) SyncAssets(ctx context.Context, job worker.JobSpec) error {
 
 		for _, ast := range assets {
 			if err := m.discoveryRepo.Upsert(ctx, ast); err != nil {
+				if strings.Contains(err.Error(), "illegal_argument_exception") {
+					m.logger.Error(err.Error())
+					continue
+				}
 				return err
 			}
 		}

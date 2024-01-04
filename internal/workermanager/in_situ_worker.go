@@ -3,21 +3,25 @@ package workermanager
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/goto/compass/core/asset"
+	"github.com/goto/salt/log"
 )
 
 type InSituWorker struct {
 	discoveryRepo DiscoveryRepository
 	assetRepo     asset.Repository
 	mutex         sync.Mutex
+	logger        log.Logger
 }
 
 func NewInSituWorker(deps Deps) *InSituWorker {
 	return &InSituWorker{
 		discoveryRepo: deps.DiscoveryRepo,
 		assetRepo:     deps.AssetRepo,
+		logger:        deps.Logger,
 	}
 }
 
@@ -61,6 +65,10 @@ func (m *InSituWorker) EnqueueSyncAssetJob(ctx context.Context, service string) 
 
 		for _, ast := range assets {
 			if err := m.discoveryRepo.Upsert(ctx, ast); err != nil {
+				if strings.Contains(err.Error(), "illegal_argument_exception") {
+					m.logger.Error(err.Error())
+					continue
+				}
 				return err
 			}
 		}
