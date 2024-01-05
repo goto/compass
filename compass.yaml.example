@@ -65,6 +65,9 @@ worker:
         username: compass
         password: compass_password
     job_manager_port: 8085
+    sync_job_timeout: 15m
+    index_job_timeout: 5s
+    delete_job_timeout: 5s
 
 client:
     host: localhost:8081
