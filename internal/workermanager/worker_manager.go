@@ -26,6 +26,9 @@ type Manager struct {
 	discoveryRepo  DiscoveryRepository
 	assetRepo      asset.Repository
 	logger         log.Logger
+	syncTimeout    time.Duration
+	indexTimeout   time.Duration
+	deleteTimeout  time.Duration
 }
 
 //go:generate mockery --name=Worker -r --case underscore --with-expecter --structname Worker --filename worker_mock.go --output=./mocks
@@ -44,6 +47,9 @@ type Config struct {
 	ActivePollPercent float64       `mapstructure:"active_poll_percent" default:"20"`
 	PGQ               pgq.Config    `mapstructure:"pgq"`
 	JobManagerPort    int           `mapstructure:"job_manager_port"`
+	SyncJobTimeout    time.Duration `mapstructure:"sync_job_timeout" default:"15m"`
+	IndexJobTimeout   time.Duration `mapstructure:"index_job_timeout" default:"5s"`
+	DeleteJobTimeout  time.Duration `mapstructure:"delete_job_timeout" default:"5s"`
 }
 
 type Deps struct {
@@ -77,6 +83,9 @@ func New(ctx context.Context, deps Deps) (*Manager, error) {
 		discoveryRepo:  deps.DiscoveryRepo,
 		assetRepo:      deps.AssetRepo,
 		logger:         deps.Logger,
+		syncTimeout:    cfg.SyncJobTimeout,
+		indexTimeout:   cfg.IndexJobTimeout,
+		deleteTimeout:  cfg.DeleteJobTimeout,
 	}, nil
 }
 

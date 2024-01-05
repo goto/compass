@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/goto/compass/core/asset"
 	"github.com/goto/compass/pkg/worker"
@@ -41,7 +40,7 @@ func (m *Manager) indexAssetHandler() worker.JobHandler {
 		Handle: m.IndexAsset,
 		JobOpts: worker.JobOptions{
 			MaxAttempts:     3,
-			Timeout:         5 * time.Second,
+			Timeout:         m.indexTimeout,
 			BackoffStrategy: worker.DefaultExponentialBackoff,
 		},
 	}
@@ -52,7 +51,7 @@ func (m *Manager) syncAssetHandler() worker.JobHandler {
 		Handle: m.SyncAssets,
 		JobOpts: worker.JobOptions{
 			MaxAttempts:     1,
-			Timeout:         5 * time.Minute,
+			Timeout:         m.syncTimeout,
 			BackoffStrategy: worker.DefaultExponentialBackoff,
 		},
 	}
@@ -143,7 +142,7 @@ func (m *Manager) deleteAssetHandler() worker.JobHandler {
 		Handle: m.DeleteAsset,
 		JobOpts: worker.JobOptions{
 			MaxAttempts:     3,
-			Timeout:         5 * time.Second,
+			Timeout:         m.deleteTimeout,
 			BackoffStrategy: worker.DefaultExponentialBackoff,
 		},
 	}
