@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/goto/compass/core/user"
 	"github.com/goto/compass/internal/server/health"
 	handlersv1beta1 "github.com/goto/compass/internal/server/v1beta1"
 	"github.com/goto/compass/internal/store/postgres"
@@ -19,9 +20,11 @@ import (
 	grpclogrus "github.com/grpc-ecosystem/go-grpc-middleware/logging/logrus"
 	grpcrecovery "github.com/grpc-ecosystem/go-grpc-middleware/recovery"
 	grpcctxtags "github.com/grpc-ecosystem/go-grpc-middleware/tags"
+	ctx_logrus "github.com/grpc-ecosystem/go-grpc-middleware/tags/logrus"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/newrelic/go-agent/v3/integrations/nrgrpc"
 	"github.com/newrelic/go-agent/v3/newrelic"
+	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -94,6 +97,7 @@ func Serve(
 			grpc_interceptor.UserHeaderCtx(config.Identity.HeaderKeyUUID, config.Identity.HeaderKeyEmail),
 			grpcctxtags.UnaryServerInterceptor(),
 			grpcrecovery.UnaryServerInterceptor(),
+			withLogrusContext(),
 		)),
 	)
 	reflection.Register(grpcServer)
@@ -182,5 +186,18 @@ func makeHeaderMatcher(c Config) func(key string) (string, bool) {
 		default:
 			return runtime.DefaultHeaderMatcher(key)
 		}
+	}
+}
+
+func withLogrusContext() grpc.UnaryServerInterceptor {
+	return func(ctx context.Context, req interface{}, _ *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+		usr := user.FromContext(ctx)
+		if usr.UUID != "" {
+			ctx_logrus.AddFields(ctx, logrus.Fields{
+				"user.uuid": usr.UUID,
+			})
+		}
+
+		return handler(ctx, req)
 	}
 }
