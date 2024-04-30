@@ -9,6 +9,7 @@ const (
 	TypeApplication  Type = "application"
 	TypeModel        Type = "model"
 	TypeQuery        Type = "query"
+	TypeMetric       Type = "metric"
 )
 
 // AllSupportedTypes holds a list of all supported types struct
@@ -21,6 +22,7 @@ var AllSupportedTypes = []Type{
 	TypeApplication,
 	TypeModel,
 	TypeQuery,
+	TypeMetric,
 }
 
 // Type specifies a supported type name
@@ -33,10 +35,10 @@ func (t Type) String() string {
 
 // IsValid will validate whether the typename is valid or not
 func (t Type) IsValid() bool {
-	switch t {
-	case TypeTable, TypeJob, TypeDashboard, TypeTopic,
-		TypeFeatureTable, TypeApplication, TypeModel, TypeQuery:
-		return true
+	for _, supportedType := range AllSupportedTypes {
+		if t == supportedType {
+			return true
+		}
 	}
 	return false
 }
