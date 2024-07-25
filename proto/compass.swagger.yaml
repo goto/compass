@@ -994,6 +994,10 @@ paths:
           in: query
           required: false
           type: string
+        - name: with_attributes
+          in: query
+          required: false
+          type: boolean
       tags:
         - Lineage
         - Asset

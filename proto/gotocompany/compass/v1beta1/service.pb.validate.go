@@ -3592,6 +3592,10 @@ func (m *GetGraphRequest) validate(all bool) error {
 		errors = append(errors, err)
 	}
 
+	if m.WithAttributes != nil {
+		// no validation rules for WithAttributes
+	}
+
 	if len(errors) > 0 {
 		return GetGraphRequestMultiError(errors)
 	}
