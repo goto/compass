@@ -22,9 +22,15 @@ func (server *APIServer) GetGraph(ctx context.Context, req *compassv1beta1.GetGr
 		return nil, status.Error(codes.InvalidArgument, "invalid direction value")
 	}
 
+	withAttributes := true
+	if req != nil && req.WithAttributes != nil {
+		withAttributes = *req.WithAttributes
+	}
+
 	lineage, err := server.assetService.GetLineage(ctx, req.GetUrn(), asset.LineageQuery{
-		Level:     int(req.GetLevel()),
-		Direction: direction,
+		Level:          int(req.GetLevel()),
+		Direction:      direction,
+		WithAttributes: withAttributes,
 	})
 	if err != nil {
 		return nil, internalServerError(server.logger, err.Error())

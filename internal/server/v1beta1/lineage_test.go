@@ -58,7 +58,7 @@ func TestGetLineageGraph(t *testing.T) {
 			defer mockUserSvc.AssertExpectations(t)
 			defer mockSvc.AssertExpectations(t)
 
-			mockSvc.EXPECT().GetLineage(ctx, nodeURN, asset.LineageQuery{Level: level, Direction: direction}).Return(lineage, nil)
+			mockSvc.EXPECT().GetLineage(ctx, nodeURN, asset.LineageQuery{Level: level, Direction: direction, WithAttributes: true}).Return(lineage, nil)
 			mockUserSvc.EXPECT().ValidateUser(ctx, userUUID, "").Return(userID, nil)
 
 			handler := NewAPIServer(APIServerDeps{AssetSvc: mockSvc, UserSvc: mockUserSvc, Logger: logger})

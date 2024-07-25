@@ -807,6 +807,7 @@ func TestService_GetLineage(t *testing.T) {
 	type testCase struct {
 		Description string
 		ID          string
+		Query       asset.LineageQuery
 		Setup       func(context.Context, *mocks.AssetRepository, *mocks.DiscoveryRepository, *mocks.LineageRepository)
 		Expected    asset.Lineage
 		Err         error
@@ -816,8 +817,11 @@ func TestService_GetLineage(t *testing.T) {
 		{
 			Description: `should return error if the GetGraph function return error`,
 			ID:          assetID,
+			Query: asset.LineageQuery{
+				WithAttributes: true,
+			},
 			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository, lr *mocks.LineageRepository) {
-				lr.EXPECT().GetGraph(ctx, "urn-source-1", asset.LineageQuery{}).
+				lr.EXPECT().GetGraph(ctx, "urn-source-1", asset.LineageQuery{WithAttributes: true}).
 					Return(asset.LineageGraph{}, errors.New("error fetching graph"))
 			},
 			Expected: asset.Lineage{},
@@ -826,8 +830,11 @@ func TestService_GetLineage(t *testing.T) {
 		{
 			Description: `should return no error if graph with 0 edges are returned`,
 			ID:          assetID,
+			Query: asset.LineageQuery{
+				WithAttributes: true,
+			},
 			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository, lr *mocks.LineageRepository) {
-				lr.EXPECT().GetGraph(ctx, "urn-source-1", asset.LineageQuery{}).
+				lr.EXPECT().GetGraph(ctx, "urn-source-1", asset.LineageQuery{WithAttributes: true}).
 					Return(asset.LineageGraph{}, nil)
 				ar.EXPECT().GetProbesWithFilter(ctx, asset.ProbesFilter{
 					AssetURNs: []string{"urn-source-1"},
@@ -840,8 +847,11 @@ func TestService_GetLineage(t *testing.T) {
 		{
 			Description: `should return an error if GetProbesWithFilter function returns error`,
 			ID:          assetID,
+			Query: asset.LineageQuery{
+				WithAttributes: true,
+			},
 			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository, lr *mocks.LineageRepository) {
-				lr.EXPECT().GetGraph(ctx, "urn-source-1", asset.LineageQuery{}).Return(asset.LineageGraph{
+				lr.EXPECT().GetGraph(ctx, "urn-source-1", asset.LineageQuery{WithAttributes: true}).Return(asset.LineageGraph{
 					{Source: "urn-source-1", Target: "urn-target-1", Prop: nil},
 					{Source: "urn-source-1", Target: "urn-target-2", Prop: nil},
 					{Source: "urn-target-2", Target: "urn-target-3", Prop: nil},
@@ -857,8 +867,11 @@ func TestService_GetLineage(t *testing.T) {
 		{
 			Description: `should return no error if GetProbesWithFilter function returns 0 probes`,
 			ID:          assetID,
+			Query: asset.LineageQuery{
+				WithAttributes: true,
+			},
 			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository, lr *mocks.LineageRepository) {
-				lr.EXPECT().GetGraph(ctx, "urn-source-1", asset.LineageQuery{}).Return(asset.LineageGraph{
+				lr.EXPECT().GetGraph(ctx, "urn-source-1", asset.LineageQuery{WithAttributes: true}).Return(asset.LineageGraph{
 					{Source: "urn-source-1", Target: "urn-target-1", Prop: nil},
 					{Source: "urn-source-1", Target: "urn-target-2", Prop: nil},
 					{Source: "urn-target-2", Target: "urn-target-3", Prop: nil},
@@ -881,8 +894,11 @@ func TestService_GetLineage(t *testing.T) {
 		{
 			Description: `should return lineage with edges and node attributes`,
 			ID:          assetID,
+			Query: asset.LineageQuery{
+				WithAttributes: true,
+			},
 			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository, lr *mocks.LineageRepository) {
-				lr.EXPECT().GetGraph(ctx, "urn-source-1", asset.LineageQuery{}).Return(asset.LineageGraph{
+				lr.EXPECT().GetGraph(ctx, "urn-source-1", asset.LineageQuery{WithAttributes: true}).Return(asset.LineageGraph{
 					{Source: "urn-source-1", Target: "urn-target-1", Prop: nil},
 					{Source: "urn-source-1", Target: "urn-target-2", Prop: nil},
 					{Source: "urn-target-2", Target: "urn-target-3", Prop: nil},
@@ -942,7 +958,7 @@ func TestService_GetLineage(t *testing.T) {
 				LineageRepo:   mockLineageRepo,
 			})
 
-			actual, err := svc.GetLineage(ctx, "urn-source-1", asset.LineageQuery{})
+			actual, err := svc.GetLineage(ctx, "urn-source-1", tc.Query)
 			if tc.Err == nil {
 				assert.NoError(t, err)
 			} else {
