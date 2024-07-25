@@ -892,6 +892,28 @@ func TestService_GetLineage(t *testing.T) {
 			Err: nil,
 		},
 		{
+			Description: `should return lineage with edges and without node attributes`,
+			ID:          assetID,
+			Query: asset.LineageQuery{
+				WithAttributes: false,
+			},
+			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository, lr *mocks.LineageRepository) {
+				lr.EXPECT().GetGraph(ctx, "urn-source-1", asset.LineageQuery{WithAttributes: false}).Return(asset.LineageGraph{
+					{Source: "urn-source-1", Target: "urn-target-1", Prop: nil},
+					{Source: "urn-source-1", Target: "urn-target-2", Prop: nil},
+					{Source: "urn-target-2", Target: "urn-target-3", Prop: nil},
+				}, nil)
+			},
+			Expected: asset.Lineage{
+				Edges: []asset.LineageEdge{
+					{Source: "urn-source-1", Target: "urn-target-1", Prop: nil},
+					{Source: "urn-source-1", Target: "urn-target-2", Prop: nil},
+					{Source: "urn-target-2", Target: "urn-target-3", Prop: nil},
+				},
+			},
+			Err: nil,
+		},
+		{
 			Description: `should return lineage with edges and node attributes`,
 			ID:          assetID,
 			Query: asset.LineageQuery{

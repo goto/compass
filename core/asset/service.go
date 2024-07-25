@@ -192,8 +192,7 @@ func (s *Service) GetLineage(ctx context.Context, urn string, query LineageQuery
 
 	if !query.WithAttributes {
 		return Lineage{
-			Edges:     edges,
-			NodeAttrs: make(map[string]NodeAttributes),
+			Edges: edges,
 		}, nil
 	}
 
