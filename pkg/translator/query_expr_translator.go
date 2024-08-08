@@ -35,6 +35,8 @@ func (q *QueryExprTranslator) ConvertToSQL() (string, error) {
 	return q.SqlQuery.String(), nil
 }
 
+// TranslateToSQL The idea came from ast.Walk. Currently, the development focus implement for the node type that most likely used in our needs.
+// TODO: implement translator for node type that still not covered right now.
 func (q *QueryExprTranslator) TranslateToSQL(node *ast.Node, translator *QueryExprTranslator) {
 	if *node == nil {
 		return
@@ -175,6 +177,8 @@ func (q *QueryExprTranslator) ConvertToEsQuery() (string, error) {
 	return string(queryJSON), nil
 }
 
+// TranslateToEsQuery The idea came from ast.Walk. Currently, the development focus implement for the node type that most likely used in our needs.
+// TODO: implement translator for node type that still not covered right now.
 func (q *QueryExprTranslator) TranslateToEsQuery(node *ast.Node) interface{} {
 	if *node == nil {
 		return nil
