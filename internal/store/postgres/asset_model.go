@@ -27,6 +27,7 @@ type AssetModel struct {
 	UpdatedBy   UserModel `db:"updated_by"`
 	CreatedAt   time.Time `db:"created_at"`
 	UpdatedAt   time.Time `db:"updated_at"`
+	RefreshedAt time.Time `db:"refreshed_at"`
 	// version specific information
 	Changelog types.JSONText `db:"changelog"`
 	Owners    types.JSONText `db:"owners"`
@@ -48,6 +49,7 @@ func (a *AssetModel) toAsset(owners []user.User) asset.Asset {
 		UpdatedBy:   a.UpdatedBy.toUser(),
 		CreatedAt:   a.CreatedAt,
 		UpdatedAt:   a.UpdatedAt,
+		RefreshedAt: a.RefreshedAt,
 	}
 }
 
@@ -59,15 +61,16 @@ func (a *AssetModel) toAssetVersion() (asset.Asset, error) {
 	}
 
 	return asset.Asset{
-		ID:        a.ID,
-		URN:       a.URN,
-		Type:      asset.Type(a.Type),
-		Service:   a.Service,
-		Version:   a.Version,
-		Changelog: clog,
-		UpdatedBy: a.UpdatedBy.toUser(),
-		CreatedAt: a.CreatedAt,
-		UpdatedAt: a.UpdatedAt,
+		ID:          a.ID,
+		URN:         a.URN,
+		Type:        asset.Type(a.Type),
+		Service:     a.Service,
+		Version:     a.Version,
+		Changelog:   clog,
+		UpdatedBy:   a.UpdatedBy.toUser(),
+		CreatedAt:   a.CreatedAt,
+		UpdatedAt:   a.UpdatedAt,
+		RefreshedAt: a.RefreshedAt,
 	}, nil
 }
 
@@ -98,6 +101,7 @@ func (a *AssetModel) toVersionedAsset(latestAssetVersion asset.Asset) (asset.Ass
 		UpdatedBy:   a.UpdatedBy.toUser(),
 		CreatedAt:   a.CreatedAt,
 		UpdatedAt:   a.UpdatedAt,
+		RefreshedAt: a.RefreshedAt,
 		Changelog:   clog,
 	}, nil
 }

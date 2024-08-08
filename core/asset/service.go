@@ -3,11 +3,13 @@ package asset
 import (
 	"context"
 	"fmt"
-
 	"github.com/google/uuid"
+	"github.com/goto/compass/pkg/generic_helper"
+	"github.com/goto/compass/pkg/translator"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
+	"time"
 )
 
 type Service struct {
@@ -24,6 +26,7 @@ type Service struct {
 type Worker interface {
 	EnqueueIndexAssetJob(ctx context.Context, ast Asset) error
 	EnqueueDeleteAssetJob(ctx context.Context, urn string) error
+	EnqueueDeleteAssetsByQueryJob(ctx context.Context, filterQuery string) error
 	EnqueueSyncAssetJob(ctx context.Context, service string) error
 	Close() error
 }
@@ -83,6 +86,9 @@ func (s *Service) UpsertAsset(ctx context.Context, ast *Asset, upstreams, downst
 }
 
 func (s *Service) UpsertAssetWithoutLineage(ctx context.Context, ast *Asset) (string, error) {
+	// Update the asset in both postgresql and elasticsearch for each upsert
+	ast.RefreshedAt = time.Now()
+
 	assetID, err := s.assetRepository.Upsert(ctx, ast)
 	if err != nil {
 		return "", err
@@ -120,6 +126,60 @@ func (s *Service) DeleteAsset(ctx context.Context, id string) (err error) {
 	}
 
 	return s.lineageRepository.DeleteByURN(ctx, urn)
+}
+
+func (s *Service) DeleteAssets(ctx context.Context, queryExpr string, dryRun bool) (affectedRows uint32, err error) {
+	queryExprTranslator := &translator.QueryExprTranslator{
+		QueryExpr: queryExpr,
+	}
+
+	// Check existence of required identifiers
+	identifiers := queryExprTranslator.GetIdentifiers()
+	mustExist := generic_helper.Contains(identifiers, "refreshed_at") &&
+		generic_helper.Contains(identifiers, "type") &&
+		generic_helper.Contains(identifiers, "service")
+	if !mustExist {
+		return 0, fmt.Errorf(
+			"must exists these identifiers: refreshed_at, type. Current identifiers: %v", identifiers)
+	}
+
+	sqlWhereCondition, err := queryExprTranslator.ConvertToSQL()
+	if err != nil {
+		return 0, err
+	}
+
+	total, err := s.assetRepository.GetCountByQuery(ctx, sqlWhereCondition)
+	if err != nil {
+		return 0, err
+	}
+
+	if dryRun {
+		return uint32(total), nil
+	}
+
+	esFilterQuery, err := queryExprTranslator.ConvertToEsQuery()
+	if err != nil {
+		return 0, err
+	}
+
+	go func() {
+		urns, err := s.assetRepository.DeleteByQuery(ctx, sqlWhereCondition)
+		if err != nil {
+			return
+		}
+
+		if err := s.worker.EnqueueDeleteAssetsByQueryJob(ctx, esFilterQuery); err != nil {
+			return
+		}
+
+		for _, urn := range urns {
+			if err := s.lineageRepository.DeleteByURN(ctx, urn); err != nil {
+				return
+			}
+		}
+	}()
+
+	return uint32(total), nil
 }
 
 func (s *Service) GetAssetByID(ctx context.Context, id string) (Asset, error) {

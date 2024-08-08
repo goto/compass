@@ -12,13 +12,25 @@ import (
 	"strings"
 )
 
+type ExprParam map[string]interface{}
+
 type QueryExprTranslator struct {
-	QueryExpr string
-	SqlQuery  strings.Builder
-	EsQuery   map[string]interface{}
+	QueryExpr   string
+	SqlQuery    strings.Builder
+	EsQuery     map[string]interface{}
+	Identifiers []string
 }
 
-type ExprParam map[string]interface{}
+func (q *QueryExprTranslator) Visit(node *ast.Node) {
+	if n, ok := (*node).(*ast.IdentifierNode); ok {
+		q.Identifiers = append(q.Identifiers, n.Value)
+	}
+}
+
+func (q *QueryExprTranslator) GetIdentifiers() []string {
+	ast.Walk(q.getTreeNodeFromQueryExpr(), q)
+	return q.Identifiers
+}
 
 func (q *QueryExprTranslator) getTreeNodeFromQueryExpr() *ast.Node {
 	parsed, err := parser.Parse(q.QueryExpr)

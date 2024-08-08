@@ -9,6 +9,7 @@ type DiscoveryRepository interface {
 	Upsert(context.Context, Asset) error
 	DeleteByID(ctx context.Context, assetID string) error
 	DeleteByURN(ctx context.Context, assetURN string) error
+	DeleteByQuery(ctx context.Context, filterQuery string) error
 	Search(ctx context.Context, cfg SearchConfig) (results []SearchResult, err error)
 	Suggest(ctx context.Context, cfg SearchConfig) (suggestions []string, err error)
 	GroupAssets(ctx context.Context, cfg GroupConfig) (results []GroupResult, err error)

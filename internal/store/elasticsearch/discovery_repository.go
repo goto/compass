@@ -144,6 +144,14 @@ func (repo *DiscoveryRepository) DeleteByURN(ctx context.Context, assetURN strin
 	return repo.deleteWithQuery(ctx, "DeleteByURN", fmt.Sprintf(`{"query":{"term":{"urn.keyword": %q}}}`, assetURN))
 }
 
+func (repo *DiscoveryRepository) DeleteByQuery(ctx context.Context, filterQuery string) error {
+	if filterQuery == "" {
+		return asset.ErrEmptyQuery
+	}
+
+	return repo.deleteWithQuery(ctx, "DeleteByQuery", filterQuery)
+}
+
 func (repo *DiscoveryRepository) deleteWithQuery(ctx context.Context, discoveryOp, qry string) (err error) {
 	defer func(start time.Time) {
 		const op = "delete_by_query"

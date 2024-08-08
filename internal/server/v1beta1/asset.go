@@ -30,6 +30,7 @@ type AssetService interface {
 	UpsertAsset(ctx context.Context, ast *asset.Asset, upstreams, downstreams []string) (string, error)
 	UpsertAssetWithoutLineage(ctx context.Context, ast *asset.Asset) (string, error)
 	DeleteAsset(ctx context.Context, id string) error
+	DeleteAssets(ctx context.Context, queryExpr string, dryRun bool) (uint32, error)
 
 	GetLineage(ctx context.Context, urn string, query asset.LineageQuery) (asset.Lineage, error)
 	GetTypes(ctx context.Context, flt asset.Filter) (map[asset.Type]int, error)
@@ -304,6 +305,28 @@ func (server *APIServer) DeleteAsset(ctx context.Context, req *compassv1beta1.De
 	}
 
 	return &compassv1beta1.DeleteAssetResponse{}, nil
+}
+
+func (server *APIServer) DeleteAssets(ctx context.Context, req *compassv1beta1.DeleteAssetsRequest) (*compassv1beta1.DeleteAssetsResponse, error) {
+	_, err := server.ValidateUserInCtx(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	affectedRows, err := server.assetService.DeleteAssets(ctx, req.QueryExpr, req.DryRun)
+	if err != nil {
+		if errors.As(err, new(asset.InvalidError)) {
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		}
+		if errors.As(err, new(asset.NotFoundError)) {
+			return nil, status.Error(codes.NotFound, err.Error())
+		}
+		return nil, internalServerError(server.logger, err.Error())
+	}
+
+	return &compassv1beta1.DeleteAssetsResponse{
+		AffectedRows: affectedRows,
+	}, nil
 }
 
 func (server *APIServer) CreateAssetProbe(ctx context.Context, req *compassv1beta1.CreateAssetProbeRequest) (*compassv1beta1.CreateAssetProbeResponse, error) {
