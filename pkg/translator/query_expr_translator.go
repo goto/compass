@@ -31,26 +31,26 @@ func (q *QueryExprTranslator) getTreeNodeFromQueryExpr() *ast.Node {
 
 func (q *QueryExprTranslator) ConvertToSQL() (string, error) {
 	q.SqlQuery = strings.Builder{}
-	q.TranslateToSQL(q.getTreeNodeFromQueryExpr(), q)
+	q.translateToSQL(q.getTreeNodeFromQueryExpr(), q)
 	return q.SqlQuery.String(), nil
 }
 
-// TranslateToSQL The idea came from ast.Walk. Currently, the development focus implement for the node type that most likely used in our needs.
+// translateToSQL The idea came from ast.Walk. Currently, the development focus implement for the node type that most likely used in our needs.
 // TODO: implement translator for node type that still not covered right now.
-func (q *QueryExprTranslator) TranslateToSQL(node *ast.Node, translator *QueryExprTranslator) {
+func (q *QueryExprTranslator) translateToSQL(node *ast.Node, translator *QueryExprTranslator) {
 	if *node == nil {
 		return
 	}
 	switch n := (*node).(type) {
 	case *ast.BinaryNode:
 		translator.SqlQuery.WriteString("(")
-		q.TranslateToSQL(&n.Left, translator)
+		q.translateToSQL(&n.Left, translator)
 
 		// write operator
 		operator := q.operatorToSQL(n)
 		translator.SqlQuery.WriteString(fmt.Sprintf(" %s ", strings.ToUpper(operator)))
 
-		q.TranslateToSQL(&n.Right, translator)
+		q.translateToSQL(&n.Right, translator)
 		translator.SqlQuery.WriteString(")")
 	case *ast.NilNode:
 		translator.SqlQuery.WriteString(fmt.Sprintf("%s", "NULL"))
@@ -86,7 +86,7 @@ func (q *QueryExprTranslator) TranslateToSQL(node *ast.Node, translator *QueryEx
 				// adjust other type if needed
 			}
 		}
-		q.TranslateToSQL(&n.Node, translator)
+		q.translateToSQL(&n.Node, translator)
 	case *ast.BuiltinNode:
 		result, err := q.getQueryExprResult(n.String())
 		if err != nil {
@@ -96,7 +96,7 @@ func (q *QueryExprTranslator) TranslateToSQL(node *ast.Node, translator *QueryEx
 	case *ast.ArrayNode:
 		translator.SqlQuery.WriteString("(")
 		for i := range n.Nodes {
-			q.TranslateToSQL(&n.Nodes[i], translator)
+			q.translateToSQL(&n.Nodes[i], translator)
 			if i != len(n.Nodes)-1 {
 				translator.SqlQuery.WriteString(", ")
 			}
@@ -108,7 +108,7 @@ func (q *QueryExprTranslator) TranslateToSQL(node *ast.Node, translator *QueryEx
 			return
 		}
 		if nodeV, ok := result.(ast.Node); ok {
-			q.TranslateToSQL(&nodeV, translator)
+			q.translateToSQL(&nodeV, translator)
 		}
 	case *ast.ChainNode:
 	case *ast.MemberNode:
@@ -161,7 +161,7 @@ func (q *QueryExprTranslator) operatorToSQL(bn *ast.BinaryNode) string {
 }
 
 func (q *QueryExprTranslator) ConvertToEsQuery() (string, error) {
-	esQueryInterface := q.TranslateToEsQuery(q.getTreeNodeFromQueryExpr())
+	esQueryInterface := q.translateToEsQuery(q.getTreeNodeFromQueryExpr())
 	esQuery, ok := esQueryInterface.(map[string]interface{})
 	if !ok {
 		return "", errors.New("failed to generate Elasticsearch query")
@@ -177,9 +177,9 @@ func (q *QueryExprTranslator) ConvertToEsQuery() (string, error) {
 	return string(queryJSON), nil
 }
 
-// TranslateToEsQuery The idea came from ast.Walk. Currently, the development focus implement for the node type that most likely used in our needs.
+// translateToEsQuery The idea came from ast.Walk. Currently, the development focus implement for the node type that most likely used in our needs.
 // TODO: implement translator for node type that still not covered right now.
-func (q *QueryExprTranslator) TranslateToEsQuery(node *ast.Node) interface{} {
+func (q *QueryExprTranslator) translateToEsQuery(node *ast.Node) interface{} {
 	if *node == nil {
 		return nil
 	}
@@ -216,7 +216,7 @@ func (q *QueryExprTranslator) TranslateToEsQuery(node *ast.Node) interface{} {
 			return nil
 		}
 		if nodeV, ok := result.(ast.Node); ok {
-			return q.TranslateToEsQuery(&nodeV)
+			return q.translateToEsQuery(&nodeV)
 		}
 	case *ast.ChainNode:
 	case *ast.MemberNode:
@@ -235,8 +235,8 @@ func (q *QueryExprTranslator) TranslateToEsQuery(node *ast.Node) interface{} {
 }
 
 func (q *QueryExprTranslator) translateBinaryNodeToEsQuery(n *ast.BinaryNode) map[string]interface{} {
-	left := q.TranslateToEsQuery(&n.Left)
-	right := q.TranslateToEsQuery(&n.Right)
+	left := q.translateToEsQuery(&n.Left)
+	right := q.translateToEsQuery(&n.Right)
 
 	switch n.Operator {
 	case "&&":
@@ -260,13 +260,13 @@ func (q *QueryExprTranslator) translateUnaryNodeToEsQuery(n *ast.UnaryNode) inte
 	switch n.Operator {
 	case "not":
 		if binaryNode, ok := n.Node.(*ast.BinaryNode); ok && binaryNode.Operator == "in" {
-			left := q.TranslateToEsQuery(&binaryNode.Left)
-			right := q.TranslateToEsQuery(&binaryNode.Right)
+			left := q.translateToEsQuery(&binaryNode.Left)
+			right := q.translateToEsQuery(&binaryNode.Right)
 			return q.mustNotTermsQuery(left.(string), right)
 		}
 		return nil
 	case "!":
-		nodeValue := q.TranslateToEsQuery(&n.Node)
+		nodeValue := q.translateToEsQuery(&n.Node)
 		switch value := nodeValue.(type) {
 		case bool:
 			return !value
@@ -285,7 +285,7 @@ func (q *QueryExprTranslator) translateUnaryNodeToEsQuery(n *ast.UnaryNode) inte
 func (q *QueryExprTranslator) translateArrayNodeToEsQuery(n *ast.ArrayNode) []interface{} {
 	values := make([]interface{}, len(n.Nodes))
 	for i, node := range n.Nodes {
-		values[i] = q.TranslateToEsQuery(&node)
+		values[i] = q.translateToEsQuery(&node)
 	}
 	return values
 }
