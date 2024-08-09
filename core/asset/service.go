@@ -3,13 +3,14 @@ package asset
 import (
 	"context"
 	"fmt"
+	"log"
+	"sync"
+	"time"
+
 	"github.com/google/uuid"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
-	"log"
-	"sync"
-	"time"
 )
 
 type Service struct {
@@ -160,14 +161,14 @@ func (s *Service) DeleteAssets(ctx context.Context, queryExpr string, dryRun boo
 		if dbErr == nil {
 			go func() {
 				if err := s.worker.EnqueueDeleteAssetsByQueryExprJob(context.Background(), queryExpr); err != nil {
-					log.Fatalf("Error occurred during Elasticsearch deletion: %s", err)
+					log.Printf("Error occurred during Elasticsearch deletion: %s", err)
 				}
 			}()
 
 			go func() {
 				for _, urn := range urns {
 					if err := s.lineageRepository.DeleteByURN(context.Background(), urn); err != nil {
-						log.Fatalf("Error occurred during Lineage deletion: %s", err)
+						log.Printf("Error occurred during Lineage deletion: %s", err)
 					}
 				}
 			}()
