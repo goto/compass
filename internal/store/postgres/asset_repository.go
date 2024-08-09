@@ -43,7 +43,8 @@ func (d *DeleteAssetSQLExpr) Validate() error {
 		generichelper.Contains(identifiers, "type") &&
 		generichelper.Contains(identifiers, "service")
 	if !mustExist {
-		return fmt.Errorf("must exists these identifiers: refreshed_at, type. Current identifiers: %v", identifiers)
+		return fmt.Errorf("must exists these identifiers: refreshed_at, type, and service. "+
+			"Current identifiers: %v", identifiers)
 	}
 
 	return nil
@@ -1003,6 +1004,7 @@ func (r *AssetRepository) getAssetSQL() sq.SelectBuilder {
 		a.version as version,
 		a.created_at as created_at,
 		a.updated_at as updated_at,
+		a.refreshed_at as refreshed_at,
 		u.id as "updated_by.id",
 		u.uuid as "updated_by.uuid",
 		u.email as "updated_by.email",
