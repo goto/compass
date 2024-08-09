@@ -7,6 +7,8 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
+	"log"
+	"sync"
 	"time"
 )
 
@@ -127,6 +129,10 @@ func (s *Service) DeleteAsset(ctx context.Context, id string) (err error) {
 }
 
 func (s *Service) DeleteAssets(ctx context.Context, queryExpr string, dryRun bool) (affectedRows uint32, err error) {
+	var wg sync.WaitGroup
+	var urns []string
+	dbErrChan := make(chan error, 1)
+
 	total, err := s.assetRepository.GetCountByQueryExpr(ctx, queryExpr, true)
 	if err != nil {
 		return 0, err
@@ -136,20 +142,37 @@ func (s *Service) DeleteAssets(ctx context.Context, queryExpr string, dryRun boo
 		return uint32(total), nil
 	}
 
+	// Perform the Assets deletion asynchronously.
+	wg.Add(1)
 	go func() {
-		urns, err := s.assetRepository.DeleteByQueryExpr(ctx, queryExpr)
-		if err != nil {
-			return
-		}
+		defer wg.Done()
+		urnsDeleted, err := s.assetRepository.DeleteByQueryExpr(context.Background(), queryExpr)
+		urns = urnsDeleted
+		dbErrChan <- err
+		close(dbErrChan)
+	}()
 
-		if err := s.worker.EnqueueDeleteAssetsByQueryExprJob(ctx, queryExpr); err != nil {
-			return
-		}
+	// Perform Elasticsearch and Lineage asynchronously if the Assets deletion is successful.
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		dbErr := <-dbErrChan
+		if dbErr == nil {
+			go func() {
+				if err := s.worker.EnqueueDeleteAssetsByQueryExprJob(context.Background(), queryExpr); err != nil {
+					log.Fatalf("Error occurred during Elasticsearch deletion: %s", err)
+				}
+			}()
 
-		for _, urn := range urns {
-			if err := s.lineageRepository.DeleteByURN(ctx, urn); err != nil {
-				return
-			}
+			go func() {
+				for _, urn := range urns {
+					if err := s.lineageRepository.DeleteByURN(context.Background(), urn); err != nil {
+						log.Fatalf("Error occurred during Lineage deletion: %s", err)
+					}
+				}
+			}()
+		} else {
+			log.Printf("Database deletion failed, skipping Elasticsearch and Lineage deletions: %s", dbErr)
 		}
 	}()
 
