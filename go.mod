@@ -9,6 +9,7 @@ require (
 	github.com/Masterminds/squirrel v1.5.2
 	github.com/elastic/go-elasticsearch/v7 v7.16.0
 	github.com/envoyproxy/protoc-gen-validate v0.10.1
+	github.com/expr-lang/expr v1.16.9
 	github.com/go-playground/locales v0.14.0
 	github.com/go-playground/universal-translator v0.18.0
 	github.com/go-playground/validator/v10 v10.10.0

@@ -15,6 +15,7 @@ import (
 type DiscoveryRepository interface {
 	Upsert(context.Context, asset.Asset) error
 	DeleteByURN(ctx context.Context, assetURN string) error
+	DeleteByQueryExpr(ctx context.Context, queryExpr string) error
 	SyncAssets(ctx context.Context, indexName string) (cleanupFn func() error, err error)
 }
 
@@ -153,6 +154,39 @@ func (m *Manager) DeleteAsset(ctx context.Context, job worker.JobSpec) error {
 	if err := m.discoveryRepo.DeleteByURN(ctx, urn); err != nil {
 		return &worker.RetryableError{
 			Cause: fmt.Errorf("delete asset from discovery repo: %w: urn '%s'", err, urn),
+		}
+	}
+	return nil
+}
+
+func (m *Manager) EnqueueDeleteAssetsByQueryExprJob(ctx context.Context, queryExpr string) error {
+	err := m.worker.Enqueue(ctx, worker.JobSpec{
+		Type:    jobDeleteAssetsByQuery,
+		Payload: ([]byte)(queryExpr),
+	})
+	if err != nil {
+		return fmt.Errorf("enqueue delete asset job: %w: query expr '%s'", err, queryExpr)
+	}
+
+	return nil
+}
+
+func (m *Manager) deleteAssetsByQueryHandler() worker.JobHandler {
+	return worker.JobHandler{
+		Handle: m.DeleteAssetsByQueryExpr,
+		JobOpts: worker.JobOptions{
+			MaxAttempts:     3,
+			Timeout:         m.indexTimeout,
+			BackoffStrategy: worker.DefaultExponentialBackoff,
+		},
+	}
+}
+
+func (m *Manager) DeleteAssetsByQueryExpr(ctx context.Context, job worker.JobSpec) error {
+	queryExpr := (string)(job.Payload)
+	if err := m.discoveryRepo.DeleteByQueryExpr(ctx, queryExpr); err != nil {
+		return &worker.RetryableError{
+			Cause: fmt.Errorf("delete asset from discovery repo: %w: query expr '%s'", err, queryExpr),
 		}
 	}
 	return nil

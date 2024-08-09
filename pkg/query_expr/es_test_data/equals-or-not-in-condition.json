@@ -1,0 +1,28 @@
+{
+  "query": {
+    "bool": {
+      "should": [
+        {
+          "term": {
+            "name": "John"
+          }
+        },
+        {
+          "bool": {
+            "must_not": [
+              {
+                "terms": {
+                  "service": [
+                    "test1",
+                    "test2",
+                    "test3"
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}

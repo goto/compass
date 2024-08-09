@@ -40,6 +40,13 @@ func (m *InSituWorker) EnqueueDeleteAssetJob(ctx context.Context, urn string) er
 	return nil
 }
 
+func (m *InSituWorker) EnqueueDeleteAssetsByQueryExprJob(ctx context.Context, queryExpr string) error {
+	if err := m.discoveryRepo.DeleteByQueryExpr(ctx, queryExpr); err != nil {
+		return fmt.Errorf("delete asset from discovery repo: %w: query expr '%s'", err, queryExpr)
+	}
+	return nil
+}
+
 func (m *InSituWorker) EnqueueSyncAssetJob(ctx context.Context, service string) error {
 	const batchSize = 1000
 
