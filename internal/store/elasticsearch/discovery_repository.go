@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	generichelper "github.com/goto/compass/pkg/generic_helper"
+	queryexpr "github.com/goto/compass/pkg/query_expr"
 	"io"
 	"net/url"
 	"strings"
@@ -22,6 +24,26 @@ type DiscoveryRepository struct {
 	logger                    log.Logger
 	requestTimeout            time.Duration
 	columnSearchExclusionList []string
+}
+
+type DeleteAssetESExpr struct {
+	queryexpr.ESExpr
+}
+
+func (d *DeleteAssetESExpr) Validate() error {
+	identifiers, err := queryexpr.GetIdentifiers(d.QueryExpr)
+	if err != nil {
+		return err
+	}
+
+	mustExist := generichelper.Contains(identifiers, "refreshed_at") &&
+		generichelper.Contains(identifiers, "type") &&
+		generichelper.Contains(identifiers, "service")
+	if !mustExist {
+		return fmt.Errorf("must exists these identifiers: refreshed_at, type. Current identifiers: %v", identifiers)
+	}
+
+	return nil
 }
 
 func NewDiscoveryRepository(cli *Client, logger log.Logger, requestTimeout time.Duration, colSearchExclusionList []string) *DiscoveryRepository {
@@ -144,12 +166,22 @@ func (repo *DiscoveryRepository) DeleteByURN(ctx context.Context, assetURN strin
 	return repo.deleteWithQuery(ctx, "DeleteByURN", fmt.Sprintf(`{"query":{"term":{"urn.keyword": %q}}}`, assetURN))
 }
 
-func (repo *DiscoveryRepository) DeleteByQuery(ctx context.Context, filterQuery string) error {
-	if filterQuery == "" {
+func (repo *DiscoveryRepository) DeleteByQueryExpr(ctx context.Context, queryExpr string) error {
+	if queryExpr == "" {
 		return asset.ErrEmptyQuery
 	}
 
-	return repo.deleteWithQuery(ctx, "DeleteByQuery", filterQuery)
+	deleteAssetESExpr := &DeleteAssetESExpr{
+		queryexpr.ESExpr{
+			QueryExpr: queryExpr,
+		},
+	}
+	esQuery, err := queryexpr.ValidateAndGetQueryFromExpr(deleteAssetESExpr)
+	if err != nil {
+		return err
+	}
+
+	return repo.deleteWithQuery(ctx, "DeleteByQueryExpr", esQuery)
 }
 
 func (repo *DiscoveryRepository) deleteWithQuery(ctx context.Context, discoveryOp, qry string) (err error) {

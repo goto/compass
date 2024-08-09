@@ -1,4 +1,4 @@
-package generic_helper
+package generichelper
 
 // Contains checks if a target item exists in an array of any type.
 func Contains[T comparable](arr []T, target T) bool {

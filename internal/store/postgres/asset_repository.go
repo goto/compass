@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	generichelper "github.com/goto/compass/pkg/generic_helper"
+	queryexpr "github.com/goto/compass/pkg/query_expr"
 	"log"
 	"strings"
 	"time"
@@ -17,9 +19,7 @@ import (
 	"github.com/r3labs/diff/v2"
 )
 
-const (
-	batchSize = 1000
-)
+const batchSize = 1000
 
 // AssetRepository is a type that manages user operation to the primary database
 type AssetRepository struct {
@@ -27,6 +27,26 @@ type AssetRepository struct {
 	userRepo            *UserRepository
 	defaultGetMaxSize   int
 	defaultUserProvider string
+}
+
+type DeleteAssetSQLExpr struct {
+	queryexpr.SQLExpr
+}
+
+func (d *DeleteAssetSQLExpr) Validate() error {
+	identifiers, err := queryexpr.GetIdentifiers(d.QueryExpr)
+	if err != nil {
+		return err
+	}
+
+	mustExist := generichelper.Contains(identifiers, "refreshed_at") &&
+		generichelper.Contains(identifiers, "type") &&
+		generichelper.Contains(identifiers, "service")
+	if !mustExist {
+		return fmt.Errorf("must exists these identifiers: refreshed_at, type. Current identifiers: %v", identifiers)
+	}
+
+	return nil
 }
 
 // GetAll retrieves list of assets with filters
@@ -117,8 +137,41 @@ func (r *AssetRepository) GetCount(ctx context.Context, flt asset.Filter) (int, 
 	return total, nil
 }
 
-// GetCountByQuery retrieves number of assets for every type based on query
-func (r *AssetRepository) GetCountByQuery(ctx context.Context, sqlQuery string) (int, error) {
+// GetCountByQueryExpr retrieves number of assets for every type based on query expr
+func (r *AssetRepository) GetCountByQueryExpr(ctx context.Context, queryExpr string, isDeleteExpr bool) (int, error) {
+	var sqlQuery string
+	if isDeleteExpr {
+		deleteExpr := &DeleteAssetSQLExpr{
+			queryexpr.SQLExpr{
+				QueryExpr: queryExpr,
+			},
+		}
+		query, err := queryexpr.ValidateAndGetQueryFromExpr(deleteExpr)
+		if err != nil {
+			return 0, err
+		}
+		sqlQuery = query
+	} else {
+		sqlExpr := &queryexpr.SQLExpr{
+			QueryExpr: queryExpr,
+		}
+		query, err := queryexpr.ValidateAndGetQueryFromExpr(sqlExpr)
+		if err != nil {
+			return 0, err
+		}
+		sqlQuery = query
+	}
+
+	total, err := r.getCountByQuery(ctx, sqlQuery)
+	if err != nil {
+		return 0, err
+	}
+
+	return total, err
+}
+
+// GetCountByQueryExpr retrieves number of assets for every type based on query expr
+func (r *AssetRepository) getCountByQuery(ctx context.Context, sqlQuery string) (int, error) {
 	builder := sq.Select("count(1)").
 		From("assets").
 		Where(sqlQuery)
@@ -371,13 +424,23 @@ func (r *AssetRepository) DeleteByURN(ctx context.Context, urn string) error {
 	return nil
 }
 
-func (r *AssetRepository) DeleteByQuery(ctx context.Context, whereCondition string) ([]string, error) {
+func (r *AssetRepository) DeleteByQueryExpr(ctx context.Context, queryExpr string) ([]string, error) {
 	var allURNs []string
 	err := r.client.RunWithinTx(ctx, func(tx *sqlx.Tx) error {
+		deleteExpr := &DeleteAssetSQLExpr{
+			queryexpr.SQLExpr{
+				QueryExpr: queryExpr,
+			},
+		}
+		query, err := queryexpr.ValidateAndGetQueryFromExpr(deleteExpr)
+		if err != nil {
+			return err
+		}
+
 		var lastID string
 		for {
 			// Fetch a batch of rows to delete using the last ID as a marker
-			urns, nextLastID, err := r.getAllURNsWithBatch(ctx, whereCondition, lastID)
+			urns, nextLastID, err := r.getAllURNsWithBatch(ctx, query, lastID)
 			if err != nil {
 				log.Printf("Failed to get batch to delete: %v", err)
 				return err
@@ -647,11 +710,7 @@ func (r *AssetRepository) update(ctx context.Context, assetID string, newAsset, 
 	onlyRefreshed := len(clog) == 1 && clog[0].Path[0] == "RefreshedAt"
 	if onlyRefreshed {
 		return r.client.RunWithinTx(ctx, func(tx *sqlx.Tx) error {
-			if err := r.updateAsset(ctx, tx, assetID, newAsset); err != nil {
-				return err
-			}
-
-			return nil
+			return r.updateAsset(ctx, tx, assetID, newAsset)
 		})
 	}
 

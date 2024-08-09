@@ -15,7 +15,7 @@ import (
 type DiscoveryRepository interface {
 	Upsert(context.Context, asset.Asset) error
 	DeleteByURN(ctx context.Context, assetURN string) error
-	DeleteByQuery(ctx context.Context, filterQuery string) error
+	DeleteByQueryExpr(ctx context.Context, queryExpr string) error
 	SyncAssets(ctx context.Context, indexName string) (cleanupFn func() error, err error)
 }
 
@@ -159,13 +159,13 @@ func (m *Manager) DeleteAsset(ctx context.Context, job worker.JobSpec) error {
 	return nil
 }
 
-func (m *Manager) EnqueueDeleteAssetsByQueryJob(ctx context.Context, filterQuery string) error {
+func (m *Manager) EnqueueDeleteAssetsByQueryExprJob(ctx context.Context, queryExpr string) error {
 	err := m.worker.Enqueue(ctx, worker.JobSpec{
 		Type:    jobDeleteAssetsByQuery,
-		Payload: ([]byte)(filterQuery),
+		Payload: ([]byte)(queryExpr),
 	})
 	if err != nil {
-		return fmt.Errorf("enqueue delete asset job: %w: urn '%s'", err, filterQuery)
+		return fmt.Errorf("enqueue delete asset job: %w: query expr '%s'", err, queryExpr)
 	}
 
 	return nil
@@ -173,7 +173,7 @@ func (m *Manager) EnqueueDeleteAssetsByQueryJob(ctx context.Context, filterQuery
 
 func (m *Manager) deleteAssetsByQueryHandler() worker.JobHandler {
 	return worker.JobHandler{
-		Handle: m.DeleteAssetsByQuery,
+		Handle: m.DeleteAssetsByQueryExpr,
 		JobOpts: worker.JobOptions{
 			MaxAttempts:     3,
 			Timeout:         m.indexTimeout,
@@ -182,11 +182,11 @@ func (m *Manager) deleteAssetsByQueryHandler() worker.JobHandler {
 	}
 }
 
-func (m *Manager) DeleteAssetsByQuery(ctx context.Context, job worker.JobSpec) error {
-	filterQuery := (string)(job.Payload)
-	if err := m.discoveryRepo.DeleteByQuery(ctx, filterQuery); err != nil {
+func (m *Manager) DeleteAssetsByQueryExpr(ctx context.Context, job worker.JobSpec) error {
+	queryExpr := (string)(job.Payload)
+	if err := m.discoveryRepo.DeleteByQueryExpr(ctx, queryExpr); err != nil {
 		return &worker.RetryableError{
-			Cause: fmt.Errorf("delete asset from discovery repo: %w: query '%s'", err, filterQuery),
+			Cause: fmt.Errorf("delete asset from discovery repo: %w: query expr '%s'", err, queryExpr),
 		}
 	}
 	return nil

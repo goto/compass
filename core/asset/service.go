@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/google/uuid"
-	"github.com/goto/compass/pkg/generic_helper"
-	"github.com/goto/compass/pkg/translator"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
@@ -26,7 +24,7 @@ type Service struct {
 type Worker interface {
 	EnqueueIndexAssetJob(ctx context.Context, ast Asset) error
 	EnqueueDeleteAssetJob(ctx context.Context, urn string) error
-	EnqueueDeleteAssetsByQueryJob(ctx context.Context, filterQuery string) error
+	EnqueueDeleteAssetsByQueryExprJob(ctx context.Context, queryExpr string) error
 	EnqueueSyncAssetJob(ctx context.Context, service string) error
 	Close() error
 }
@@ -129,26 +127,7 @@ func (s *Service) DeleteAsset(ctx context.Context, id string) (err error) {
 }
 
 func (s *Service) DeleteAssets(ctx context.Context, queryExpr string, dryRun bool) (affectedRows uint32, err error) {
-	queryExprTranslator := &translator.QueryExprTranslator{
-		QueryExpr: queryExpr,
-	}
-
-	// Check existence of required identifiers
-	identifiers := queryExprTranslator.GetIdentifiers()
-	mustExist := generic_helper.Contains(identifiers, "refreshed_at") &&
-		generic_helper.Contains(identifiers, "type") &&
-		generic_helper.Contains(identifiers, "service")
-	if !mustExist {
-		return 0, fmt.Errorf(
-			"must exists these identifiers: refreshed_at, type. Current identifiers: %v", identifiers)
-	}
-
-	sqlWhereCondition, err := queryExprTranslator.ConvertToSQL()
-	if err != nil {
-		return 0, err
-	}
-
-	total, err := s.assetRepository.GetCountByQuery(ctx, sqlWhereCondition)
+	total, err := s.assetRepository.GetCountByQueryExpr(ctx, queryExpr, true)
 	if err != nil {
 		return 0, err
 	}
@@ -157,18 +136,13 @@ func (s *Service) DeleteAssets(ctx context.Context, queryExpr string, dryRun boo
 		return uint32(total), nil
 	}
 
-	esFilterQuery, err := queryExprTranslator.ConvertToEsQuery()
-	if err != nil {
-		return 0, err
-	}
-
 	go func() {
-		urns, err := s.assetRepository.DeleteByQuery(ctx, sqlWhereCondition)
+		urns, err := s.assetRepository.DeleteByQueryExpr(ctx, queryExpr)
 		if err != nil {
 			return
 		}
 
-		if err := s.worker.EnqueueDeleteAssetsByQueryJob(ctx, esFilterQuery); err != nil {
+		if err := s.worker.EnqueueDeleteAssetsByQueryExprJob(ctx, queryExpr); err != nil {
 			return
 		}
 
