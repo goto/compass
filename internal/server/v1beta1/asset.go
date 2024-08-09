@@ -315,13 +315,7 @@ func (server *APIServer) DeleteAssets(ctx context.Context, req *compassv1beta1.D
 
 	affectedRows, err := server.assetService.DeleteAssets(ctx, req.QueryExpr, req.DryRun)
 	if err != nil {
-		if errors.As(err, new(asset.InvalidError)) {
-			return nil, status.Error(codes.InvalidArgument, err.Error())
-		}
-		if errors.As(err, new(asset.NotFoundError)) {
-			return nil, status.Error(codes.NotFound, err.Error())
-		}
-		return nil, internalServerError(server.logger, err.Error())
+		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
 	return &compassv1beta1.DeleteAssetsResponse{
