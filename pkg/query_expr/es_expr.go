@@ -3,6 +3,7 @@ package queryexpr
 import (
 	"encoding/json"
 	"fmt"
+
 	"github.com/expr-lang/expr/ast"
 )
 
@@ -41,11 +42,11 @@ func (*ESExpr) Validate() error {
 
 // translateToEsQuery The idea came from ast.Walk. Currently, the development focus implement for the node type that most likely used in our needs.
 // TODO: implement translator for node type that still not covered right now.
-func (e *ESExpr) translateToEsQuery(node *ast.Node) interface{} {
-	if *node == nil {
+func (e *ESExpr) translateToEsQuery(node ast.Node) interface{} {
+	if node == nil {
 		return nil
 	}
-	switch n := (*node).(type) {
+	switch n := (node).(type) {
 	case *ast.BinaryNode:
 		return e.translateBinaryNodeToEsQuery(n)
 	case *ast.NilNode:
@@ -78,7 +79,7 @@ func (e *ESExpr) translateToEsQuery(node *ast.Node) interface{} {
 			return nil
 		}
 		if nodeV, ok := result.(ast.Node); ok {
-			return e.translateToEsQuery(&nodeV)
+			return e.translateToEsQuery(nodeV)
 		}
 	}
 
@@ -86,8 +87,8 @@ func (e *ESExpr) translateToEsQuery(node *ast.Node) interface{} {
 }
 
 func (e *ESExpr) translateBinaryNodeToEsQuery(n *ast.BinaryNode) map[string]interface{} {
-	left := e.translateToEsQuery(&n.Left)
-	right := e.translateToEsQuery(&n.Right)
+	left := e.translateToEsQuery(n.Left)
+	right := e.translateToEsQuery(n.Right)
 
 	switch n.Operator {
 	case "&&":
@@ -111,13 +112,13 @@ func (e *ESExpr) translateUnaryNodeToEsQuery(n *ast.UnaryNode) interface{} {
 	switch n.Operator {
 	case "not":
 		if binaryNode, ok := n.Node.(*ast.BinaryNode); ok && binaryNode.Operator == "in" {
-			left := e.translateToEsQuery(&binaryNode.Left)
-			right := e.translateToEsQuery(&binaryNode.Right)
+			left := e.translateToEsQuery(binaryNode.Left)
+			right := e.translateToEsQuery(binaryNode.Right)
 			return e.mustNotTermsQuery(left.(string), right)
 		}
 		return nil
 	case "!":
-		nodeValue := e.translateToEsQuery(&n.Node)
+		nodeValue := e.translateToEsQuery(n.Node)
 		switch value := nodeValue.(type) {
 		case bool:
 			return !value
@@ -136,7 +137,7 @@ func (e *ESExpr) translateUnaryNodeToEsQuery(n *ast.UnaryNode) interface{} {
 func (e *ESExpr) translateArrayNodeToEsQuery(n *ast.ArrayNode) []interface{} {
 	values := make([]interface{}, len(n.Nodes))
 	for i, node := range n.Nodes {
-		values[i] = e.translateToEsQuery(&node)
+		values[i] = e.translateToEsQuery(node)
 	}
 	return values
 }

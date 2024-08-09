@@ -2,9 +2,10 @@ package queryexpr
 
 import (
 	"fmt"
-	"github.com/expr-lang/expr/ast"
 	"strconv"
 	"strings"
+
+	"github.com/expr-lang/expr/ast"
 )
 
 type SQLExpr struct {
@@ -29,20 +30,20 @@ func (*SQLExpr) Validate() error {
 
 // ConvertToSQL The idea came from ast.Walk. Currently, the development focus implement for the node type that most likely used in our needs.
 // TODO: implement translator for node type that still not covered right now.
-func (s *SQLExpr) ConvertToSQL(node *ast.Node) {
-	if *node == nil {
+func (s *SQLExpr) ConvertToSQL(node ast.Node) {
+	if node == nil {
 		return
 	}
-	switch n := (*node).(type) {
+	switch n := (node).(type) {
 	case *ast.BinaryNode:
 		s.SQLQuery.WriteString("(")
-		s.ConvertToSQL(&n.Left)
+		s.ConvertToSQL(n.Left)
 
 		// write operator
 		operator := s.operatorToSQL(n)
 		s.SQLQuery.WriteString(fmt.Sprintf(" %s ", strings.ToUpper(operator)))
 
-		s.ConvertToSQL(&n.Right)
+		s.ConvertToSQL(n.Right)
 		s.SQLQuery.WriteString(")")
 	case *ast.NilNode:
 		s.SQLQuery.WriteString("NULL")
@@ -60,7 +61,7 @@ func (s *SQLExpr) ConvertToSQL(node *ast.Node) {
 		s.SQLQuery.WriteString(fmt.Sprintf("%s", n.Value))
 	case *ast.UnaryNode:
 		s.patchUnaryNode(n)
-		s.ConvertToSQL(&n.Node)
+		s.ConvertToSQL(n.Node)
 	case *ast.BuiltinNode:
 		result, err := GetQueryExprResult(n.String())
 		if err != nil {
@@ -70,7 +71,7 @@ func (s *SQLExpr) ConvertToSQL(node *ast.Node) {
 	case *ast.ArrayNode:
 		s.SQLQuery.WriteString("(")
 		for i := range n.Nodes {
-			s.ConvertToSQL(&n.Nodes[i])
+			s.ConvertToSQL(n.Nodes[i])
 			if i != len(n.Nodes)-1 {
 				s.SQLQuery.WriteString(", ")
 			}
@@ -82,7 +83,7 @@ func (s *SQLExpr) ConvertToSQL(node *ast.Node) {
 			return
 		}
 		if nodeV, ok := result.(ast.Node); ok {
-			s.ConvertToSQL(&nodeV)
+			s.ConvertToSQL(nodeV)
 		}
 	}
 }

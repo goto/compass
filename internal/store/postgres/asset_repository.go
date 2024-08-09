@@ -6,8 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	generichelper "github.com/goto/compass/pkg/generic_helper"
-	queryexpr "github.com/goto/compass/pkg/query_expr"
 	"log"
 	"strings"
 	"time"
@@ -15,6 +13,8 @@ import (
 	sq "github.com/Masterminds/squirrel"
 	"github.com/goto/compass/core/asset"
 	"github.com/goto/compass/core/user"
+	generichelper "github.com/goto/compass/pkg/generic_helper"
+	queryexpr "github.com/goto/compass/pkg/query_expr"
 	"github.com/jmoiron/sqlx"
 	"github.com/r3labs/diff/v2"
 )

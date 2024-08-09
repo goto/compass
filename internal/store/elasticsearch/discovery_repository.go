@@ -6,14 +6,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	generichelper "github.com/goto/compass/pkg/generic_helper"
-	queryexpr "github.com/goto/compass/pkg/query_expr"
 	"io"
 	"net/url"
 	"strings"
 	"time"
 
 	"github.com/goto/compass/core/asset"
+	generichelper "github.com/goto/compass/pkg/generic_helper"
+	queryexpr "github.com/goto/compass/pkg/query_expr"
 	"github.com/goto/salt/log"
 )
 
