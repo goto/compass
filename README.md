@@ -25,14 +25,14 @@ Discover why users choose Compass as their main data discovery and lineage servi
 
 Explore the following resources to get started with Compass:
 
-- [Guides](https://goto.github.io/compass/docs/guides) provides guidance on ingesting and querying metadata from Compass.
-- [Concepts](https://goto.github.io/compass/docs/concepts) describes all important Compass concepts.
-- [Reference](https://goto.github.io/compass/docs/reference) contains details about configurations, metrics and other aspects of Compass.
-- [Contribute](https://goto.github.io/compass/docs/contribute/contribution.md) contains resources for anyone who wants to contribute to Compass.
+- [Guides](https://goto.github.io/compass/guides/ingestion) provides guidance on ingesting and querying metadata from Compass.
+- [Concepts](https://goto.github.io/compass/concepts/overview) describes all important Compass concepts.
+- [Reference](https://goto.github.io/compass/reference/api) contains details about configurations, metrics and other aspects of Compass.
+- [Contribute](https://goto.github.io/compass/contribute/contributing) contains resources for anyone who wants to contribute to Compass.
 
 ## Installation
 
-Install Compass on macOS, Windows, Linux, OpenBSD, FreeBSD, and on any machine. <br/>Refer this for [installations](https://goto.github.io/compass/docs/installation) and [configurations](https://goto.github.io/compass/docs/guides/configuration)
+Install Compass on macOS, Windows, Linux, OpenBSD, FreeBSD, and on any machine. <br/>Refer this for [installations](https://goto.github.io/compass/installation) and [configurations](https://goto.github.io/compass/configuration)
 
 #### Binary (Cross-platform)
 
@@ -204,7 +204,7 @@ elasticsearch cluster, set the value of `ES_TEST_SERVER_URL` to the URL of the e
 
 Development of Compass happens in the open on GitHub, and we are grateful to the community for contributing bugfixes and improvements. Read below to learn how you can take part in improving Compass.
 
-Read our [contributing guide](https://goto.github.io/compass/docs/contribute/contribution.md) to learn about our development process, how to propose bugfixes and improvements, and how to build and test your changes to Compass.
+Read our [contributing guide](https://goto.github.io/compass/contribute/contributing) to learn about our development process, how to propose bugfixes and improvements, and how to build and test your changes to Compass.
 
 To help you get your feet wet and get you familiar with our contribution process, we have a list of [good first issues](https://github.com/goto/compass/labels/good%20first%20issue) that contain bugs which have a relatively limited scope. This is a great place to get started.
 
