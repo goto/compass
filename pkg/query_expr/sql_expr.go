@@ -58,16 +58,10 @@ func (s *SQLExpr) ConvertToSQL(node ast.Node) {
 	case *ast.StringNode:
 		s.SQLQuery.WriteString(fmt.Sprintf("'%s'", n.Value))
 	case *ast.ConstantNode:
-		s.SQLQuery.WriteString(fmt.Sprintf("%s", n.Value))
+		s.SQLQuery.WriteString(fmt.Sprintf("%v", n.Value))
 	case *ast.UnaryNode:
 		s.patchUnaryNode(n)
 		s.ConvertToSQL(n.Node)
-	case *ast.BuiltinNode:
-		result, err := GetQueryExprResult(n.String())
-		if err != nil {
-			return
-		}
-		s.SQLQuery.WriteString(fmt.Sprintf("%s", result))
 	case *ast.ArrayNode:
 		s.SQLQuery.WriteString("(")
 		for i := range n.Nodes {
@@ -77,14 +71,12 @@ func (s *SQLExpr) ConvertToSQL(node ast.Node) {
 			}
 		}
 		s.SQLQuery.WriteString(")")
-	case *ast.ConditionalNode:
+	case *ast.BuiltinNode, *ast.ConditionalNode:
 		result, err := GetQueryExprResult(n.String())
 		if err != nil {
 			return
 		}
-		if nodeV, ok := result.(ast.Node); ok {
-			s.ConvertToSQL(nodeV)
-		}
+		s.SQLQuery.WriteString(fmt.Sprintf("%v", result))
 	}
 }
 

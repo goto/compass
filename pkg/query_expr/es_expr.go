@@ -67,20 +67,12 @@ func (e *ESExpr) translateToEsQuery(node ast.Node) interface{} {
 		return e.translateArrayNodeToEsQuery(n)
 	case *ast.ConstantNode:
 		return n.Value
-	case *ast.BuiltinNode:
+	case *ast.BuiltinNode, *ast.ConditionalNode:
 		result, err := GetQueryExprResult(n.String())
 		if err != nil {
 			return nil
 		}
 		return result
-	case *ast.ConditionalNode:
-		result, err := GetQueryExprResult(n.String())
-		if err != nil {
-			return nil
-		}
-		if nodeV, ok := result.(ast.Node); ok {
-			return e.translateToEsQuery(nodeV)
-		}
 	}
 
 	return nil
