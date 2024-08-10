@@ -31,7 +31,7 @@ type DeleteAssetESExpr struct {
 }
 
 func (d *DeleteAssetESExpr) Validate() error {
-	identifiers, err := queryexpr.GetIdentifiers(d.QueryExpr)
+	identifiers, err := queryexpr.GetIdentifiers(d.String())
 	if err != nil {
 		return err
 	}
@@ -172,9 +172,7 @@ func (repo *DiscoveryRepository) DeleteByQueryExpr(ctx context.Context, queryExp
 	}
 
 	deleteAssetESExpr := &DeleteAssetESExpr{
-		queryexpr.ESExpr{
-			QueryExpr: queryExpr,
-		},
+		queryexpr.ESExpr(queryExpr),
 	}
 	esQuery, err := queryexpr.ValidateAndGetQueryFromExpr(deleteAssetESExpr)
 	if err != nil {

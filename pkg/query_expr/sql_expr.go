@@ -8,19 +8,23 @@ import (
 	"github.com/expr-lang/expr/ast"
 )
 
-type SQLExpr struct {
-	QueryExpr string
-	SQLQuery  strings.Builder
+type SQLExpr string
+
+func (s *SQLExpr) String() string {
+	return string(*s)
 }
 
 // ToQuery default
 func (s *SQLExpr) ToQuery() (string, error) {
-	queryExprParsed, err := GetTreeNodeFromQueryExpr(s.QueryExpr)
+	queryExprParsed, err := GetTreeNodeFromQueryExpr(s.String())
 	if err != nil {
 		return "", err
 	}
-	s.ConvertToSQL(queryExprParsed)
-	return s.SQLQuery.String(), nil
+	stringBuilder := &strings.Builder{}
+	if err := s.ConvertToSQL(queryExprParsed, stringBuilder); err != nil {
+		return "", err
+	}
+	return stringBuilder.String(), nil
 }
 
 // Validate default: no validation
@@ -30,57 +34,96 @@ func (*SQLExpr) Validate() error {
 
 // ConvertToSQL The idea came from ast.Walk. Currently, the development focus implement for the node type that most likely used in our needs.
 // TODO: implement translator for node type that still not covered right now.
-func (s *SQLExpr) ConvertToSQL(node ast.Node) {
+func (s *SQLExpr) ConvertToSQL(node ast.Node, stringBuilder *strings.Builder) error {
 	if node == nil {
-		return
+		return fmt.Errorf("cannot convert nil to SQL query")
 	}
 	switch n := (node).(type) {
 	case *ast.BinaryNode:
-		s.SQLQuery.WriteString("(")
-		s.ConvertToSQL(n.Left)
-
-		// write operator
-		operator := s.operatorToSQL(n)
-		s.SQLQuery.WriteString(fmt.Sprintf(" %s ", strings.ToUpper(operator)))
-
-		s.ConvertToSQL(n.Right)
-		s.SQLQuery.WriteString(")")
-	case *ast.NilNode:
-		s.SQLQuery.WriteString("NULL")
-	case *ast.IdentifierNode:
-		s.SQLQuery.WriteString(n.Value)
-	case *ast.IntegerNode:
-		s.SQLQuery.WriteString(strconv.FormatInt(int64(n.Value), 10))
-	case *ast.FloatNode:
-		s.SQLQuery.WriteString(strconv.FormatFloat(n.Value, 'f', -1, 64))
-	case *ast.BoolNode:
-		s.SQLQuery.WriteString(strconv.FormatBool(n.Value))
-	case *ast.StringNode:
-		s.SQLQuery.WriteString(fmt.Sprintf("'%s'", n.Value))
-	case *ast.ConstantNode:
-		s.SQLQuery.WriteString(fmt.Sprintf("%v", n.Value))
-	case *ast.UnaryNode:
-		s.patchUnaryNode(n)
-		s.ConvertToSQL(n.Node)
-	case *ast.ArrayNode:
-		s.SQLQuery.WriteString("(")
-		for i := range n.Nodes {
-			s.ConvertToSQL(n.Nodes[i])
-			if i != len(n.Nodes)-1 {
-				s.SQLQuery.WriteString(", ")
-			}
+		err := s.binaryNodeToSQLQuery(n, stringBuilder)
+		if err != nil {
+			return err
 		}
-		s.SQLQuery.WriteString(")")
+	case *ast.NilNode:
+		stringBuilder.WriteString("NULL")
+	case *ast.IdentifierNode:
+		stringBuilder.WriteString(n.Value)
+	case *ast.IntegerNode:
+		stringBuilder.WriteString(strconv.FormatInt(int64(n.Value), 10))
+	case *ast.FloatNode:
+		stringBuilder.WriteString(strconv.FormatFloat(n.Value, 'f', -1, 64))
+	case *ast.BoolNode:
+		stringBuilder.WriteString(strconv.FormatBool(n.Value))
+	case *ast.StringNode:
+		fmt.Fprintf(stringBuilder, "'%s'", n.Value)
+	case *ast.ConstantNode:
+		fmt.Fprintf(stringBuilder, "%v", n.Value)
+	case *ast.UnaryNode:
+		if err := s.patchUnaryNode(n); err != nil {
+			return err
+		}
+		if err := s.ConvertToSQL(n.Node, stringBuilder); err != nil {
+			return err
+		}
+	case *ast.ArrayNode:
+		err := s.arrayNodeToSQLQuery(n, stringBuilder)
+		if err != nil {
+			return err
+		}
 	case *ast.BuiltinNode, *ast.ConditionalNode:
 		result, err := GetQueryExprResult(n.String())
 		if err != nil {
-			return
+			return err
 		}
-		s.SQLQuery.WriteString(fmt.Sprintf("%v", result))
+		fmt.Fprintf(stringBuilder, "%v", result)
+	default:
+		return s.unsupportedQueryError(n)
 	}
+
+	return nil
 }
 
-func (*SQLExpr) patchUnaryNode(n *ast.UnaryNode) {
+func (s *SQLExpr) binaryNodeToSQLQuery(n *ast.BinaryNode, stringBuilder *strings.Builder) error {
+	operator := s.operatorToSQL(n)
+	if operator == "" { // most likely the node is operation
+		result, err := GetQueryExprResult(n.String())
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(stringBuilder, "%v", result)
+	} else {
+		stringBuilder.WriteString("(")
+		if err := s.ConvertToSQL(n.Left, stringBuilder); err != nil {
+			return err
+		}
+
+		// write operator
+		fmt.Fprintf(stringBuilder, " %s ", strings.ToUpper(operator))
+
+		if err := s.ConvertToSQL(n.Right, stringBuilder); err != nil {
+			return err
+		}
+		stringBuilder.WriteString(")")
+	}
+
+	return nil
+}
+
+func (s *SQLExpr) arrayNodeToSQLQuery(n *ast.ArrayNode, stringBuilder *strings.Builder) error {
+	stringBuilder.WriteString("(")
+	for i := range n.Nodes {
+		if err := s.ConvertToSQL(n.Nodes[i], stringBuilder); err != nil {
+			return err
+		}
+		if i != len(n.Nodes)-1 {
+			stringBuilder.WriteString(", ")
+		}
+	}
+	stringBuilder.WriteString(")")
+	return nil
+}
+
+func (s *SQLExpr) patchUnaryNode(n *ast.UnaryNode) error {
 	switch n.Operator {
 	case "not":
 		binaryNode, ok := (n.Node).(*ast.BinaryNode)
@@ -90,6 +133,8 @@ func (*SQLExpr) patchUnaryNode(n *ast.UnaryNode) {
 				Left:     binaryNode.Left,
 				Right:    binaryNode.Right,
 			})
+		} else {
+			return s.unsupportedQueryError(n)
 		}
 	case "!":
 		switch nodeV := n.Node.(type) {
@@ -97,27 +142,46 @@ func (*SQLExpr) patchUnaryNode(n *ast.UnaryNode) {
 			ast.Patch(&n.Node, &ast.BoolNode{
 				Value: !nodeV.Value,
 			})
-			// TODO: adjust other types if needed
+		default:
+			result, err := GetQueryExprResult(n.String())
+			if err != nil {
+				return err
+			}
+			if boolResult, ok := result.(bool); ok {
+				ast.Patch(&n.Node, &ast.BoolNode{
+					Value: !boolResult,
+				})
+				return nil
+			}
+			return s.unsupportedQueryError(n)
 		}
 	}
+
+	return nil
 }
 
 func (*SQLExpr) operatorToSQL(bn *ast.BinaryNode) string {
-	switch {
-	case bn.Operator == "&&":
+	switch bn.Operator {
+	case "&&":
 		return "AND"
-	case bn.Operator == "||":
+	case "||":
 		return "OR"
-	case bn.Operator == "!=":
+	case "!=":
 		if _, ok := bn.Right.(*ast.NilNode); ok {
 			return "IS NOT"
 		}
-	case bn.Operator == "==":
+	case "==":
 		if _, ok := bn.Right.(*ast.NilNode); ok {
 			return "IS"
 		}
 		return "="
+	case "<", "<=", ">", ">=":
+		return bn.Operator
 	}
 
-	return bn.Operator
+	return "" // identify operation, like: +, -, *, etc
+}
+
+func (*SQLExpr) unsupportedQueryError(node ast.Node) error {
+	return fmt.Errorf("unsupported query expr: %s to SQL query", node.String())
 }

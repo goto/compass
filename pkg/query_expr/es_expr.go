@@ -7,27 +7,31 @@ import (
 	"github.com/expr-lang/expr/ast"
 )
 
-type ESExpr struct {
-	QueryExpr string
-	ESQuery   map[string]interface{}
+type ESExpr string
+
+func (e *ESExpr) String() string {
+	return string(*e)
 }
 
 // ToQuery default
 func (e *ESExpr) ToQuery() (string, error) {
-	queryExprParsed, err := GetTreeNodeFromQueryExpr(e.QueryExpr)
+	queryExprParsed, err := GetTreeNodeFromQueryExpr(e.String())
 	if err != nil {
 		return "", err
 	}
 
-	esQueryInterface := e.translateToEsQuery(queryExprParsed)
+	esQueryInterface, err := e.translateToEsQuery(queryExprParsed)
+	if err != nil {
+		return "", err
+	}
 	esQuery, ok := esQueryInterface.(map[string]interface{})
 	if !ok {
 		return "", fmt.Errorf("failed to generate Elasticsearch query")
 	}
-	e.ESQuery = map[string]interface{}{"query": esQuery}
+	esQuery = map[string]interface{}{"query": esQuery}
 
 	// Convert to JSON
-	queryJSON, err := json.Marshal(e.ESQuery)
+	queryJSON, err := json.Marshal(esQuery)
 	if err != nil {
 		return "", err
 	}
@@ -42,96 +46,155 @@ func (*ESExpr) Validate() error {
 
 // translateToEsQuery The idea came from ast.Walk. Currently, the development focus implement for the node type that most likely used in our needs.
 // TODO: implement translator for node type that still not covered right now.
-func (e *ESExpr) translateToEsQuery(node ast.Node) interface{} {
+func (e *ESExpr) translateToEsQuery(node ast.Node) (interface{}, error) {
 	if node == nil {
-		return nil
+		return nil, fmt.Errorf("cannot convert nil to Elasticsearch query")
 	}
 	switch n := (node).(type) {
 	case *ast.BinaryNode:
-		return e.translateBinaryNodeToEsQuery(n)
+		return e.binaryNodeToEsQuery(n)
 	case *ast.NilNode:
-		return nil
+		return nil, nil
 	case *ast.IdentifierNode:
-		return n.Value
+		return n.Value, nil
 	case *ast.IntegerNode:
-		return n.Value
+		return n.Value, nil
 	case *ast.FloatNode:
-		return n.Value
+		return n.Value, nil
 	case *ast.BoolNode:
-		return n.Value
+		return n.Value, nil
 	case *ast.StringNode:
-		return n.Value
+		return n.Value, nil
 	case *ast.UnaryNode:
-		return e.translateUnaryNodeToEsQuery(n)
+		return e.unaryNodeToEsQuery(n)
 	case *ast.ArrayNode:
-		return e.translateArrayNodeToEsQuery(n)
+		return e.arrayNodeToEsQuery(n)
 	case *ast.ConstantNode:
-		return n.Value
+		return n.Value, nil
 	case *ast.BuiltinNode, *ast.ConditionalNode:
 		result, err := GetQueryExprResult(n.String())
 		if err != nil {
-			return nil
+			return nil, err
 		}
-		return result
+		return result, nil
+	default:
+		return nil, e.unsupportedQueryError(n)
 	}
-
-	return nil
 }
 
-func (e *ESExpr) translateBinaryNodeToEsQuery(n *ast.BinaryNode) map[string]interface{} {
-	left := e.translateToEsQuery(n.Left)
-	right := e.translateToEsQuery(n.Right)
+func (e *ESExpr) binaryNodeToEsQuery(n *ast.BinaryNode) (interface{}, error) { //nolint:gocognit
+	left, err := e.translateToEsQuery(n.Left)
+	if err != nil {
+		return nil, err
+	}
+	right, err := e.translateToEsQuery(n.Right)
+	if err != nil {
+		return nil, err
+	}
 
 	switch n.Operator {
 	case "&&":
-		return e.boolQuery("must", left, right)
+		return e.boolQuery("must", left, right), nil
+
 	case "||":
-		return e.boolQuery("should", left, right)
+		return e.boolQuery("should", left, right), nil
+
 	case "==":
-		return e.termQuery(left.(string), right)
+		if leftStr, ok := left.(string); ok {
+			return e.termQuery(leftStr, right), nil
+		}
+		result, err := GetQueryExprResult(n.String())
+		if err != nil {
+			return nil, err
+		}
+		return result, nil
+
 	case "!=":
-		return e.mustNotQuery(left.(string), right)
+		if leftStr, ok := left.(string); ok {
+			return e.mustNotQuery(leftStr, right), nil
+		}
+		result, err := GetQueryExprResult(n.String())
+		if err != nil {
+			return nil, err
+		}
+		return result, nil
+
 	case "<", "<=", ">", ">=":
-		return e.rangeQuery(left.(string), e.operatorToEsQuery(n.Operator), right)
+		if leftStr, ok := left.(string); ok {
+			return e.rangeQuery(leftStr, e.operatorToEsQuery(n.Operator), right), nil
+		}
+		result, err := GetQueryExprResult(n.String())
+		if err != nil {
+			return nil, err
+		}
+		return result, nil
+
 	case "in":
-		return e.termsQuery(left.(string), right)
+		if leftStr, ok := left.(string); ok {
+			return e.termsQuery(leftStr, right), nil
+		}
+		result, err := GetQueryExprResult(n.String())
+		if err != nil {
+			return nil, err
+		}
+		return result, nil
+
 	default:
-		return nil
+		result, err := GetQueryExprResult(n.String())
+		if err != nil {
+			return nil, err
+		}
+		return result, nil
 	}
 }
 
-func (e *ESExpr) translateUnaryNodeToEsQuery(n *ast.UnaryNode) interface{} {
+func (e *ESExpr) unaryNodeToEsQuery(n *ast.UnaryNode) (interface{}, error) {
 	switch n.Operator {
 	case "not":
 		if binaryNode, ok := n.Node.(*ast.BinaryNode); ok && binaryNode.Operator == "in" {
-			left := e.translateToEsQuery(binaryNode.Left)
-			right := e.translateToEsQuery(binaryNode.Right)
-			return e.mustNotTermsQuery(left.(string), right)
+			left, err := e.translateToEsQuery(binaryNode.Left)
+			if err != nil {
+				return nil, err
+			}
+			right, err := e.translateToEsQuery(binaryNode.Right)
+			if err != nil {
+				return nil, err
+			}
+			return e.mustNotTermsQuery(left.(string), right), nil
 		}
-		return nil
+		return nil, e.unsupportedQueryError(n)
+
 	case "!":
-		nodeValue := e.translateToEsQuery(n.Node)
+		nodeValue, err := e.translateToEsQuery(n.Node)
+		if err != nil {
+			return nil, err
+		}
 		switch value := nodeValue.(type) {
 		case bool:
-			return !value
+			return !value, nil
 		default:
 			return map[string]interface{}{
 				"bool": map[string]interface{}{
 					"must_not": []interface{}{nodeValue},
 				},
-			}
+			}, nil
 		}
+
 	default:
-		return nil
+		return nil, e.unsupportedQueryError(n)
 	}
 }
 
-func (e *ESExpr) translateArrayNodeToEsQuery(n *ast.ArrayNode) []interface{} {
+func (e *ESExpr) arrayNodeToEsQuery(n *ast.ArrayNode) ([]interface{}, error) {
 	values := make([]interface{}, len(n.Nodes))
 	for i, node := range n.Nodes {
-		values[i] = e.translateToEsQuery(node)
+		nodeValue, err := e.translateToEsQuery(node)
+		if err != nil {
+			return nil, err
+		}
+		values[i] = nodeValue
 	}
-	return values
+	return values, nil
 }
 
 func (*ESExpr) operatorToEsQuery(operator string) string {
@@ -209,4 +272,8 @@ func (*ESExpr) mustNotTermsQuery(field string, values interface{}) map[string]in
 			},
 		},
 	}
+}
+
+func (*ESExpr) unsupportedQueryError(node ast.Node) error {
+	return fmt.Errorf("unsupported query expr: %s to Elasticsearch query", node.String())
 }

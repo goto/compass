@@ -13,7 +13,7 @@ type ExprStr interface {
 	Validate() error
 }
 
-type QueryExpr struct {
+type ExprVisitor struct {
 	Identifiers []string
 }
 
@@ -32,7 +32,7 @@ func ValidateAndGetQueryFromExpr(exprStr ExprStr) (string, error) {
 }
 
 // Visit is implementation Visitor interface from expr-lang/expr lib, used by ast.Walk
-func (s *QueryExpr) Visit(node *ast.Node) { //nolint:gocritic
+func (s *ExprVisitor) Visit(node *ast.Node) { //nolint:gocritic
 	if n, ok := (*node).(*ast.IdentifierNode); ok {
 		s.Identifiers = append(s.Identifiers, n.Value)
 	}
@@ -43,7 +43,7 @@ func GetIdentifiers(queryExpr string) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	queryExprVisitor := &QueryExpr{}
+	queryExprVisitor := &ExprVisitor{}
 	ast.Walk(&queryExprParsed, queryExprVisitor)
 	return queryExprVisitor.Identifiers, nil
 }

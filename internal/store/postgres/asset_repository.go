@@ -34,7 +34,7 @@ type DeleteAssetSQLExpr struct {
 }
 
 func (d *DeleteAssetSQLExpr) Validate() error {
-	identifiers, err := queryexpr.GetIdentifiers(d.QueryExpr)
+	identifiers, err := queryexpr.GetIdentifiers(d.String())
 	if err != nil {
 		return err
 	}
@@ -143,9 +143,7 @@ func (r *AssetRepository) GetCountByQueryExpr(ctx context.Context, queryExpr str
 	var sqlQuery string
 	if isDeleteExpr {
 		deleteExpr := &DeleteAssetSQLExpr{
-			queryexpr.SQLExpr{
-				QueryExpr: queryExpr,
-			},
+			queryexpr.SQLExpr(queryExpr),
 		}
 		query, err := queryexpr.ValidateAndGetQueryFromExpr(deleteExpr)
 		if err != nil {
@@ -153,10 +151,8 @@ func (r *AssetRepository) GetCountByQueryExpr(ctx context.Context, queryExpr str
 		}
 		sqlQuery = query
 	} else {
-		sqlExpr := &queryexpr.SQLExpr{
-			QueryExpr: queryExpr,
-		}
-		query, err := queryexpr.ValidateAndGetQueryFromExpr(sqlExpr)
+		sqlExpr := queryexpr.SQLExpr(queryExpr)
+		query, err := queryexpr.ValidateAndGetQueryFromExpr(&sqlExpr)
 		if err != nil {
 			return 0, err
 		}
@@ -429,9 +425,7 @@ func (r *AssetRepository) DeleteByQueryExpr(ctx context.Context, queryExpr strin
 	var allURNs []string
 	err := r.client.RunWithinTx(ctx, func(tx *sqlx.Tx) error {
 		deleteExpr := &DeleteAssetSQLExpr{
-			queryexpr.SQLExpr{
-				QueryExpr: queryExpr,
-			},
+			queryexpr.SQLExpr(queryExpr),
 		}
 		query, err := queryexpr.ValidateAndGetQueryFromExpr(deleteExpr)
 		if err != nil {
