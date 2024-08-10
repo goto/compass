@@ -7,7 +7,7 @@ Documentation of our Compass API with gRPC and gRPC-Gateway.
 
 [More about Compass](https://goto.github.io/compass/)
 
-## default
+## Assets
 
 ### /v1beta1/assets
 
@@ -180,6 +180,47 @@ Delete a single asset with given ID
 | 500 | Returned when theres is something wrong on the server side. | [Status](#status) |
 | default | An unexpected error response. | [Status](#status) |
 
+### /v1beta1/assets/delete-by-query
+##### Summary
+
+Delete assets by [query expression](https://expr-lang.org/).
+
+##### Description
+
+Delete all assets that match the given [query expression](https://expr-lang.org/). 
+The query expr at least must consist `refreshed_at`, `type`, and `service` identifiers. 
+For example of the correct query:
+```
+refreshed_at <= "2023-12-12 23:59:59" && service in ["service-1", "service-2"] && (type == "table") || description != "definitely-active-asset")
+```
+
+The idea of query expr converter is convert `query_expr` to AST (Abstract Syntax Tree), then make it as SQL Query and Elasticsearch Query so can used as filter query on deletion process.
+Currently, the expr query **already support most of the frequently used cases, except** ChainNode, MemberNode, SliceNode, CallNode, ClosureNode, PointerNode, VariableDeclaratorNode, MapNode, and PairNode.
+For more contexts, please refer to [AST Node](https://github.com/expr-lang/expr/blob/master/ast/node.go) in expr-lang library and [Query Expr Converter](https://github.com/goto/compass/tree/main/pkg/query_expr) in Compass.
+Example of **unsupported query for now** due to not directly produce a value is
+```
+service in filter(assets, .Service startsWith "T")
+```
+
+Complex query covered only if it directly produces a value, like `number_identifier == findLast([1, 2, 3, 4], # > 2)` will produce `number_identifier == 4`. 
+However, **please do the best practice that try to simplify the query first** to makes readable and prevent unwanted things like errors or false positive result. Like example before, please write `4` instead of `findLast([1, 2, 3, 4], # > 2)`. You can use [expr-lang playground](https://expr-lang.org/playground) to simplify the query expr.
+
+
+##### Parameters
+
+| Name       | Located in | Description                                                                                                                                                                                                                                                                                                                                           | Required | Schema |
+|------------|------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------| ------ |
+| query_expr | body       | query expression based on [expr-lang](https://expr-lang.org/) to filtering the assets that wants to be deleted. `refreshed_at`, `type`, and `service` identifiers must exist in the query.  | Yes      | string |
+| dry_run    | body       | if set to true, then deletion should not proceed and only return the affected rows. Else, will perform deletion in the background (default)                                                                                                                                                                                                           | No       | string |
+
+##### Responses
+
+| Code | Description | Schema                                        |
+| ---- | ----------- |-----------------------------------------------|
+| 200 | A successful response. | [DeleteAssetsResponse](#deleteassetsresponse) |
+| 400 | Returned when the data that user input is wrong. | [Status](#status)                           |
+| 500 | Returned when theres is something wrong on the server side. | [Status](#status)                             |
+| default | An unexpected error response. | [Status](#status)                             |
 ### /v1beta1/assets/{id}/stargazers
 
 #### GET
@@ -1579,6 +1620,13 @@ Request to be sent to create a tag's template
 | Name | Type | Description | Required |
 | ---- | ---- | ----------- | -------- |
 | DeleteAssetResponse | object |  |  |
+
+#### DeleteAssetsResponse
+
+| Name          | Type    | Description                                         | Required |
+|---------------|---------|-----------------------------------------------------|----------|
+| affected_rows | integer | the numbers of assets that match the given query | No       |
+
 
 #### DeleteCommentResponse
 
