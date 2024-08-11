@@ -648,9 +648,8 @@ func (r *AssetRepository) deleteWithPredicate(ctx context.Context, pred sq.Eq) (
 func (r *AssetRepository) insert(ctx context.Context, ast *asset.Asset) (string, error) {
 	var id string
 	err := r.client.RunWithinTx(ctx, func(tx *sqlx.Tx) error {
-		ast.CreatedAt = time.Now()
+		ast.CreatedAt = ast.RefreshedAt // current time
 		ast.UpdatedAt = ast.CreatedAt
-		ast.RefreshedAt = ast.CreatedAt
 		query, args, err := sq.Insert("assets").
 			Columns("urn", "type", "service", "name", "description", "data", "url", "labels", "created_at", "updated_by", "updated_at", "refreshed_at", "version").
 			Values(ast.URN, ast.Type, ast.Service, ast.Name, ast.Description, ast.Data, ast.URL, ast.Labels, ast.CreatedAt, ast.UpdatedBy.ID, ast.UpdatedAt, ast.RefreshedAt, asset.BaseVersion).
@@ -717,7 +716,7 @@ func (r *AssetRepository) update(ctx context.Context, assetID string, newAsset, 
 		}
 		newAsset.Version = newVersion
 		newAsset.ID = oldAsset.ID
-		newAsset.UpdatedAt = time.Now()
+		newAsset.UpdatedAt = newAsset.RefreshedAt // current time
 
 		if err := r.updateAsset(ctx, tx, assetID, newAsset); err != nil {
 			return err
