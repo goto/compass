@@ -23,6 +23,49 @@ func (_m *DiscoveryRepository) EXPECT() *DiscoveryRepository_Expecter {
 	return &DiscoveryRepository_Expecter{mock: &_m.Mock}
 }
 
+// DeleteByQueryExpr provides a mock function with given fields: ctx, queryExpr
+func (_m *DiscoveryRepository) DeleteByQueryExpr(ctx context.Context, queryExpr string) error {
+	ret := _m.Called(ctx, queryExpr)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) error); ok {
+		r0 = rf(ctx, queryExpr)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// DiscoveryRepository_DeleteByQueryExpr_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteByQueryExpr'
+type DiscoveryRepository_DeleteByQueryExpr_Call struct {
+	*mock.Call
+}
+
+// DeleteByQueryExpr is a helper method to define mock.On call
+//   - ctx context.Context
+//   - queryExpr string
+func (_e *DiscoveryRepository_Expecter) DeleteByQueryExpr(ctx interface{}, queryExpr interface{}) *DiscoveryRepository_DeleteByQueryExpr_Call {
+	return &DiscoveryRepository_DeleteByQueryExpr_Call{Call: _e.mock.On("DeleteByQueryExpr", ctx, queryExpr)}
+}
+
+func (_c *DiscoveryRepository_DeleteByQueryExpr_Call) Run(run func(ctx context.Context, queryExpr string)) *DiscoveryRepository_DeleteByQueryExpr_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *DiscoveryRepository_DeleteByQueryExpr_Call) Return(_a0 error) *DiscoveryRepository_DeleteByQueryExpr_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *DiscoveryRepository_DeleteByQueryExpr_Call) RunAndReturn(run func(context.Context, string) error) *DiscoveryRepository_DeleteByQueryExpr_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // DeleteByURN provides a mock function with given fields: ctx, assetURN
 func (_m *DiscoveryRepository) DeleteByURN(ctx context.Context, assetURN string) error {
 	ret := _m.Called(ctx, assetURN)
@@ -111,8 +154,8 @@ func (_c *DiscoveryRepository_SyncAssets_Call) Run(run func(ctx context.Context,
 	return _c
 }
 
-func (_c *DiscoveryRepository_SyncAssets_Call) Return(cleanup func() error, err error) *DiscoveryRepository_SyncAssets_Call {
-	_c.Call.Return(cleanup, err)
+func (_c *DiscoveryRepository_SyncAssets_Call) Return(cleanupFn func() error, err error) *DiscoveryRepository_SyncAssets_Call {
+	_c.Call.Return(cleanupFn, err)
 	return _c
 }
 

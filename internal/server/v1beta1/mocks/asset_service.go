@@ -110,6 +110,60 @@ func (_c *AssetService_DeleteAsset_Call) RunAndReturn(run func(context.Context, 
 	return _c
 }
 
+// DeleteAssets provides a mock function with given fields: ctx, queryExpr, dryRun
+func (_m *AssetService) DeleteAssets(ctx context.Context, queryExpr string, dryRun bool) (uint32, error) {
+	ret := _m.Called(ctx, queryExpr, dryRun)
+
+	var r0 uint32
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, bool) (uint32, error)); ok {
+		return rf(ctx, queryExpr, dryRun)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, bool) uint32); ok {
+		r0 = rf(ctx, queryExpr, dryRun)
+	} else {
+		r0 = ret.Get(0).(uint32)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, bool) error); ok {
+		r1 = rf(ctx, queryExpr, dryRun)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// AssetService_DeleteAssets_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteAssets'
+type AssetService_DeleteAssets_Call struct {
+	*mock.Call
+}
+
+// DeleteAssets is a helper method to define mock.On call
+//   - ctx context.Context
+//   - queryExpr string
+//   - dryRun bool
+func (_e *AssetService_Expecter) DeleteAssets(ctx interface{}, queryExpr interface{}, dryRun interface{}) *AssetService_DeleteAssets_Call {
+	return &AssetService_DeleteAssets_Call{Call: _e.mock.On("DeleteAssets", ctx, queryExpr, dryRun)}
+}
+
+func (_c *AssetService_DeleteAssets_Call) Run(run func(ctx context.Context, queryExpr string, dryRun bool)) *AssetService_DeleteAssets_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(bool))
+	})
+	return _c
+}
+
+func (_c *AssetService_DeleteAssets_Call) Return(_a0 uint32, _a1 error) *AssetService_DeleteAssets_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *AssetService_DeleteAssets_Call) RunAndReturn(run func(context.Context, string, bool) (uint32, error)) *AssetService_DeleteAssets_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetAllAssets provides a mock function with given fields: ctx, flt, withTotal
 func (_m *AssetService) GetAllAssets(ctx context.Context, flt asset.Filter, withTotal bool) ([]asset.Asset, uint32, error) {
 	ret := _m.Called(ctx, flt, withTotal)

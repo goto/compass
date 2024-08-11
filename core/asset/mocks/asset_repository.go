@@ -110,6 +110,61 @@ func (_c *AssetRepository_DeleteByID_Call) RunAndReturn(run func(context.Context
 	return _c
 }
 
+// DeleteByQueryExpr provides a mock function with given fields: ctx, queryExpr
+func (_m *AssetRepository) DeleteByQueryExpr(ctx context.Context, queryExpr string) ([]string, error) {
+	ret := _m.Called(ctx, queryExpr)
+
+	var r0 []string
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) ([]string, error)); ok {
+		return rf(ctx, queryExpr)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) []string); ok {
+		r0 = rf(ctx, queryExpr)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]string)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, queryExpr)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// AssetRepository_DeleteByQueryExpr_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteByQueryExpr'
+type AssetRepository_DeleteByQueryExpr_Call struct {
+	*mock.Call
+}
+
+// DeleteByQueryExpr is a helper method to define mock.On call
+//   - ctx context.Context
+//   - queryExpr string
+func (_e *AssetRepository_Expecter) DeleteByQueryExpr(ctx interface{}, queryExpr interface{}) *AssetRepository_DeleteByQueryExpr_Call {
+	return &AssetRepository_DeleteByQueryExpr_Call{Call: _e.mock.On("DeleteByQueryExpr", ctx, queryExpr)}
+}
+
+func (_c *AssetRepository_DeleteByQueryExpr_Call) Run(run func(ctx context.Context, queryExpr string)) *AssetRepository_DeleteByQueryExpr_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *AssetRepository_DeleteByQueryExpr_Call) Return(_a0 []string, _a1 error) *AssetRepository_DeleteByQueryExpr_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *AssetRepository_DeleteByQueryExpr_Call) RunAndReturn(run func(context.Context, string) ([]string, error)) *AssetRepository_DeleteByQueryExpr_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // DeleteByURN provides a mock function with given fields: ctx, urn
 func (_m *AssetRepository) DeleteByURN(ctx context.Context, urn string) error {
 	ret := _m.Called(ctx, urn)
@@ -471,6 +526,60 @@ func (_c *AssetRepository_GetCount_Call) Return(_a0 int, _a1 error) *AssetReposi
 }
 
 func (_c *AssetRepository_GetCount_Call) RunAndReturn(run func(context.Context, asset.Filter) (int, error)) *AssetRepository_GetCount_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetCountByQueryExpr provides a mock function with given fields: _a0, _a1, _a2
+func (_m *AssetRepository) GetCountByQueryExpr(_a0 context.Context, _a1 string, _a2 bool) (int, error) {
+	ret := _m.Called(_a0, _a1, _a2)
+
+	var r0 int
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, bool) (int, error)); ok {
+		return rf(_a0, _a1, _a2)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, bool) int); ok {
+		r0 = rf(_a0, _a1, _a2)
+	} else {
+		r0 = ret.Get(0).(int)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, bool) error); ok {
+		r1 = rf(_a0, _a1, _a2)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// AssetRepository_GetCountByQueryExpr_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetCountByQueryExpr'
+type AssetRepository_GetCountByQueryExpr_Call struct {
+	*mock.Call
+}
+
+// GetCountByQueryExpr is a helper method to define mock.On call
+//   - _a0 context.Context
+//   - _a1 string
+//   - _a2 bool
+func (_e *AssetRepository_Expecter) GetCountByQueryExpr(_a0 interface{}, _a1 interface{}, _a2 interface{}) *AssetRepository_GetCountByQueryExpr_Call {
+	return &AssetRepository_GetCountByQueryExpr_Call{Call: _e.mock.On("GetCountByQueryExpr", _a0, _a1, _a2)}
+}
+
+func (_c *AssetRepository_GetCountByQueryExpr_Call) Run(run func(_a0 context.Context, _a1 string, _a2 bool)) *AssetRepository_GetCountByQueryExpr_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(bool))
+	})
+	return _c
+}
+
+func (_c *AssetRepository_GetCountByQueryExpr_Call) Return(_a0 int, _a1 error) *AssetRepository_GetCountByQueryExpr_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *AssetRepository_GetCountByQueryExpr_Call) RunAndReturn(run func(context.Context, string, bool) (int, error)) *AssetRepository_GetCountByQueryExpr_Call {
 	_c.Call.Return(run)
 	return _c
 }
