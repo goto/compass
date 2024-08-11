@@ -977,11 +977,12 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 	r.Run("on insert", func() {
 		r.Run("set ID to asset and version to base version", func() {
 			ast := asset.Asset{
-				URN:       "urn-u-1",
-				Type:      "table",
-				Service:   "bigquery",
-				URL:       "https://sample-url.com",
-				UpdatedBy: r.users[0],
+				URN:         "urn-u-1",
+				Type:        "table",
+				Service:     "bigquery",
+				URL:         "https://sample-url.com",
+				UpdatedBy:   r.users[0],
+				RefreshedAt: time.Now(),
 			}
 			id, err := r.repository.Upsert(r.ctx, &ast)
 			r.Equal(asset.BaseVersion, ast.Version)
@@ -998,6 +999,7 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 			r.assertAsset(&ast, &assetInDB)
 
 			ast2 := ast
+			ast2.RefreshedAt = time.Now()
 			ast2.Description = "create a new version" // to force fetch from asset_versions.
 			_, err = r.repository.Upsert(r.ctx, &ast2)
 			r.NoError(err)
@@ -1915,11 +1917,13 @@ func (r *AssetRepositoryTestSuite) assertAsset(expectedAsset, actualAsset *asset
 	// sanitize time to make the assets comparable
 	expectedAsset.CreatedAt = time.Time{}
 	expectedAsset.UpdatedAt = time.Time{}
+	expectedAsset.RefreshedAt = time.Time{}
 	expectedAsset.UpdatedBy.CreatedAt = time.Time{}
 	expectedAsset.UpdatedBy.UpdatedAt = time.Time{}
 
 	actualAsset.CreatedAt = time.Time{}
 	actualAsset.UpdatedAt = time.Time{}
+	actualAsset.RefreshedAt = time.Time{}
 	actualAsset.UpdatedBy.CreatedAt = time.Time{}
 	actualAsset.UpdatedBy.UpdatedAt = time.Time{}
 
