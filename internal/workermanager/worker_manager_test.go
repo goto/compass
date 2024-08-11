@@ -77,13 +77,16 @@ func TestManager_Run(t *testing.T) {
 			wrkr := mocks.NewWorker(t)
 			mgr := workermanager.NewWithWorker(wrkr, workermanager.Deps{})
 			wrkr.EXPECT().
-				Register("index-asset", mock.AnythingOfType("worker.JobHandler")).
+				Register(workermanager.JobIndexAsset, mock.AnythingOfType("worker.JobHandler")).
 				Return(nil)
 			wrkr.EXPECT().
-				Register("delete-asset", mock.AnythingOfType("worker.JobHandler")).
+				Register(workermanager.JobDeleteAsset, mock.AnythingOfType("worker.JobHandler")).
 				Return(nil)
 			wrkr.EXPECT().
-				Register("sync-asset", mock.AnythingOfType("worker.JobHandler")).
+				Register(workermanager.JobDeleteAssetsByQuery, mock.AnythingOfType("worker.JobHandler")).
+				Return(nil)
+			wrkr.EXPECT().
+				Register(workermanager.JobSyncAsset, mock.AnythingOfType("worker.JobHandler")).
 				Return(nil)
 			wrkr.EXPECT().
 				Run(ctx).

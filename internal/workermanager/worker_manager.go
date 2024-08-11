@@ -124,10 +124,10 @@ func (m *Manager) init() error {
 	m.initDone.Store(true)
 
 	jobHandlers := map[string]worker.JobHandler{
-		jobIndexAsset:          m.indexAssetHandler(),
-		jobDeleteAsset:         m.deleteAssetHandler(),
-		jobDeleteAssetsByQuery: m.deleteAssetsByQueryHandler(),
-		jobSyncAsset:           m.syncAssetHandler(),
+		JobIndexAsset:          m.indexAssetHandler(),
+		JobDeleteAsset:         m.deleteAssetHandler(),
+		JobDeleteAssetsByQuery: m.deleteAssetsByQueryHandler(),
+		JobSyncAsset:           m.syncAssetHandler(),
 	}
 	for typ, h := range jobHandlers {
 		if err := m.worker.Register(typ, h); err != nil {

@@ -26,7 +26,7 @@ func (m *Manager) EnqueueIndexAssetJob(ctx context.Context, ast asset.Asset) err
 	}
 
 	err = m.worker.Enqueue(ctx, worker.JobSpec{
-		Type:    jobIndexAsset,
+		Type:    JobIndexAsset,
 		Payload: payload,
 	})
 	if err != nil {
@@ -128,7 +128,7 @@ func (m *Manager) SyncAssets(ctx context.Context, job worker.JobSpec) error {
 
 func (m *Manager) EnqueueDeleteAssetJob(ctx context.Context, urn string) error {
 	err := m.worker.Enqueue(ctx, worker.JobSpec{
-		Type:    jobDeleteAsset,
+		Type:    JobDeleteAsset,
 		Payload: ([]byte)(urn),
 	})
 	if err != nil {
@@ -161,7 +161,7 @@ func (m *Manager) DeleteAsset(ctx context.Context, job worker.JobSpec) error {
 
 func (m *Manager) EnqueueDeleteAssetsByQueryExprJob(ctx context.Context, queryExpr string) error {
 	err := m.worker.Enqueue(ctx, worker.JobSpec{
-		Type:    jobDeleteAssetsByQuery,
+		Type:    JobDeleteAssetsByQuery,
 		Payload: ([]byte)(queryExpr),
 	})
 	if err != nil {
@@ -194,7 +194,7 @@ func (m *Manager) DeleteAssetsByQueryExpr(ctx context.Context, job worker.JobSpe
 
 func (m *Manager) EnqueueSyncAssetJob(ctx context.Context, service string) error {
 	err := m.worker.Enqueue(ctx, worker.JobSpec{
-		Type:    jobSyncAsset,
+		Type:    JobSyncAsset,
 		Payload: ([]byte)(service),
 	})
 	if err != nil {
