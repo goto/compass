@@ -701,8 +701,8 @@ func (r *AssetRepository) update(ctx context.Context, assetID string, newAsset, 
 		return nil
 	}
 
-	onlyRefreshed := len(clog) == 1 && clog[0].Path[0] == "RefreshedAt"
-	if onlyRefreshed {
+	refreshedOnly := len(clog) == 1 && clog[0].Path[0] == "RefreshedAt"
+	if refreshedOnly {
 		return r.client.RunWithinTx(ctx, func(tx *sqlx.Tx) error {
 			return r.updateAsset(ctx, tx, assetID, newAsset)
 		})
