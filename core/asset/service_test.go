@@ -445,6 +445,80 @@ func TestService_DeleteAsset(t *testing.T) {
 	}
 }
 
+func TestService_DeleteAssets(t *testing.T) {
+	emptyQueryExpr := ""
+	notMeetIdentifierRequirementQueryExpr := `refreshed_at < now()`
+	successfulQueryExpr := `refreshed_at <= "2023-12-12 23:59:59" && service in ["service-1", "service-2"] && type == "table"`
+	type testCase struct {
+		Description        string
+		QueryExpr          string
+		DryRun             bool
+		Setup              func(context.Context, *mocks.AssetRepository, *mocks.DiscoveryRepository, *mocks.LineageRepository)
+		ExpectAffectedRows uint32
+		ExpectErr          error
+	}
+
+	testCases := []testCase{
+		{
+			Description: `should return error if query expr is empty`,
+			QueryExpr:   emptyQueryExpr,
+			DryRun:      false,
+			Setup: func(ctx context.Context, ar *mocks.AssetRepository, _ *mocks.DiscoveryRepository, _ *mocks.LineageRepository) {
+				ar.EXPECT().GetCountByQueryExpr(ctx, emptyQueryExpr, true).Return(0, errors.New("error"))
+			},
+			ExpectAffectedRows: 0,
+			ExpectErr:          errors.New("error"),
+		},
+		{
+			Description: `should return error if query expr does not meet identifier requirement`,
+			QueryExpr:   notMeetIdentifierRequirementQueryExpr,
+			DryRun:      false,
+			Setup: func(ctx context.Context, ar *mocks.AssetRepository, _ *mocks.DiscoveryRepository, _ *mocks.LineageRepository) {
+				ar.EXPECT().GetCountByQueryExpr(ctx, notMeetIdentifierRequirementQueryExpr, true).
+					Return(0, errors.New("must exist these identifiers: refreshed_at, type, and service. Current identifiers: refreshed_at"))
+			},
+			ExpectAffectedRows: 0,
+			ExpectErr:          errors.New("must exist these identifiers: refreshed_at, type, and service. Current identifiers: refreshed_at"),
+		},
+		{
+			Description: `should only return the numbers of assets that match the given query if dry run is true`,
+			QueryExpr:   successfulQueryExpr,
+			DryRun:      true,
+			Setup: func(ctx context.Context, ar *mocks.AssetRepository, _ *mocks.DiscoveryRepository, _ *mocks.LineageRepository) {
+				ar.EXPECT().GetCountByQueryExpr(ctx, successfulQueryExpr, true).Return(11, nil)
+			},
+			ExpectAffectedRows: 11,
+			ExpectErr:          nil,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.Description, func(t *testing.T) {
+			ctx := context.Background()
+
+			assetRepo := mocks.NewAssetRepository(t)
+			discoveryRepo := mocks.NewDiscoveryRepository(t)
+			lineageRepo := mocks.NewLineageRepository(t)
+			if tc.Setup != nil {
+				tc.Setup(ctx, assetRepo, discoveryRepo, lineageRepo)
+			}
+
+			svc := asset.NewService(asset.ServiceDeps{
+				AssetRepo:     assetRepo,
+				DiscoveryRepo: discoveryRepo,
+				LineageRepo:   lineageRepo,
+				Worker:        workermanager.NewInSituWorker(workermanager.Deps{DiscoveryRepo: discoveryRepo}),
+			})
+
+			affectedRows, err := svc.DeleteAssets(ctx, tc.QueryExpr, tc.DryRun)
+
+			if tc.ExpectErr != nil {
+				assert.ErrorContains(t, err, tc.ExpectErr.Error())
+			}
+			assert.Equal(t, tc.ExpectAffectedRows, affectedRows)
+		})
+	}
+}
+
 func TestService_GetAssetByID(t *testing.T) {
 	assetID := "f742aa61-1100-445c-8d72-355a42e2fb59"
 	urn := "my-test-urn"

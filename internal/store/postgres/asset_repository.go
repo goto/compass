@@ -43,7 +43,7 @@ func (d *DeleteAssetSQLExpr) Validate() error {
 		generichelper.Contains(identifiers, "type") &&
 		generichelper.Contains(identifiers, "service")
 	if !mustExist {
-		return fmt.Errorf("must exists these identifiers: refreshed_at, type, and service. "+
+		return fmt.Errorf("must exist these identifiers: refreshed_at, type, and service. "+
 			"Current identifiers: %v", identifiers)
 	}
 

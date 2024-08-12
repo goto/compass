@@ -9,6 +9,7 @@ import (
 
 	"github.com/goto/compass/core/asset"
 	store "github.com/goto/compass/internal/store/elasticsearch"
+	queryexpr "github.com/goto/compass/pkg/query_expr"
 	"github.com/goto/salt/log"
 	"github.com/olivere/elastic/v7"
 	"github.com/stretchr/testify/assert"
@@ -387,6 +388,111 @@ func TestDiscoveryRepositoryDeleteByURN(t *testing.T) {
 		require.NoError(t, err)
 
 		err = repo.DeleteByURN(ctx, ast1.URN)
+		assert.NoError(t, err)
+	})
+}
+
+func TestDiscoveryRepositoryDeleteByQueryExpr(t *testing.T) {
+	var (
+		ctx             = context.Background()
+		bigqueryService = "bigquery-test"
+		kafkaService    = "kafka-test"
+	)
+
+	cli, err := esTestServer.NewClient()
+	require.NoError(t, err)
+
+	esClient, err := store.NewClient(
+		log.NewNoop(), store.Config{}, store.WithClient(cli),
+	)
+	require.NoError(t, err)
+
+	repo := store.NewDiscoveryRepository(esClient, log.NewNoop(), time.Second*10, []string{"number", "id"})
+
+	t.Run("should return error if the given query expr is empty", func(t *testing.T) {
+		err = repo.DeleteByQueryExpr(ctx, "")
+		assert.ErrorIs(t, err, asset.ErrEmptyQuery)
+	})
+
+	t.Run("should not return error on success", func(t *testing.T) {
+		ast := asset.Asset{
+			ID:          "delete-id",
+			Type:        asset.TypeTable,
+			Service:     bigqueryService,
+			URN:         "some-urn",
+			RefreshedAt: time.Now(),
+		}
+
+		err = repo.Upsert(ctx, ast)
+		require.NoError(t, err)
+
+		queryExpr := "refreshed_at <= '" + time.Now().Format("2006-01-02 15:04:05") +
+			"' && service == '" + bigqueryService +
+			"' && type == '" + asset.TypeTable.String() + "'"
+		err = repo.DeleteByQueryExpr(ctx, queryExpr)
+		assert.NoError(t, err)
+
+		deleteAssetESExpr := &store.DeleteAssetESExpr{
+			ESExpr: queryexpr.ESExpr(queryExpr),
+		}
+		esQuery, _ := queryexpr.ValidateAndGetQueryFromExpr(deleteAssetESExpr)
+
+		res, err := cli.Search(
+			cli.Search.WithBody(strings.NewReader(esQuery)),
+			cli.Search.WithIndex("_all"),
+		)
+		require.NoError(t, err)
+		assert.False(t, res.IsError())
+
+		var body struct {
+			Hits struct {
+				Total elastic.TotalHits `json:"total"`
+			} `json:"hits"`
+		}
+		require.NoError(t, json.NewDecoder(res.Body).Decode(&body))
+		assert.Equal(t, int64(0), body.Hits.Total.Value)
+	})
+
+	t.Run("should ignore unavailable indices", func(t *testing.T) {
+		currentTime := time.Now()
+		ast1 := asset.Asset{
+			ID:          "id1",
+			Type:        asset.TypeTable,
+			Service:     bigqueryService,
+			URN:         "urn1",
+			RefreshedAt: currentTime,
+		}
+		ast2 := asset.Asset{
+			ID:          "id2",
+			Type:        asset.TypeTopic,
+			Service:     kafkaService,
+			URN:         "urn2",
+			RefreshedAt: currentTime,
+		}
+		cli, err := esTestServer.NewClient()
+		require.NoError(t, err)
+		esClient, err := store.NewClient(
+			log.NewNoop(),
+			store.Config{},
+			store.WithClient(cli),
+		)
+		require.NoError(t, err)
+
+		repo := store.NewDiscoveryRepository(esClient, log.NewNoop(), time.Second*10, []string{"number", "id"})
+
+		err = repo.Upsert(ctx, ast1)
+		require.NoError(t, err)
+
+		err = repo.Upsert(ctx, ast2)
+		require.NoError(t, err)
+
+		_, err = cli.Indices.Close([]string{kafkaService})
+		require.NoError(t, err)
+
+		queryExpr := "refreshed_at <= '" + time.Now().Format("2006-01-02 15:04:05") +
+			"' && service == '" + kafkaService +
+			"' && type == '" + asset.TypeTopic.String() + "'"
+		err = repo.DeleteByQueryExpr(ctx, queryExpr)
 		assert.NoError(t, err)
 	})
 }

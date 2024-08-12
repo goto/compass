@@ -42,7 +42,7 @@ func (m *InSituWorker) EnqueueDeleteAssetJob(ctx context.Context, urn string) er
 
 func (m *InSituWorker) EnqueueDeleteAssetsByQueryExprJob(ctx context.Context, queryExpr string) error {
 	if err := m.discoveryRepo.DeleteByQueryExpr(ctx, queryExpr); err != nil {
-		return fmt.Errorf("delete asset from discovery repo: %w: query expr '%s'", err, queryExpr)
+		return fmt.Errorf("delete asset from discovery repo: %w: query expr: '%s'", err, queryExpr)
 	}
 	return nil
 }

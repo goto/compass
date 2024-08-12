@@ -1316,6 +1316,52 @@ func (r *AssetRepositoryTestSuite) TestDeleteByURN() {
 	})
 }
 
+func (r *AssetRepositoryTestSuite) TestDeleteByQueryExpr() {
+	r.Run("should delete correct asset", func() {
+		currentTime := time.Now()
+		asset1 := asset.Asset{
+			URN:         "urn-del-1",
+			Type:        "table",
+			Service:     "bigquery",
+			UpdatedBy:   user.User{ID: defaultAssetUpdaterUserID},
+			RefreshedAt: currentTime.AddDate(-1, 0, 0),
+		}
+		asset2 := asset.Asset{
+			URN:         "urn-del-2",
+			Type:        "topic",
+			Service:     "kafka",
+			Version:     asset.BaseVersion,
+			UpdatedBy:   user.User{ID: defaultAssetUpdaterUserID},
+			RefreshedAt: currentTime.AddDate(-1, 0, 0),
+		}
+
+		_, err := r.repository.Upsert(r.ctx, &asset1)
+		r.Require().NoError(err)
+
+		id, err := r.repository.Upsert(r.ctx, &asset2)
+		r.Require().NoError(err)
+
+		queryExpr := "refreshed_at <= '" + time.Now().Format("2006-01-02 15:04:05") +
+			"' && service == '" + asset1.Service +
+			"' && type == '" + asset1.Type.String() +
+			"' && urn == '" + asset1.URN + "'"
+		urns, err := r.repository.DeleteByQueryExpr(r.ctx, queryExpr)
+		r.NoError(err)
+		r.Equal([]string{"urn-del-1"}, urns)
+
+		_, err = r.repository.GetByURN(r.ctx, asset1.URN)
+		r.ErrorAs(err, &asset.NotFoundError{URN: asset1.URN})
+
+		asset2FromDB, err := r.repository.GetByURN(r.ctx, asset2.URN)
+		r.NoError(err)
+		r.Equal(id, asset2FromDB.ID)
+
+		// cleanup
+		err = r.repository.DeleteByURN(r.ctx, asset2.URN)
+		r.NoError(err)
+	})
+}
+
 func (r *AssetRepositoryTestSuite) TestAddProbe() {
 	r.Run("return NotFoundError if asset does not exist", func() {
 		urn := "invalid-urn"

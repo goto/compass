@@ -165,7 +165,7 @@ func (m *Manager) EnqueueDeleteAssetsByQueryExprJob(ctx context.Context, queryEx
 		Payload: ([]byte)(queryExpr),
 	})
 	if err != nil {
-		return fmt.Errorf("enqueue delete asset job: %w: query expr '%s'", err, queryExpr)
+		return fmt.Errorf("enqueue delete asset job: %w: query expr: '%s'", err, queryExpr)
 	}
 
 	return nil
@@ -186,7 +186,7 @@ func (m *Manager) DeleteAssetsByQueryExpr(ctx context.Context, job worker.JobSpe
 	queryExpr := (string)(job.Payload)
 	if err := m.discoveryRepo.DeleteByQueryExpr(ctx, queryExpr); err != nil {
 		return &worker.RetryableError{
-			Cause: fmt.Errorf("delete asset from discovery repo: %w: query expr '%s'", err, queryExpr),
+			Cause: fmt.Errorf("delete asset from discovery repo: %w: query expr: '%s'", err, queryExpr),
 		}
 	}
 	return nil
