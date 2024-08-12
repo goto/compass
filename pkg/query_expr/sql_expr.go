@@ -21,7 +21,7 @@ func (s *SQLExpr) ToQuery() (string, error) {
 		return "", err
 	}
 	stringBuilder := &strings.Builder{}
-	if err := s.ConvertToSQL(queryExprParsed, stringBuilder); err != nil {
+	if err := s.convertToSQL(queryExprParsed, stringBuilder); err != nil {
 		return "", err
 	}
 	return stringBuilder.String(), nil
@@ -32,9 +32,9 @@ func (*SQLExpr) Validate() error {
 	return nil
 }
 
-// ConvertToSQL The idea came from ast.Walk. Currently, the development focus implement for the node type that most likely used in our needs.
+// convertToSQL The idea came from ast.Walk. Currently, the development focus implement for the node type that most likely used in our needs.
 // TODO: implement translator for node type that still not covered right now.
-func (s *SQLExpr) ConvertToSQL(node ast.Node, stringBuilder *strings.Builder) error {
+func (s *SQLExpr) convertToSQL(node ast.Node, stringBuilder *strings.Builder) error {
 	if node == nil {
 		return fmt.Errorf("cannot convert nil to SQL query")
 	}
@@ -62,7 +62,7 @@ func (s *SQLExpr) ConvertToSQL(node ast.Node, stringBuilder *strings.Builder) er
 		if err := s.patchUnaryNode(n); err != nil {
 			return err
 		}
-		if err := s.ConvertToSQL(n.Node, stringBuilder); err != nil {
+		if err := s.convertToSQL(n.Node, stringBuilder); err != nil {
 			return err
 		}
 	case *ast.ArrayNode:
@@ -93,14 +93,14 @@ func (s *SQLExpr) binaryNodeToSQLQuery(n *ast.BinaryNode, stringBuilder *strings
 		fmt.Fprintf(stringBuilder, "%v", result)
 	} else {
 		stringBuilder.WriteString("(")
-		if err := s.ConvertToSQL(n.Left, stringBuilder); err != nil {
+		if err := s.convertToSQL(n.Left, stringBuilder); err != nil {
 			return err
 		}
 
 		// write operator
 		fmt.Fprintf(stringBuilder, " %s ", strings.ToUpper(operator))
 
-		if err := s.ConvertToSQL(n.Right, stringBuilder); err != nil {
+		if err := s.convertToSQL(n.Right, stringBuilder); err != nil {
 			return err
 		}
 		stringBuilder.WriteString(")")
@@ -112,7 +112,7 @@ func (s *SQLExpr) binaryNodeToSQLQuery(n *ast.BinaryNode, stringBuilder *strings
 func (s *SQLExpr) arrayNodeToSQLQuery(n *ast.ArrayNode, stringBuilder *strings.Builder) error {
 	stringBuilder.WriteString("(")
 	for i := range n.Nodes {
-		if err := s.ConvertToSQL(n.Nodes[i], stringBuilder); err != nil {
+		if err := s.convertToSQL(n.Nodes[i], stringBuilder); err != nil {
 			return err
 		}
 		if i != len(n.Nodes)-1 {
@@ -127,7 +127,7 @@ func (s *SQLExpr) patchUnaryNode(n *ast.UnaryNode) error {
 	switch n.Operator {
 	case "not":
 		binaryNode, ok := (n.Node).(*ast.BinaryNode)
-		if ok && binaryNode.Operator == "in" {
+		if ok && strings.ToUpper(binaryNode.Operator) == "IN" {
 			ast.Patch(&n.Node, &ast.BinaryNode{
 				Operator: "not in",
 				Left:     binaryNode.Left,
@@ -149,7 +149,7 @@ func (s *SQLExpr) patchUnaryNode(n *ast.UnaryNode) error {
 			}
 			if boolResult, ok := result.(bool); ok {
 				ast.Patch(&n.Node, &ast.BoolNode{
-					Value: !boolResult,
+					Value: boolResult,
 				})
 				return nil
 			}
@@ -161,7 +161,7 @@ func (s *SQLExpr) patchUnaryNode(n *ast.UnaryNode) error {
 }
 
 func (*SQLExpr) operatorToSQL(bn *ast.BinaryNode) string {
-	switch bn.Operator {
+	switch strings.ToUpper(bn.Operator) {
 	case "&&":
 		return "AND"
 	case "||":
@@ -170,12 +170,15 @@ func (*SQLExpr) operatorToSQL(bn *ast.BinaryNode) string {
 		if _, ok := bn.Right.(*ast.NilNode); ok {
 			return "IS NOT"
 		}
+		return bn.Operator
 	case "==":
 		if _, ok := bn.Right.(*ast.NilNode); ok {
 			return "IS"
 		}
 		return "="
 	case "<", "<=", ">", ">=":
+		return bn.Operator
+	case "IN", "NOT IN":
 		return bn.Operator
 	}
 
