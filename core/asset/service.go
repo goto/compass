@@ -159,25 +159,32 @@ func (s *Service) DeleteAssets(ctx context.Context, queryExpr string, dryRun boo
 		defer wg.Done()
 		dbErr := <-dbErrChan
 		if dbErr == nil {
-			go func() {
-				if err := s.worker.EnqueueDeleteAssetsByQueryExprJob(context.Background(), queryExpr); err != nil {
-					log.Printf("Error occurred during Elasticsearch deletion: %s", err)
-				}
-			}()
-
-			go func() {
-				for _, urn := range urns {
-					if err := s.lineageRepository.DeleteByURN(context.Background(), urn); err != nil {
-						log.Printf("Error occurred during Lineage deletion: %s", err)
-					}
-				}
-			}()
+			s.deleteAssetsInElasticsearchAsynchronously(queryExpr)
+			s.deleteAssetsInLineageAsynchronously(urns)
 		} else {
 			log.Printf("Database deletion failed, skipping Elasticsearch and Lineage deletions: %s", dbErr)
 		}
 	}()
 
 	return uint32(total), nil
+}
+
+func (s *Service) deleteAssetsInElasticsearchAsynchronously(queryExpr string) {
+	go func() {
+		if err := s.worker.EnqueueDeleteAssetsByQueryExprJob(context.Background(), queryExpr); err != nil {
+			log.Printf("Error occurred during Elasticsearch deletion: %s", err)
+		}
+	}()
+}
+
+func (s *Service) deleteAssetsInLineageAsynchronously(urns []string) {
+	go func() {
+		for _, urn := range urns {
+			if err := s.lineageRepository.DeleteByURN(context.Background(), urn); err != nil {
+				log.Printf("Error occurred during Lineage deletion: %s", err)
+			}
+		}
+	}()
 }
 
 func (s *Service) GetAssetByID(ctx context.Context, id string) (Asset, error) {
