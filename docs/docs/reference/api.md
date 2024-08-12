@@ -202,8 +202,8 @@ Example of **unsupported query for now** due to not directly produce a value is
 service in filter(assets, .Service startsWith "T")
 ```
 
-Complex query covered only if it directly produces a value, like `number_identifier == findLast([1, 2, 3, 4], # > 2)` will produce `number_identifier == 4`. 
-However, **please do the best practice that try to simplify the query first** to makes readable and prevent unwanted things like errors or false positive result. Like example before, please write `4` instead of `findLast([1, 2, 3, 4], # > 2)`. You can use [expr-lang playground](https://expr-lang.org/playground) to simplify the query expr.
+Complex query covered only if it directly produces a value, like `bool_identifier == !(findLast([1, 2, 3, 4], # > 2) == 4)` will produce `bool_identifier == false`. 
+However, **please do the best practice that try to simplify the query first** to makes readable and prevent unwanted things like errors or false positive result. Like example before, please write `false` instead of `!(findLast([1, 2, 3, 4], # > 2) == 4)`. You can use [expr-lang playground](https://expr-lang.org/playground) to simplify the query expr.
 
 
 ##### Parameters
