@@ -308,12 +308,17 @@ func (server *APIServer) DeleteAsset(ctx context.Context, req *compassv1beta1.De
 }
 
 func (server *APIServer) DeleteAssets(ctx context.Context, req *compassv1beta1.DeleteAssetsRequest) (*compassv1beta1.DeleteAssetsResponse, error) {
+	var affectedRows uint32
 	_, err := server.ValidateUserInCtx(ctx)
 	if err != nil {
 		return nil, err
 	}
+	defer func() {
+		server.logger.Warn("the number of affected rows is %d", affectedRows)
+	}()
 
-	affectedRows, err := server.assetService.DeleteAssets(ctx, req.QueryExpr, req.DryRun)
+	server.logger.Warn("delete request: %v", req)
+	affectedRows, err = server.assetService.DeleteAssets(ctx, req.QueryExpr, req.DryRun)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}

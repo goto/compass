@@ -432,8 +432,9 @@ func TestDiscoveryRepositoryDeleteByQueryExpr(t *testing.T) {
 		err = repo.DeleteByQueryExpr(ctx, queryExpr)
 		assert.NoError(t, err)
 
-		deleteAssetESExpr := &store.DeleteAssetESExpr{
-			ESExpr: queryexpr.ESExpr(queryExpr),
+		expr := queryexpr.ESExpr(queryExpr)
+		deleteAssetESExpr := &queryexpr.DeleteAssetExpr{
+			ExprStr: &expr,
 		}
 		esQuery, _ := queryexpr.ValidateAndGetQueryFromExpr(deleteAssetESExpr)
 

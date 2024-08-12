@@ -9,12 +9,13 @@ import (
 )
 
 type ExprStr interface {
+	String() string
 	ToQuery() (string, error)
 	Validate() error
 }
 
 type ExprVisitor struct {
-	Identifiers []string
+	IdentifiersWithOperator map[string]string // Key: Identifier, Value: Operator
 }
 
 type ExprParam map[string]interface{}
@@ -33,19 +34,24 @@ func ValidateAndGetQueryFromExpr(exprStr ExprStr) (string, error) {
 
 // Visit is implementation Visitor interface from expr-lang/expr lib, used by ast.Walk
 func (s *ExprVisitor) Visit(node *ast.Node) { //nolint:gocritic
-	if n, ok := (*node).(*ast.IdentifierNode); ok {
-		s.Identifiers = append(s.Identifiers, n.Value)
+	if n, ok := (*node).(*ast.BinaryNode); ok {
+		if left, ok := (n.Left).(*ast.IdentifierNode); ok {
+			s.IdentifiersWithOperator[left.Value] = n.Operator
+		}
+		if right, ok := (n.Right).(*ast.IdentifierNode); ok {
+			s.IdentifiersWithOperator[right.Value] = n.Operator
+		}
 	}
 }
 
-func GetIdentifiers(queryExpr string) ([]string, error) {
+func GetIdentifiersMap(queryExpr string) (map[string]string, error) {
 	queryExprParsed, err := GetTreeNodeFromQueryExpr(queryExpr)
 	if err != nil {
 		return nil, err
 	}
-	queryExprVisitor := &ExprVisitor{}
+	queryExprVisitor := &ExprVisitor{IdentifiersWithOperator: make(map[string]string)}
 	ast.Walk(&queryExprParsed, queryExprVisitor)
-	return queryExprVisitor.Identifiers, nil
+	return queryExprVisitor.IdentifiersWithOperator, nil
 }
 
 func GetTreeNodeFromQueryExpr(queryExpr string) (ast.Node, error) {

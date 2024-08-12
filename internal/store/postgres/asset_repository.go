@@ -13,7 +13,6 @@ import (
 	sq "github.com/Masterminds/squirrel"
 	"github.com/goto/compass/core/asset"
 	"github.com/goto/compass/core/user"
-	generichelper "github.com/goto/compass/pkg/generic_helper"
 	queryexpr "github.com/goto/compass/pkg/query_expr"
 	"github.com/jmoiron/sqlx"
 	"github.com/r3labs/diff/v2"
@@ -27,27 +26,6 @@ type AssetRepository struct {
 	userRepo            *UserRepository
 	defaultGetMaxSize   int
 	defaultUserProvider string
-}
-
-type DeleteAssetSQLExpr struct {
-	queryexpr.SQLExpr
-}
-
-func (d *DeleteAssetSQLExpr) Validate() error {
-	identifiers, err := queryexpr.GetIdentifiers(d.String())
-	if err != nil {
-		return err
-	}
-
-	mustExist := generichelper.Contains(identifiers, "refreshed_at") &&
-		generichelper.Contains(identifiers, "type") &&
-		generichelper.Contains(identifiers, "service")
-	if !mustExist {
-		return fmt.Errorf("must exist these identifiers: refreshed_at, type, and service. "+
-			"Current identifiers: %v", identifiers)
-	}
-
-	return nil
 }
 
 // GetAll retrieves list of assets with filters
@@ -142,8 +120,9 @@ func (r *AssetRepository) GetCount(ctx context.Context, flt asset.Filter) (int, 
 func (r *AssetRepository) GetCountByQueryExpr(ctx context.Context, queryExpr string, isDeleteExpr bool) (int, error) {
 	var sqlQuery string
 	if isDeleteExpr {
-		deleteExpr := &DeleteAssetSQLExpr{
-			queryexpr.SQLExpr(queryExpr),
+		expr := queryexpr.SQLExpr(queryExpr)
+		deleteExpr := &queryexpr.DeleteAssetExpr{
+			ExprStr: &expr,
 		}
 		query, err := queryexpr.ValidateAndGetQueryFromExpr(deleteExpr)
 		if err != nil {
@@ -424,8 +403,9 @@ func (r *AssetRepository) DeleteByURN(ctx context.Context, urn string) error {
 func (r *AssetRepository) DeleteByQueryExpr(ctx context.Context, queryExpr string) ([]string, error) {
 	var allURNs []string
 	err := r.client.RunWithinTx(ctx, func(tx *sqlx.Tx) error {
-		deleteExpr := &DeleteAssetSQLExpr{
-			queryexpr.SQLExpr(queryExpr),
+		expr := queryexpr.SQLExpr(queryExpr)
+		deleteExpr := &queryexpr.DeleteAssetExpr{
+			ExprStr: &expr,
 		}
 		query, err := queryexpr.ValidateAndGetQueryFromExpr(deleteExpr)
 		if err != nil {

@@ -127,14 +127,15 @@ func (s *SQLExpr) patchUnaryNode(n *ast.UnaryNode) error {
 	switch n.Operator {
 	case "not":
 		binaryNode, ok := (n.Node).(*ast.BinaryNode)
-		if ok && strings.ToUpper(binaryNode.Operator) == "IN" {
+		if !ok {
+			return s.unsupportedQueryError(n)
+		}
+		if strings.ToUpper(binaryNode.Operator) == "IN" {
 			ast.Patch(&n.Node, &ast.BinaryNode{
 				Operator: "not in",
 				Left:     binaryNode.Left,
 				Right:    binaryNode.Right,
 			})
-		} else {
-			return s.unsupportedQueryError(n)
 		}
 	case "!":
 		switch nodeV := n.Node.(type) {

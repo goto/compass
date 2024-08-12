@@ -93,6 +93,5 @@ func TestSQLExpr_Validate(t *testing.T) {
 		if err := (&expr).Validate(); err != nil {
 			t.Errorf("Validate() error = %v, wantErr %v", err, nil)
 		}
-		return
 	})
 }

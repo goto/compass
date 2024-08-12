@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/goto/compass/core/asset"
-	generichelper "github.com/goto/compass/pkg/generic_helper"
 	queryexpr "github.com/goto/compass/pkg/query_expr"
 	"github.com/goto/salt/log"
 )
@@ -24,26 +23,6 @@ type DiscoveryRepository struct {
 	logger                    log.Logger
 	requestTimeout            time.Duration
 	columnSearchExclusionList []string
-}
-
-type DeleteAssetESExpr struct {
-	queryexpr.ESExpr
-}
-
-func (d *DeleteAssetESExpr) Validate() error {
-	identifiers, err := queryexpr.GetIdentifiers(d.String())
-	if err != nil {
-		return err
-	}
-
-	mustExist := generichelper.Contains(identifiers, "refreshed_at") &&
-		generichelper.Contains(identifiers, "type") &&
-		generichelper.Contains(identifiers, "service")
-	if !mustExist {
-		return fmt.Errorf("must exists these identifiers: refreshed_at, type. Current identifiers: %v", identifiers)
-	}
-
-	return nil
 }
 
 func NewDiscoveryRepository(cli *Client, logger log.Logger, requestTimeout time.Duration, colSearchExclusionList []string) *DiscoveryRepository {
@@ -171,8 +150,9 @@ func (repo *DiscoveryRepository) DeleteByQueryExpr(ctx context.Context, queryExp
 		return asset.ErrEmptyQuery
 	}
 
-	deleteAssetESExpr := &DeleteAssetESExpr{
-		queryexpr.ESExpr(queryExpr),
+	expr := queryexpr.ESExpr(queryExpr)
+	deleteAssetESExpr := &queryexpr.DeleteAssetExpr{
+		ExprStr: &expr,
 	}
 	esQuery, err := queryexpr.ValidateAndGetQueryFromExpr(deleteAssetESExpr)
 	if err != nil {
