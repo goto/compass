@@ -2,6 +2,7 @@ package queryexpr
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/goto/compass/core/asset"
 	generichelper "github.com/goto/compass/pkg/generic_helper"
@@ -29,11 +30,11 @@ func (d DeleteAssetExpr) Validate() error {
 		return fmt.Errorf("must exists these identifiers: refreshed_at, type, and service")
 	}
 
-	getOperator := func(jsonTag string) string {
-		return identifiersWithOperator[jsonTag]
+	isOperatorEqualsOrIn := func(jsonTag string) bool {
+		return identifiersWithOperator[jsonTag] == "==" || strings.ToUpper(identifiersWithOperator[jsonTag]) == "IN"
 	}
-	if getOperator("type") != "==" || getOperator("service") != "==" {
-		return fmt.Errorf("identifier type and service must be equals operator (==)")
+	if !isOperatorEqualsOrIn("type") || !isOperatorEqualsOrIn("service") {
+		return fmt.Errorf("identifier type and service must be equals (==) or IN operator")
 	}
 
 	identifiers := generichelper.GetMapKeys(identifiersWithOperator)

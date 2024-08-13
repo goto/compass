@@ -2,6 +2,7 @@ package queryexpr
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/expr-lang/expr"
 	"github.com/expr-lang/expr/ast"
@@ -34,12 +35,25 @@ func ValidateAndGetQueryFromExpr(exprStr ExprStr) (string, error) {
 
 // Visit is implementation Visitor interface from expr-lang/expr lib, used by ast.Walk
 func (s *ExprVisitor) Visit(node *ast.Node) { //nolint:gocritic
-	if n, ok := (*node).(*ast.BinaryNode); ok {
+	switch n := (*node).(type) {
+	case *ast.BinaryNode:
 		if left, ok := (n.Left).(*ast.IdentifierNode); ok {
 			s.IdentifiersWithOperator[left.Value] = n.Operator
 		}
 		if right, ok := (n.Right).(*ast.IdentifierNode); ok {
 			s.IdentifiersWithOperator[right.Value] = n.Operator
+		}
+	case *ast.UnaryNode:
+		if binaryNode, ok := (n.Node).(*ast.BinaryNode); ok {
+			if strings.ToUpper(binaryNode.Operator) == "IN" {
+				notInOperator := "NOT IN"
+				if left, ok := (binaryNode.Left).(*ast.IdentifierNode); ok {
+					s.IdentifiersWithOperator[left.Value] = notInOperator
+				}
+				if right, ok := (binaryNode.Right).(*ast.IdentifierNode); ok {
+					s.IdentifiersWithOperator[right.Value] = notInOperator
+				}
+			}
 		}
 	}
 }
