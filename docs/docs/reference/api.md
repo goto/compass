@@ -189,6 +189,7 @@ Delete assets by [query expression](https://expr-lang.org/).
 
 Delete all assets that match the given [query expression](https://expr-lang.org/). 
 The query expr at least must consist `refreshed_at`, `type`, and `service` identifiers. 
+`type` and `service` identifiers valid only if it's using equals (`==`) or `IN` operator, to prevent human error on deleting assets.
 For example of the correct query:
 ```
 refreshed_at <= "2023-12-12 23:59:59" && service in ["service-1", "service-2"] && (type == "table") || description != "definitely-active-asset")
@@ -208,10 +209,10 @@ However, **please do the best practice that try to simplify the query first** to
 
 ##### Parameters
 
-| Name       | Located in | Description                                                                                                                                                                                                                                                                                                                                           | Required | Schema |
-|------------|------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------| ------ |
-| query_expr | body       | query expression based on [expr-lang](https://expr-lang.org/) to filtering the assets that wants to be deleted. `refreshed_at`, `type`, and `service` identifiers must exist in the query.  | Yes      | string |
-| dry_run    | body       | if set to true, then deletion should not proceed and only return the affected rows. Else, will perform deletion in the background (default)                                                                                                                                                                                                           | No       | string |
+| Name       | Located in | Description                                                                                                                                                                                                                                                          | Required | Schema |
+|------------|------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------| ------ |
+| query_expr | body       | query expression based on [expr-lang](https://expr-lang.org/) to filtering the assets that wants to be deleted. `refreshed_at`, `type`, and `service` identifiers must exist in the query. The `type` and `service` must using equals (`==`) or `IN` operator | Yes      | string |
+| dry_run    | body       | if set to true, then deletion should not proceed and only return the affected rows. Else, will perform deletion in the background (default)                                                                                                                          | No       | string |
 
 ##### Responses
 
