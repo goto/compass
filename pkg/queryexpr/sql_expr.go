@@ -16,7 +16,7 @@ func (s *SQLExpr) String() string {
 
 // ToQuery default
 func (s *SQLExpr) ToQuery() (string, error) {
-	queryExprParsed, err := GetTreeNodeFromQueryExpr(s.String())
+	queryExprParsed, err := getTreeNodeFromQueryExpr(s.String())
 	if err != nil {
 		return "", err
 	}

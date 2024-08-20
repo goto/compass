@@ -9,7 +9,7 @@ import (
 
 	"github.com/goto/compass/core/asset"
 	store "github.com/goto/compass/internal/store/elasticsearch"
-	queryexpr "github.com/goto/compass/pkg/query_expr"
+	"github.com/goto/compass/pkg/queryexpr"
 	"github.com/goto/salt/log"
 	"github.com/olivere/elastic/v7"
 	"github.com/stretchr/testify/assert"
@@ -433,7 +433,7 @@ func TestDiscoveryRepositoryDeleteByQueryExpr(t *testing.T) {
 		assert.NoError(t, err)
 
 		expr := queryexpr.ESExpr(queryExpr)
-		deleteAssetESExpr := &queryexpr.DeleteAssetExpr{
+		deleteAssetESExpr := &asset.DeleteAssetExpr{
 			ExprStr: &expr,
 		}
 		esQuery, _ := queryexpr.ValidateAndGetQueryFromExpr(deleteAssetESExpr)

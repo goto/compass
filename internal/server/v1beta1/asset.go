@@ -30,7 +30,7 @@ type AssetService interface {
 	UpsertAsset(ctx context.Context, ast *asset.Asset, upstreams, downstreams []string) (string, error)
 	UpsertAssetWithoutLineage(ctx context.Context, ast *asset.Asset) (string, error)
 	DeleteAsset(ctx context.Context, id string) error
-	DeleteAssets(ctx context.Context, queryExpr string, dryRun bool) (uint32, error)
+	DeleteAssets(ctx context.Context, request asset.DeleteAssetsRequest) (uint32, error)
 
 	GetLineage(ctx context.Context, urn string, query asset.LineageQuery) (asset.Lineage, error)
 	GetTypes(ctx context.Context, flt asset.Filter) (map[asset.Type]int, error)
@@ -309,16 +309,18 @@ func (server *APIServer) DeleteAsset(ctx context.Context, req *compassv1beta1.De
 
 func (server *APIServer) DeleteAssets(ctx context.Context, req *compassv1beta1.DeleteAssetsRequest) (*compassv1beta1.DeleteAssetsResponse, error) {
 	var affectedRows uint32
-	_, err := server.ValidateUserInCtx(ctx)
-	if err != nil {
+	if _, err := server.ValidateUserInCtx(ctx); err != nil {
 		return nil, err
 	}
 	defer func() {
-		server.logger.Warn("the number of affected rows is %d", affectedRows)
+		server.logger.Warn(fmt.Sprintf("the number of affected rows is %d. delete request: %v", affectedRows, req))
 	}()
 
-	server.logger.Warn("delete request: %v", req)
-	affectedRows, err = server.assetService.DeleteAssets(ctx, req.QueryExpr, req.DryRun)
+	deleteAssetsRequest := asset.DeleteAssetsRequest{
+		QueryExpr: req.QueryExpr,
+		DryRun:    req.DryRun,
+	}
+	affectedRows, err := server.assetService.DeleteAssets(ctx, deleteAssetsRequest)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}

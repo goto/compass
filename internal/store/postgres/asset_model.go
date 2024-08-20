@@ -14,20 +14,20 @@ import (
 )
 
 type AssetModel struct {
-	ID          string    `db:"id"`
-	URN         string    `db:"urn"`
-	Type        string    `db:"type"`
-	Name        string    `db:"name"`
-	Service     string    `db:"service"`
-	Description string    `db:"description"`
-	Data        JSONMap   `db:"data"`
-	URL         string    `db:"url"`
-	Labels      JSONMap   `db:"labels"`
-	Version     string    `db:"version"`
-	UpdatedBy   UserModel `db:"updated_by"`
-	CreatedAt   time.Time `db:"created_at"`
-	UpdatedAt   time.Time `db:"updated_at"`
-	RefreshedAt time.Time `db:"refreshed_at"`
+	ID          string     `db:"id"`
+	URN         string     `db:"urn"`
+	Type        string     `db:"type"`
+	Name        string     `db:"name"`
+	Service     string     `db:"service"`
+	Description string     `db:"description"`
+	Data        JSONMap    `db:"data"`
+	URL         string     `db:"url"`
+	Labels      JSONMap    `db:"labels"`
+	Version     string     `db:"version"`
+	UpdatedBy   UserModel  `db:"updated_by"`
+	CreatedAt   time.Time  `db:"created_at"`
+	UpdatedAt   time.Time  `db:"updated_at"`
+	RefreshedAt *time.Time `db:"refreshed_at"`
 	// version specific information
 	Changelog types.JSONText `db:"changelog"`
 	Owners    types.JSONText `db:"owners"`

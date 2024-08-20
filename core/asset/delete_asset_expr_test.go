@@ -1,10 +1,11 @@
-package queryexpr_test
+package asset_test
 
 import (
 	"errors"
 	"testing"
 
-	queryexpr "github.com/goto/compass/pkg/query_expr"
+	"github.com/goto/compass/core/asset"
+	"github.com/goto/compass/pkg/queryexpr"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -21,7 +22,7 @@ func TestDeleteAssetExpr_ToQuery(t *testing.T) {
 	}{
 		{
 			name: "convert to SQL query",
-			exprStr: queryexpr.DeleteAssetExpr{
+			exprStr: asset.DeleteAssetExpr{
 				ExprStr: &sqlExpr,
 			},
 			want:    "((name = 'John') OR (service NOT IN ('test1', 'test2', 'test3')))",
@@ -29,7 +30,7 @@ func TestDeleteAssetExpr_ToQuery(t *testing.T) {
 		},
 		{
 			name: "convert to ES query",
-			exprStr: queryexpr.DeleteAssetExpr{
+			exprStr: asset.DeleteAssetExpr{
 				ExprStr: &esExpr,
 			},
 			want:    `{"query":{"bool":{"should":[{"term":{"name":"John"}},{"bool":{"must_not":[{"terms":{"service":["test1","test2","test3"]}}]}}]}}}`,
@@ -37,7 +38,7 @@ func TestDeleteAssetExpr_ToQuery(t *testing.T) {
 		},
 		{
 			name: "got error due to wrong syntax",
-			exprStr: queryexpr.DeleteAssetExpr{
+			exprStr: asset.DeleteAssetExpr{
 				ExprStr: &wrongExpr,
 			},
 			want:    "",
@@ -46,7 +47,7 @@ func TestDeleteAssetExpr_ToQuery(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			d := queryexpr.DeleteAssetExpr{
+			d := asset.DeleteAssetExpr{
 				ExprStr: tt.exprStr,
 			}
 			got, err := d.ToQuery()
@@ -72,7 +73,7 @@ func TestDeleteAssetExpr_Validate(t *testing.T) {
 			name: "error get identifiers map",
 			exprStrFn: func() queryexpr.ExprStr {
 				wrongExpr := queryexpr.SQLExpr("findLast(")
-				return queryexpr.DeleteAssetExpr{
+				return asset.DeleteAssetExpr{
 					ExprStr: &wrongExpr,
 				}
 			},
@@ -83,7 +84,7 @@ func TestDeleteAssetExpr_Validate(t *testing.T) {
 			name: "error miss refreshed_at not exist",
 			exprStrFn: func() queryexpr.ExprStr {
 				missRefreshedAt := queryexpr.SQLExpr(`updated_at < "2023-12-12 23:59:59" && type == "table" && service in ["test1","test2","test3"]`)
-				return queryexpr.DeleteAssetExpr{
+				return asset.DeleteAssetExpr{
 					ExprStr: &missRefreshedAt,
 				}
 			},
@@ -94,7 +95,7 @@ func TestDeleteAssetExpr_Validate(t *testing.T) {
 			name: "error miss type not exist",
 			exprStrFn: func() queryexpr.ExprStr {
 				missType := queryexpr.SQLExpr(`refreshed_at < "2023-12-12 23:59:59" && service in ["test1","test2","test3"]`)
-				return queryexpr.DeleteAssetExpr{
+				return asset.DeleteAssetExpr{
 					ExprStr: &missType,
 				}
 			},
@@ -105,7 +106,7 @@ func TestDeleteAssetExpr_Validate(t *testing.T) {
 			name: "error miss service not exist",
 			exprStrFn: func() queryexpr.ExprStr {
 				missService := queryexpr.SQLExpr(`refreshed_at < "2023-12-12 23:59:59" && type == "table"`)
-				return queryexpr.DeleteAssetExpr{
+				return asset.DeleteAssetExpr{
 					ExprStr: &missService,
 				}
 			},
@@ -116,7 +117,7 @@ func TestDeleteAssetExpr_Validate(t *testing.T) {
 			name: "error wrong operator for type identifier",
 			exprStrFn: func() queryexpr.ExprStr {
 				wrongTypeOperator := queryexpr.SQLExpr(`refreshed_at < "2023-12-12 23:59:59" && type != "table" && service in ["test1","test2","test3"]`)
-				return queryexpr.DeleteAssetExpr{
+				return asset.DeleteAssetExpr{
 					ExprStr: &wrongTypeOperator,
 				}
 			},
@@ -127,7 +128,7 @@ func TestDeleteAssetExpr_Validate(t *testing.T) {
 			name: "error wrong operator for service identifier",
 			exprStrFn: func() queryexpr.ExprStr {
 				wrongServiceOperator := queryexpr.SQLExpr(`refreshed_at < "2023-12-12 23:59:59" && type != "table" && service not in ["test1","test2","test3"]`)
-				return queryexpr.DeleteAssetExpr{
+				return asset.DeleteAssetExpr{
 					ExprStr: &wrongServiceOperator,
 				}
 			},

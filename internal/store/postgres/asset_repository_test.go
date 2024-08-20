@@ -18,6 +18,7 @@ import (
 	"github.com/goto/compass/core/user"
 	"github.com/goto/compass/internal/store/postgres"
 	"github.com/goto/compass/internal/testutils"
+	"github.com/goto/compass/pkg/queryexpr"
 	"github.com/goto/salt/log"
 	"github.com/r3labs/diff/v2"
 	"github.com/stretchr/testify/suite"
@@ -976,13 +977,14 @@ func (r *AssetRepositoryTestSuite) TestVersions() {
 func (r *AssetRepositoryTestSuite) TestUpsert() {
 	r.Run("on insert", func() {
 		r.Run("set ID to asset and version to base version", func() {
+			currentTime := time.Now()
 			ast := asset.Asset{
 				URN:         "urn-u-1",
 				Type:        "table",
 				Service:     "bigquery",
 				URL:         "https://sample-url.com",
 				UpdatedBy:   r.users[0],
-				RefreshedAt: time.Now(),
+				RefreshedAt: &currentTime,
 			}
 			id, err := r.repository.Upsert(r.ctx, &ast)
 			r.Equal(asset.BaseVersion, ast.Version)
@@ -999,7 +1001,7 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 			r.assertAsset(&ast, &assetInDB)
 
 			ast2 := ast
-			ast2.RefreshedAt = time.Now()
+			ast2.RefreshedAt = &currentTime
 			ast2.Description = "create a new version" // to force fetch from asset_versions.
 			_, err = r.repository.Upsert(r.ctx, &ast2)
 			r.NoError(err)
@@ -1319,12 +1321,13 @@ func (r *AssetRepositoryTestSuite) TestDeleteByURN() {
 func (r *AssetRepositoryTestSuite) TestDeleteByQueryExpr() {
 	r.Run("should delete correct asset", func() {
 		currentTime := time.Now()
+		oneYearAgoTime := currentTime.AddDate(-1, 0, 0)
 		asset1 := asset.Asset{
 			URN:         "urn-del-1",
 			Type:        "table",
 			Service:     "bigquery",
 			UpdatedBy:   user.User{ID: defaultAssetUpdaterUserID},
-			RefreshedAt: currentTime.AddDate(-1, 0, 0),
+			RefreshedAt: &oneYearAgoTime,
 		}
 		asset2 := asset.Asset{
 			URN:         "urn-del-2",
@@ -1332,7 +1335,7 @@ func (r *AssetRepositoryTestSuite) TestDeleteByQueryExpr() {
 			Service:     "kafka",
 			Version:     asset.BaseVersion,
 			UpdatedBy:   user.User{ID: defaultAssetUpdaterUserID},
-			RefreshedAt: currentTime.AddDate(-1, 0, 0),
+			RefreshedAt: &oneYearAgoTime,
 		}
 
 		_, err := r.repository.Upsert(r.ctx, &asset1)
@@ -1341,10 +1344,14 @@ func (r *AssetRepositoryTestSuite) TestDeleteByQueryExpr() {
 		id, err := r.repository.Upsert(r.ctx, &asset2)
 		r.Require().NoError(err)
 
-		queryExpr := "refreshed_at <= '" + time.Now().Format("2006-01-02 15:04:05") +
+		query := "refreshed_at <= '" + currentTime.Format("2006-01-02 15:04:05") +
 			"' && service == '" + asset1.Service +
 			"' && type == '" + asset1.Type.String() +
 			"' && urn == '" + asset1.URN + "'"
+		sqlExpr := queryexpr.SQLExpr(query)
+		queryExpr := &asset.DeleteAssetExpr{
+			ExprStr: &sqlExpr,
+		}
 		urns, err := r.repository.DeleteByQueryExpr(r.ctx, queryExpr)
 		r.NoError(err)
 		r.Equal([]string{"urn-del-1"}, urns)
@@ -1963,13 +1970,13 @@ func (r *AssetRepositoryTestSuite) assertAsset(expectedAsset, actualAsset *asset
 	// sanitize time to make the assets comparable
 	expectedAsset.CreatedAt = time.Time{}
 	expectedAsset.UpdatedAt = time.Time{}
-	expectedAsset.RefreshedAt = time.Time{}
+	expectedAsset.RefreshedAt = &time.Time{}
 	expectedAsset.UpdatedBy.CreatedAt = time.Time{}
 	expectedAsset.UpdatedBy.UpdatedAt = time.Time{}
 
 	actualAsset.CreatedAt = time.Time{}
 	actualAsset.UpdatedAt = time.Time{}
-	actualAsset.RefreshedAt = time.Time{}
+	actualAsset.RefreshedAt = &time.Time{}
 	actualAsset.UpdatedBy.CreatedAt = time.Time{}
 	actualAsset.UpdatedBy.UpdatedAt = time.Time{}
 

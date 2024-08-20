@@ -110,23 +110,23 @@ func (_c *AssetService_DeleteAsset_Call) RunAndReturn(run func(context.Context, 
 	return _c
 }
 
-// DeleteAssets provides a mock function with given fields: ctx, queryExpr, dryRun
-func (_m *AssetService) DeleteAssets(ctx context.Context, queryExpr string, dryRun bool) (uint32, error) {
-	ret := _m.Called(ctx, queryExpr, dryRun)
+// DeleteAssets provides a mock function with given fields: ctx, request
+func (_m *AssetService) DeleteAssets(ctx context.Context, request asset.DeleteAssetsRequest) (uint32, error) {
+	ret := _m.Called(ctx, request)
 
 	var r0 uint32
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, bool) (uint32, error)); ok {
-		return rf(ctx, queryExpr, dryRun)
+	if rf, ok := ret.Get(0).(func(context.Context, asset.DeleteAssetsRequest) (uint32, error)); ok {
+		return rf(ctx, request)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, bool) uint32); ok {
-		r0 = rf(ctx, queryExpr, dryRun)
+	if rf, ok := ret.Get(0).(func(context.Context, asset.DeleteAssetsRequest) uint32); ok {
+		r0 = rf(ctx, request)
 	} else {
 		r0 = ret.Get(0).(uint32)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, bool) error); ok {
-		r1 = rf(ctx, queryExpr, dryRun)
+	if rf, ok := ret.Get(1).(func(context.Context, asset.DeleteAssetsRequest) error); ok {
+		r1 = rf(ctx, request)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -141,15 +141,14 @@ type AssetService_DeleteAssets_Call struct {
 
 // DeleteAssets is a helper method to define mock.On call
 //   - ctx context.Context
-//   - queryExpr string
-//   - dryRun bool
-func (_e *AssetService_Expecter) DeleteAssets(ctx interface{}, queryExpr interface{}, dryRun interface{}) *AssetService_DeleteAssets_Call {
-	return &AssetService_DeleteAssets_Call{Call: _e.mock.On("DeleteAssets", ctx, queryExpr, dryRun)}
+//   - request asset.DeleteAssetsRequest
+func (_e *AssetService_Expecter) DeleteAssets(ctx interface{}, request interface{}) *AssetService_DeleteAssets_Call {
+	return &AssetService_DeleteAssets_Call{Call: _e.mock.On("DeleteAssets", ctx, request)}
 }
 
-func (_c *AssetService_DeleteAssets_Call) Run(run func(ctx context.Context, queryExpr string, dryRun bool)) *AssetService_DeleteAssets_Call {
+func (_c *AssetService_DeleteAssets_Call) Run(run func(ctx context.Context, request asset.DeleteAssetsRequest)) *AssetService_DeleteAssets_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(bool))
+		run(args[0].(context.Context), args[1].(asset.DeleteAssetsRequest))
 	})
 	return _c
 }
@@ -159,7 +158,7 @@ func (_c *AssetService_DeleteAssets_Call) Return(_a0 uint32, _a1 error) *AssetSe
 	return _c
 }
 
-func (_c *AssetService_DeleteAssets_Call) RunAndReturn(run func(context.Context, string, bool) (uint32, error)) *AssetService_DeleteAssets_Call {
+func (_c *AssetService_DeleteAssets_Call) RunAndReturn(run func(context.Context, asset.DeleteAssetsRequest) (uint32, error)) *AssetService_DeleteAssets_Call {
 	_c.Call.Return(run)
 	return _c
 }

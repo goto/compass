@@ -66,13 +66,13 @@ func (_c *DiscoveryRepository_DeleteByID_Call) RunAndReturn(run func(context.Con
 	return _c
 }
 
-// DeleteByQueryExpr provides a mock function with given fields: ctx, filterQuery
-func (_m *DiscoveryRepository) DeleteByQueryExpr(ctx context.Context, filterQuery string) error {
-	ret := _m.Called(ctx, filterQuery)
+// DeleteByQueryExpr provides a mock function with given fields: ctx, queryExpr
+func (_m *DiscoveryRepository) DeleteByQueryExpr(ctx context.Context, queryExpr string) error {
+	ret := _m.Called(ctx, queryExpr)
 
 	var r0 error
 	if rf, ok := ret.Get(0).(func(context.Context, string) error); ok {
-		r0 = rf(ctx, filterQuery)
+		r0 = rf(ctx, queryExpr)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -87,12 +87,12 @@ type DiscoveryRepository_DeleteByQueryExpr_Call struct {
 
 // DeleteByQueryExpr is a helper method to define mock.On call
 //   - ctx context.Context
-//   - filterQuery string
-func (_e *DiscoveryRepository_Expecter) DeleteByQueryExpr(ctx interface{}, filterQuery interface{}) *DiscoveryRepository_DeleteByQueryExpr_Call {
-	return &DiscoveryRepository_DeleteByQueryExpr_Call{Call: _e.mock.On("DeleteByQueryExpr", ctx, filterQuery)}
+//   - queryExpr string
+func (_e *DiscoveryRepository_Expecter) DeleteByQueryExpr(ctx interface{}, queryExpr interface{}) *DiscoveryRepository_DeleteByQueryExpr_Call {
+	return &DiscoveryRepository_DeleteByQueryExpr_Call{Call: _e.mock.On("DeleteByQueryExpr", ctx, queryExpr)}
 }
 
-func (_c *DiscoveryRepository_DeleteByQueryExpr_Call) Run(run func(ctx context.Context, filterQuery string)) *DiscoveryRepository_DeleteByQueryExpr_Call {
+func (_c *DiscoveryRepository_DeleteByQueryExpr_Call) Run(run func(ctx context.Context, queryExpr string)) *DiscoveryRepository_DeleteByQueryExpr_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(context.Context), args[1].(string))
 	})

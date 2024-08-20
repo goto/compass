@@ -1,8 +1,8 @@
 package workermanager
 
 const (
-	JobIndexAsset          = "index-asset"
-	JobDeleteAsset         = "delete-asset"
-	JobDeleteAssetsByQuery = "delete-assets-by-query"
-	JobSyncAsset           = "sync-asset"
+	jobIndexAsset          = "index-asset"
+	jobDeleteAsset         = "delete-asset"
+	jobDeleteAssetsByQuery = "delete-assets-by-query"
+	jobSyncAsset           = "sync-asset"
 )

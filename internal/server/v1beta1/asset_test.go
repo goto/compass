@@ -985,11 +985,13 @@ func TestDeleteAsset(t *testing.T) {
 
 func TestDeleteAssets(t *testing.T) {
 	var (
-		userID                                = uuid.NewString()
-		userUUID                              = uuid.NewString()
-		emptyQueryExpr                        = ""
-		notMeetIdentifierRequirementQueryExpr = `refreshed_at < now()`
-		successfulQueryExpr                   = `refreshed_at <= "2023-12-12 23:59:59" && service in ["service-1", "service-2"] && type == "table"`
+		userID       = uuid.NewString()
+		userUUID     = uuid.NewString()
+		dummyQuery   = "testing < now()"
+		dummyRequest = asset.DeleteAssetsRequest{
+			QueryExpr: dummyQuery,
+			DryRun:    false,
+		}
 	)
 	type TestCase struct {
 		Description  string
@@ -1003,43 +1005,33 @@ func TestDeleteAssets(t *testing.T) {
 	testCases := []TestCase{
 		{
 			Description:  "should return error when insert empty query expr",
-			QueryExpr:    emptyQueryExpr,
+			QueryExpr:    dummyQuery,
 			DryRun:       false,
 			ExpectStatus: codes.InvalidArgument,
 			ExpectResult: nil,
 			Setup: func(ctx context.Context, as *mocks.AssetService, astID string) {
-				as.EXPECT().DeleteAssets(ctx, emptyQueryExpr, false).Return(0, errors.New("error"))
+				as.EXPECT().DeleteAssets(ctx, dummyRequest).Return(0, errors.New("error"))
 			},
 		},
 		{
 			Description:  "should return error when query expr does not meet identifier requirement",
-			QueryExpr:    notMeetIdentifierRequirementQueryExpr,
+			QueryExpr:    dummyQuery,
 			DryRun:       false,
 			ExpectStatus: codes.InvalidArgument,
 			ExpectResult: nil,
 			Setup: func(ctx context.Context, as *mocks.AssetService, astID string) {
-				as.EXPECT().DeleteAssets(ctx, notMeetIdentifierRequirementQueryExpr, false).
+				as.EXPECT().DeleteAssets(ctx, dummyRequest).
 					Return(0, errors.New("must exist these identifiers: refreshed_at, type, and service. Current identifiers: refreshed_at"))
 			},
 		},
 		{
-			Description:  `should only return the numbers of assets that match the given query if dry run is true`,
-			QueryExpr:    successfulQueryExpr,
-			DryRun:       true,
+			Description:  `should only return the numbers of assets that match the given query`,
+			QueryExpr:    dummyQuery,
+			DryRun:       false,
 			ExpectStatus: codes.OK,
 			ExpectResult: &compassv1beta1.DeleteAssetsResponse{AffectedRows: 11},
 			Setup: func(ctx context.Context, as *mocks.AssetService, astID string) {
-				as.EXPECT().DeleteAssets(ctx, successfulQueryExpr, true).Return(11, nil)
-			},
-		},
-		{
-			Description:  `should return the affected rows numbers and perform deletion in the background if dry run is false`,
-			QueryExpr:    successfulQueryExpr,
-			DryRun:       false,
-			ExpectStatus: codes.OK,
-			ExpectResult: &compassv1beta1.DeleteAssetsResponse{AffectedRows: 2},
-			Setup: func(ctx context.Context, as *mocks.AssetService, astID string) {
-				as.EXPECT().DeleteAssets(ctx, successfulQueryExpr, false).Return(2, nil)
+				as.EXPECT().DeleteAssets(ctx, dummyRequest).Return(11, nil)
 			},
 		},
 	}

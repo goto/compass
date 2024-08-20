@@ -3,7 +3,7 @@ package queryexpr_test
 import (
 	"testing"
 
-	queryexpr "github.com/goto/compass/pkg/query_expr"
+	"github.com/goto/compass/pkg/queryexpr"
 )
 
 func TestESExpr_String(t *testing.T) {

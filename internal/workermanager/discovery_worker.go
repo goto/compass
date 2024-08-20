@@ -4,10 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
-
 	"github.com/goto/compass/core/asset"
 	"github.com/goto/compass/pkg/worker"
+	"strings"
 )
 
 //go:generate mockery --name=DiscoveryRepository -r --case underscore --with-expecter --structname DiscoveryRepository --filename discovery_repository_mock.go --output=./mocks
@@ -26,7 +25,7 @@ func (m *Manager) EnqueueIndexAssetJob(ctx context.Context, ast asset.Asset) err
 	}
 
 	err = m.worker.Enqueue(ctx, worker.JobSpec{
-		Type:    JobIndexAsset,
+		Type:    jobIndexAsset,
 		Payload: payload,
 	})
 	if err != nil {
@@ -128,7 +127,7 @@ func (m *Manager) SyncAssets(ctx context.Context, job worker.JobSpec) error {
 
 func (m *Manager) EnqueueDeleteAssetJob(ctx context.Context, urn string) error {
 	err := m.worker.Enqueue(ctx, worker.JobSpec{
-		Type:    JobDeleteAsset,
+		Type:    jobDeleteAsset,
 		Payload: ([]byte)(urn),
 	})
 	if err != nil {
@@ -161,7 +160,7 @@ func (m *Manager) DeleteAsset(ctx context.Context, job worker.JobSpec) error {
 
 func (m *Manager) EnqueueDeleteAssetsByQueryExprJob(ctx context.Context, queryExpr string) error {
 	err := m.worker.Enqueue(ctx, worker.JobSpec{
-		Type:    JobDeleteAssetsByQuery,
+		Type:    jobDeleteAssetsByQuery,
 		Payload: ([]byte)(queryExpr),
 	})
 	if err != nil {
@@ -194,7 +193,7 @@ func (m *Manager) DeleteAssetsByQueryExpr(ctx context.Context, job worker.JobSpe
 
 func (m *Manager) EnqueueSyncAssetJob(ctx context.Context, service string) error {
 	err := m.worker.Enqueue(ctx, worker.JobSpec{
-		Type:    JobSyncAsset,
+		Type:    jobSyncAsset,
 		Payload: ([]byte)(service),
 	})
 	if err != nil {

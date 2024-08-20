@@ -7,15 +7,18 @@ import (
 	"github.com/expr-lang/expr/ast"
 )
 
+var KeywordIdentifiers = [...]string{"service"}
+
+// TODO: Consider not to be pointer
 type ESExpr string
 
 func (e *ESExpr) String() string {
 	return string(*e)
 }
 
-// ToQuery default
+// ToQuery default: convert to be Elasticsearch query
 func (e *ESExpr) ToQuery() (string, error) {
-	queryExprParsed, err := GetTreeNodeFromQueryExpr(e.String())
+	queryExprParsed, err := getTreeNodeFromQueryExpr(e.String())
 	if err != nil {
 		return "", err
 	}
@@ -30,7 +33,6 @@ func (e *ESExpr) ToQuery() (string, error) {
 	}
 	esQuery = map[string]interface{}{"query": esQuery}
 
-	// Convert to JSON
 	queryJSON, err := json.Marshal(esQuery)
 	if err != nil {
 		return "", err
@@ -56,6 +58,9 @@ func (e *ESExpr) translateToEsQuery(node ast.Node) (interface{}, error) {
 	case *ast.NilNode:
 		return nil, nil
 	case *ast.IdentifierNode:
+		if e.isKeywordIdentifier(n) {
+			return fmt.Sprintf("%s.keyword", n.Value), nil
+		}
 		return n.Value, nil
 	case *ast.IntegerNode:
 		return n.Value, nil
@@ -146,6 +151,15 @@ func (e *ESExpr) binaryNodeToEsQuery(n *ast.BinaryNode) (interface{}, error) { /
 		}
 		return result, nil
 	}
+}
+
+func (*ESExpr) isKeywordIdentifier(node *ast.IdentifierNode) bool {
+	for _, keyword := range KeywordIdentifiers {
+		if node.Value == keyword {
+			return true
+		}
+	}
+	return false
 }
 
 func (e *ESExpr) unaryNodeToEsQuery(n *ast.UnaryNode) (interface{}, error) {

@@ -1,0 +1,68 @@
+package asset
+
+import (
+	"fmt"
+	"strings"
+
+	generichelper "github.com/goto/compass/pkg/generic_helper"
+	"github.com/goto/compass/pkg/queryexpr"
+)
+
+var assetJSONTagsSchema = generichelper.GetJSONTags(Asset{})
+
+type DeleteAssetExpr struct {
+	queryexpr.ExprStr
+}
+
+func (d DeleteAssetExpr) ToQuery() (string, error) {
+	return d.ExprStr.ToQuery()
+}
+
+func (d DeleteAssetExpr) Validate() error {
+	identifiersWithOperator, err := queryexpr.GetIdentifiersMap(d.ExprStr.String())
+	if err != nil {
+		return err
+	}
+
+	if err := d.isRequiredIdentifiersExist(identifiersWithOperator); err != nil {
+		return err
+	}
+
+	if err := d.isUsingRightOperator(identifiersWithOperator); err != nil {
+		return err
+	}
+
+	return d.isAllIdentifiersExistInStruct(identifiersWithOperator)
+}
+
+func (DeleteAssetExpr) isAllIdentifiersExistInStruct(identifiersWithOperator map[string]string) error {
+	identifiers := generichelper.GetMapKeys(identifiersWithOperator)
+	for _, identifier := range identifiers {
+		isFieldValid := generichelper.Contains(assetJSONTagsSchema, identifier)
+		if !isFieldValid {
+			return fmt.Errorf("%s is not a valid identifier", identifier)
+		}
+	}
+	return nil
+}
+
+func (DeleteAssetExpr) isUsingRightOperator(identifiersWithOperator map[string]string) error {
+	isOperatorEqualsOrIn := func(jsonTag string) bool {
+		return identifiersWithOperator[jsonTag] == "==" || strings.ToUpper(identifiersWithOperator[jsonTag]) == "IN"
+	}
+	if !isOperatorEqualsOrIn("type") || !isOperatorEqualsOrIn("service") {
+		return fmt.Errorf("identifier type and service must be equals (==) or IN operator")
+	}
+	return nil
+}
+
+func (DeleteAssetExpr) isRequiredIdentifiersExist(identifiersWithOperator map[string]string) error {
+	isExist := func(jsonTag string) bool {
+		return identifiersWithOperator[jsonTag] != ""
+	}
+	mustExist := isExist("refreshed_at") && isExist("type") && isExist("service")
+	if !mustExist {
+		return fmt.Errorf("must exists these identifiers: refreshed_at, type, and service")
+	}
+	return nil
+}

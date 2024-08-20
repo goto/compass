@@ -33,7 +33,7 @@ func TestManager_EnqueueIndexAssetJob(t *testing.T) {
 			wrkr := mocks.NewWorker(t)
 			wrkr.EXPECT().
 				Enqueue(ctx, worker.JobSpec{
-					Type:    workermanager.JobIndexAsset,
+					Type:    "index-asset",
 					Payload: testutils.Marshal(t, sampleAsset),
 				}).
 				Return(tc.enqueueErr)
@@ -75,7 +75,7 @@ func TestManager_IndexAsset(t *testing.T) {
 				DiscoveryRepo: discoveryRepo,
 			})
 			err := mgr.IndexAsset(ctx, worker.JobSpec{
-				Type:    workermanager.JobIndexAsset,
+				Type:    "index-asset",
 				Payload: testutils.Marshal(t, sampleAsset),
 			})
 			if tc.expectedErr {
@@ -107,7 +107,7 @@ func TestManager_EnqueueDeleteAssetJob(t *testing.T) {
 			wrkr := mocks.NewWorker(t)
 			wrkr.EXPECT().
 				Enqueue(ctx, worker.JobSpec{
-					Type:    workermanager.JobDeleteAsset,
+					Type:    "delete-asset",
 					Payload: []byte("some-urn"),
 				}).
 				Return(tc.enqueueErr)
@@ -147,7 +147,7 @@ func TestManager_DeleteAsset(t *testing.T) {
 				DiscoveryRepo: discoveryRepo,
 			})
 			err := mgr.DeleteAsset(ctx, worker.JobSpec{
-				Type:    workermanager.JobDeleteAsset,
+				Type:    "delete-asset",
 				Payload: []byte("some-urn"),
 			})
 			if tc.expectedErr {
@@ -183,7 +183,7 @@ func TestManager_EnqueueDeleteAssetsByQueryExprJob(t *testing.T) {
 			wrkr := mocks.NewWorker(t)
 			wrkr.EXPECT().
 				Enqueue(ctx, worker.JobSpec{
-					Type:    workermanager.JobDeleteAssetsByQuery,
+					Type:    "delete-assets-by-query",
 					Payload: []byte(queryExpr),
 				}).
 				Return(tc.enqueueErr)
@@ -227,7 +227,7 @@ func TestManager_DeleteAssets(t *testing.T) {
 				DiscoveryRepo: discoveryRepo,
 			})
 			err := mgr.DeleteAssetsByQueryExpr(ctx, worker.JobSpec{
-				Type:    workermanager.JobDeleteAssetsByQuery,
+				Type:    "delete-assets-by-query",
 				Payload: []byte(queryExpr),
 			})
 			if tc.expectedErr {

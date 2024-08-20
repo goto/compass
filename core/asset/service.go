@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"sync"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/goto/compass/pkg/queryexpr"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
@@ -87,8 +87,8 @@ func (s *Service) UpsertAsset(ctx context.Context, ast *Asset, upstreams, downst
 }
 
 func (s *Service) UpsertAssetWithoutLineage(ctx context.Context, ast *Asset) (string, error) {
-	// Update the asset in both postgresql and elasticsearch for each upsert
-	ast.RefreshedAt = time.Now()
+	currentTime := time.Now()
+	ast.RefreshedAt = &currentTime
 
 	assetID, err := s.assetRepository.Upsert(ctx, ast)
 	if err != nil {
@@ -129,46 +129,41 @@ func (s *Service) DeleteAsset(ctx context.Context, id string) (err error) {
 	return s.lineageRepository.DeleteByURN(ctx, urn)
 }
 
-func (s *Service) DeleteAssets(ctx context.Context, queryExpr string, dryRun bool) (affectedRows uint32, err error) {
-	var wg sync.WaitGroup
-	var urns []string
-	dbErrChan := make(chan error, 1)
-
-	total, err := s.assetRepository.GetCountByQueryExpr(ctx, queryExpr, true)
+func (s *Service) DeleteAssets(ctx context.Context, request DeleteAssetsRequest) (affectedRows uint32, err error) {
+	expr := queryexpr.SQLExpr(request.QueryExpr)
+	deleteExpr := &DeleteAssetExpr{
+		ExprStr: &expr,
+	}
+	total, err := s.assetRepository.GetCountByQueryExpr(ctx, deleteExpr)
 	if err != nil {
 		return 0, err
 	}
 
-	if dryRun {
+	if request.DryRun {
 		return uint32(total), nil
 	}
 
-	s.deleteAssetsAsynchronously(&wg, queryExpr, urns, dbErrChan)
+	s.deleteAssetsAsynchronously(request.QueryExpr)
 
 	return uint32(total), nil
 }
 
-func (s *Service) deleteAssetsAsynchronously(wg *sync.WaitGroup, queryExpr string, urns []string, dbErrChan chan error) {
-	// Perform the Assets deletion asynchronously
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		urnsDeleted, err := s.assetRepository.DeleteByQueryExpr(context.Background(), queryExpr)
-		urns = urnsDeleted
-		dbErrChan <- err
-		close(dbErrChan)
-	}()
+func (s *Service) deleteAssetsAsynchronously(queryExpr string) {
+	expr := queryexpr.SQLExpr(queryExpr)
+	deleteExpr := DeleteAssetExpr{
+		ExprStr: &expr,
+	}
 
-	// Perform Elasticsearch and Lineage deletion asynchronously if the Assets deletion is successful
-	wg.Add(1)
 	go func() {
-		defer wg.Done()
-		dbErr := <-dbErrChan
-		if dbErr == nil {
-			go s.deleteAssetsInElasticsearchByQueryExpr(queryExpr)
-			go s.deleteAssetsInLineageByQueryExpr(urns)
+		urnsDeleted, err := s.assetRepository.DeleteByQueryExpr(context.Background(), deleteExpr)
+
+		// Perform Elasticsearch and Lineage deletion asynchronously ONLY IF the Assets deletion is successful
+		if err == nil {
+			go s.deleteAssetsInLineageByQueryExpr(urnsDeleted)
+			s.deleteAssetsInElasticsearchByQueryExpr(queryExpr)
 		} else {
-			log.Printf("Database deletion failed, skipping Elasticsearch and Lineage deletions: %s", dbErr)
+			// TODO: need to reconsider how to properly handle error
+			log.Printf("Database deletion failed, skipping Elasticsearch and Lineage deletions. Err: %v", err)
 		}
 	}()
 }

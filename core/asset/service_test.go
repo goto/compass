@@ -446,13 +446,13 @@ func TestService_DeleteAsset(t *testing.T) {
 }
 
 func TestService_DeleteAssets(t *testing.T) {
-	emptyQueryExpr := ""
-	notMeetIdentifierRequirementQueryExpr := `refreshed_at < now()`
-	successfulQueryExpr := `refreshed_at <= "2023-12-12 23:59:59" && service in ["service-1", "service-2"] && type == "table"`
+	dummyRequest := asset.DeleteAssetsRequest{
+		QueryExpr: `testing < now()`,
+		DryRun:    false,
+	}
 	type testCase struct {
 		Description        string
-		QueryExpr          string
-		DryRun             bool
+		Request            asset.DeleteAssetsRequest
 		Setup              func(context.Context, *mocks.AssetRepository, *mocks.DiscoveryRepository, *mocks.LineageRepository)
 		ExpectAffectedRows uint32
 		ExpectErr          error
@@ -460,32 +460,20 @@ func TestService_DeleteAssets(t *testing.T) {
 
 	testCases := []testCase{
 		{
-			Description: `should return error if query expr is empty`,
-			QueryExpr:   emptyQueryExpr,
-			DryRun:      false,
+			Description: `should return error if query expr not valid`,
+			Request:     dummyRequest,
 			Setup: func(ctx context.Context, ar *mocks.AssetRepository, _ *mocks.DiscoveryRepository, _ *mocks.LineageRepository) {
-				ar.EXPECT().GetCountByQueryExpr(ctx, emptyQueryExpr, true).Return(0, errors.New("error"))
+				ar.EXPECT().GetCountByQueryExpr(ctx, mock.AnythingOfType("*asset.DeleteAssetExpr")).
+					Return(0, errors.New("something wrong"))
 			},
 			ExpectAffectedRows: 0,
-			ExpectErr:          errors.New("error"),
+			ExpectErr:          errors.New("something wrong"),
 		},
 		{
-			Description: `should return error if query expr does not meet identifier requirement`,
-			QueryExpr:   notMeetIdentifierRequirementQueryExpr,
-			DryRun:      false,
+			Description: `should only return the numbers of assets that match the given query`,
+			Request:     dummyRequest,
 			Setup: func(ctx context.Context, ar *mocks.AssetRepository, _ *mocks.DiscoveryRepository, _ *mocks.LineageRepository) {
-				ar.EXPECT().GetCountByQueryExpr(ctx, notMeetIdentifierRequirementQueryExpr, true).
-					Return(0, errors.New("must exist these identifiers: refreshed_at, type, and service. Current identifiers: refreshed_at"))
-			},
-			ExpectAffectedRows: 0,
-			ExpectErr:          errors.New("must exist these identifiers: refreshed_at, type, and service. Current identifiers: refreshed_at"),
-		},
-		{
-			Description: `should only return the numbers of assets that match the given query if dry run is true`,
-			QueryExpr:   successfulQueryExpr,
-			DryRun:      true,
-			Setup: func(ctx context.Context, ar *mocks.AssetRepository, _ *mocks.DiscoveryRepository, _ *mocks.LineageRepository) {
-				ar.EXPECT().GetCountByQueryExpr(ctx, successfulQueryExpr, true).Return(11, nil)
+				ar.EXPECT().GetCountByQueryExpr(ctx, mock.AnythingOfType("*asset.DeleteAssetExpr")).Return(11, nil)
 			},
 			ExpectAffectedRows: 11,
 			ExpectErr:          nil,
@@ -509,7 +497,7 @@ func TestService_DeleteAssets(t *testing.T) {
 				Worker:        workermanager.NewInSituWorker(workermanager.Deps{DiscoveryRepo: discoveryRepo}),
 			})
 
-			affectedRows, err := svc.DeleteAssets(ctx, tc.QueryExpr, tc.DryRun)
+			affectedRows, err := svc.DeleteAssets(ctx, tc.Request)
 
 			if tc.ExpectErr != nil {
 				assert.ErrorContains(t, err, tc.ExpectErr.Error())

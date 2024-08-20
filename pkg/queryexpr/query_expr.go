@@ -59,7 +59,7 @@ func (s *ExprVisitor) Visit(node *ast.Node) { //nolint:gocritic
 }
 
 func GetIdentifiersMap(queryExpr string) (map[string]string, error) {
-	queryExprParsed, err := GetTreeNodeFromQueryExpr(queryExpr)
+	queryExprParsed, err := getTreeNodeFromQueryExpr(queryExpr)
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +68,7 @@ func GetIdentifiersMap(queryExpr string) (map[string]string, error) {
 	return queryExprVisitor.IdentifiersWithOperator, nil
 }
 
-func GetTreeNodeFromQueryExpr(queryExpr string) (ast.Node, error) {
+func getTreeNodeFromQueryExpr(queryExpr string) (ast.Node, error) {
 	parsed, err := parser.Parse(queryExpr)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing expression: %w", err)
