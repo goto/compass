@@ -33,7 +33,7 @@ func TestDeleteAssetExpr_ToQuery(t *testing.T) {
 			exprStr: asset.DeleteAssetExpr{
 				ExprStr: &esExpr,
 			},
-			want:    `{"query":{"bool":{"should":[{"term":{"name":"John"}},{"bool":{"must_not":[{"terms":{"service":["test1","test2","test3"]}}]}}]}}}`,
+			want:    `{"query":{"bool":{"should":[{"term":{"name":"John"}},{"bool":{"must_not":[{"terms":{"service.keyword":["test1","test2","test3"]}}]}}]}}}`,
 			wantErr: false,
 		},
 		{

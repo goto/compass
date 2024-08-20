@@ -614,14 +614,20 @@ func (r *AssetRepository) update(ctx context.Context, assetID string, newAsset, 
 		return asset.InvalidError{AssetID: assetID}
 	}
 
+	currentTime := time.Now()
+	if newAsset.RefreshedAt != nil {
+		currentTime = *newAsset.RefreshedAt
+	}
+
 	if len(clog) == 0 {
-		if newAsset.RefreshedAt != oldAsset.RefreshedAt {
-			return r.client.RunWithinTx(ctx, func(tx *sqlx.Tx) error {
-				return r.updateAsset(ctx, tx, assetID, newAsset)
-			})
+		if newAsset.RefreshedAt == nil || newAsset.RefreshedAt == oldAsset.RefreshedAt {
+			return nil
 		}
 
-		return nil
+		return r.client.RunWithinTx(ctx, func(tx *sqlx.Tx) error {
+			newAsset.RefreshedAt = &currentTime
+			return r.updateAsset(ctx, tx, assetID, newAsset)
+		})
 	}
 
 	return r.client.RunWithinTx(ctx, func(tx *sqlx.Tx) error {
@@ -632,7 +638,8 @@ func (r *AssetRepository) update(ctx context.Context, assetID string, newAsset, 
 		}
 		newAsset.Version = newVersion
 		newAsset.ID = oldAsset.ID
-		newAsset.UpdatedAt = *newAsset.RefreshedAt // current time
+		newAsset.UpdatedAt = currentTime
+		newAsset.RefreshedAt = &currentTime
 
 		if err := r.updateAsset(ctx, tx, assetID, newAsset); err != nil {
 			return err
@@ -661,10 +668,6 @@ func (r *AssetRepository) update(ctx context.Context, assetID string, newAsset, 
 }
 
 func (r *AssetRepository) updateAsset(ctx context.Context, tx *sqlx.Tx, assetID string, newAsset *asset.Asset) error {
-	currentTime := time.Now()
-	if newAsset.RefreshedAt != nil {
-		currentTime = *newAsset.RefreshedAt
-	}
 	query, args, err := sq.Update("assets").
 		Set("urn", newAsset.URN).
 		Set("type", newAsset.Type).
@@ -675,7 +678,7 @@ func (r *AssetRepository) updateAsset(ctx context.Context, tx *sqlx.Tx, assetID 
 		Set("url", newAsset.URL).
 		Set("labels", newAsset.Labels).
 		Set("updated_at", newAsset.UpdatedAt).
-		Set("refreshed_at", currentTime).
+		Set("refreshed_at", *newAsset.RefreshedAt).
 		Set("updated_by", newAsset.UpdatedBy.ID).
 		Set("version", newAsset.Version).
 		Where(sq.Eq{"id": assetID}).

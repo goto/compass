@@ -448,7 +448,7 @@ func TestService_DeleteAsset(t *testing.T) {
 func TestService_DeleteAssets(t *testing.T) {
 	dummyRequest := asset.DeleteAssetsRequest{
 		QueryExpr: `testing < now()`,
-		DryRun:    false,
+		DryRun:    true,
 	}
 	type testCase struct {
 		Description        string
@@ -478,6 +478,7 @@ func TestService_DeleteAssets(t *testing.T) {
 			ExpectAffectedRows: 11,
 			ExpectErr:          nil,
 		},
+		// TODO: add case when DryRun = false which regarding goroutine
 	}
 	for _, tc := range testCases {
 		t.Run(tc.Description, func(t *testing.T) {

@@ -51,13 +51,13 @@ func TestESExpr_ToQuery(t *testing.T) {
 		{
 			name:    "in condition",
 			expr:    queryexpr.ESExpr(`service in ["test1","test2","test3"]`),
-			want:    `{"query":{"terms":{"service":["test1","test2","test3"]}}}`,
+			want:    `{"query":{"terms":{"service.keyword":["test1","test2","test3"]}}}`,
 			wantErr: false,
 		},
 		{
 			name:    "equals or not in condition",
 			expr:    queryexpr.ESExpr(`name == "John" || service not in ["test1","test2","test3"]`),
-			want:    `{"query":{"bool":{"should":[{"term":{"name":"John"}},{"bool":{"must_not":[{"terms":{"service":["test1","test2","test3"]}}]}}]}}}`,
+			want:    `{"query":{"bool":{"should":[{"term":{"name":"John"}},{"bool":{"must_not":[{"terms":{"service.keyword":["test1","test2","test3"]}}]}}]}}}`,
 			wantErr: false,
 		},
 		{

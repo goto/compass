@@ -415,12 +415,13 @@ func TestDiscoveryRepositoryDeleteByQueryExpr(t *testing.T) {
 	})
 
 	t.Run("should not return error on success", func(t *testing.T) {
+		currentTime := time.Now().UTC()
 		ast := asset.Asset{
 			ID:          "delete-id",
 			Type:        asset.TypeTable,
 			Service:     bigqueryService,
 			URN:         "some-urn",
-			RefreshedAt: time.Now(),
+			RefreshedAt: &currentTime,
 		}
 
 		err = repo.Upsert(ctx, ast)
@@ -461,14 +462,14 @@ func TestDiscoveryRepositoryDeleteByQueryExpr(t *testing.T) {
 			Type:        asset.TypeTable,
 			Service:     bigqueryService,
 			URN:         "urn1",
-			RefreshedAt: currentTime,
+			RefreshedAt: &currentTime,
 		}
 		ast2 := asset.Asset{
 			ID:          "id2",
 			Type:        asset.TypeTopic,
 			Service:     kafkaService,
 			URN:         "urn2",
-			RefreshedAt: currentTime,
+			RefreshedAt: &currentTime,
 		}
 		cli, err := esTestServer.NewClient()
 		require.NoError(t, err)

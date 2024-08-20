@@ -705,13 +705,15 @@ func (r *AssetRepositoryTestSuite) TestGetByURN() {
 }
 
 func (r *AssetRepositoryTestSuite) TestVersions() {
+	currentTime := time.Now().UTC()
 	assetURN := uuid.NewString() + "urn-u-2-version"
 	// v0.1
 	astVersioning := asset.Asset{
-		URN:       assetURN,
-		Type:      "table",
-		Service:   "bigquery",
-		UpdatedBy: r.users[1],
+		URN:         assetURN,
+		Type:        "table",
+		Service:     "bigquery",
+		UpdatedBy:   r.users[1],
+		RefreshedAt: &currentTime,
 	}
 
 	id, err := r.repository.Upsert(r.ctx, &astVersioning)
@@ -767,6 +769,7 @@ func (r *AssetRepositoryTestSuite) TestVersions() {
 			Labels:      map[string]string{"key1": "value1"},
 			Version:     "0.5",
 			UpdatedBy:   r.users[1],
+			RefreshedAt: &currentTime,
 		}
 
 		ast, err := r.repository.GetByID(r.ctx, astVersioning.ID)
@@ -797,6 +800,7 @@ func (r *AssetRepositoryTestSuite) TestVersions() {
 			Labels:      map[string]string{"key1": "value1"},
 			Version:     "0.5",
 			UpdatedBy:   r.users[1],
+			RefreshedAt: &currentTime,
 		}
 
 		ast, err := r.repository.GetByVersionWithID(r.ctx, astVersioning.ID, "0.5")
@@ -1066,11 +1070,14 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 
 	r.Run("on update", func() {
 		r.Run("should not create nor updating the asset if asset is identical", func() {
+			currentTime := time.Now().UTC()
 			ast := asset.Asset{
-				URN:       "urn-u-2",
-				Type:      "table",
-				Service:   "bigquery",
-				UpdatedBy: r.users[0],
+				URN:         "urn-u-2",
+				Type:        "table",
+				Service:     "bigquery",
+				UpdatedBy:   r.users[0],
+				RefreshedAt: &currentTime,
+				Version:     "0.1",
 			}
 			identicalAsset := ast
 
@@ -1085,15 +1092,52 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 			identicalAsset.ID = id
 
 			r.Equal(ast.ID, identicalAsset.ID)
+			r.Equal(ast.Version, identicalAsset.Version)
 		})
 
-		r.Run("should update the asset if asset is not identical", func() {
+		r.Run("should same asset version if asset only has different in RefreshedAt", func() {
+			currentTime := time.Now().UTC().AddDate(0, 0, -1)
+			ast := asset.Asset{
+				URN:         "urn-u-2",
+				Type:        "table",
+				Service:     "bigquery",
+				URL:         "https://sample-url-old.com",
+				UpdatedBy:   r.users[0],
+				RefreshedAt: &currentTime,
+				Version:     "0.1",
+			}
+
+			id, err := r.repository.Upsert(r.ctx, &ast)
+			r.Require().NoError(err)
+			r.NotEmpty(id)
+			ast.ID = id
+
+			updated := ast
+			currentTime2 := time.Now().UTC()
+			updated.RefreshedAt = &currentTime2
+
+			id, err = r.repository.Upsert(r.ctx, &updated)
+			r.Require().NoError(err)
+			r.NotEmpty(id)
+			updated.ID = id
+
+			r.Equal(ast.ID, updated.ID)
+
+			actual, err := r.repository.GetByID(r.ctx, ast.ID)
+			r.NoError(err)
+
+			r.Equal(updated.RefreshedAt, actual.RefreshedAt)
+			r.Equal(ast.Version, actual.Version)
+		})
+
+		r.Run("should update the asset version if asset is not identical", func() {
 			ast := asset.Asset{
 				URN:       "urn-u-2",
 				Type:      "table",
 				Service:   "bigquery",
 				URL:       "https://sample-url-old.com",
 				UpdatedBy: r.users[0],
+				Version:   "0.1",
 			}
 
 			id, err := r.repository.Upsert(r.ctx, &ast)
@@ -1115,6 +1159,7 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 			r.NoError(err)
 
 			r.Equal(updated.URL, actual.URL)
+			r.NotEqual(ast.Version, actual.Version)
 		})
 
 		r.Run("should delete old owners if it does not exist on new asset", func() {
