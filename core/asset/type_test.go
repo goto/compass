@@ -55,3 +55,23 @@ func TestTypeIsValid(t *testing.T) {
 		assert.Falsef(t, typeToValidate.IsValid(), "%s should be invalid")
 	})
 }
+
+func TestGetSupportedTypes(t *testing.T) {
+	t.Run("should_return_valid_built_in_types", func(t *testing.T) {
+		expectedTypes := []asset.Type{
+			asset.Type("table"),
+			asset.Type("job"),
+			asset.Type("dashboard"),
+			asset.Type("topic"),
+			asset.Type("feature_table"),
+			asset.Type("application"),
+			asset.Type("model"),
+			asset.Type("query"),
+			asset.Type("metric"),
+		}
+
+		actualTypes := asset.GetSupportedTypes()
+
+		assert.EqualValues(t, expectedTypes, actualTypes)
+	})
+}
