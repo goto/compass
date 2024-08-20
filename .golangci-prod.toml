@@ -298,8 +298,6 @@
       "returnAfterHttpError",
       # Detects suspicious/confusing re-assignments.
       "sloppyReassign",
-      # Detects unsupported test and benchmark funcs.
-      "sloppyTestFuncName",
       # Detects redundant type assertions.
       "sloppyTypeAssert",
       # Detects “%s” formatting directives that can be replaced with %q.
