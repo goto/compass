@@ -145,7 +145,6 @@ func (repo *DiscoveryRepository) DeleteByURN(ctx context.Context, assetURN strin
 	return repo.deleteWithQuery(ctx, "DeleteByURN", fmt.Sprintf(`{"query":{"term":{"urn.keyword": %q}}}`, assetURN))
 }
 
-// TODO: Integration testing
 func (repo *DiscoveryRepository) DeleteByQueryExpr(ctx context.Context, queryExpr string) error {
 	if strings.TrimSpace(queryExpr) == "" {
 		return asset.ErrEmptyQuery
