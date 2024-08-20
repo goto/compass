@@ -191,6 +191,8 @@ If you are using Compass binary, you can run this command.
 
 ## Running tests
 
+Before running unit test, be warned that it will spin up docker container behind the scene. If the engine being used is Lima-based (like Colima), ensure that the `DOCKER_HOST` environment variable is set to avoid spin up failure.
+
 Running all unit tests
 
 ```
