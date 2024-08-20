@@ -705,7 +705,7 @@ func (r *AssetRepositoryTestSuite) TestGetByURN() {
 }
 
 func (r *AssetRepositoryTestSuite) TestVersions() {
-	currentTime := time.Now().UTC()
+	currentTime := time.Date(2024, time.August, 20, 8, 19, 49, 0, time.UTC)
 	assetURN := uuid.NewString() + "urn-u-2-version"
 	// v0.1
 	astVersioning := asset.Asset{
@@ -979,16 +979,16 @@ func (r *AssetRepositoryTestSuite) TestVersions() {
 }
 
 func (r *AssetRepositoryTestSuite) TestUpsert() {
+	refreshedAtTime := time.Date(2024, time.August, 20, 8, 19, 49, 0, time.UTC)
 	r.Run("on insert", func() {
 		r.Run("set ID to asset and version to base version", func() {
-			currentTime := time.Now()
 			ast := asset.Asset{
 				URN:         "urn-u-1",
 				Type:        "table",
 				Service:     "bigquery",
 				URL:         "https://sample-url.com",
 				UpdatedBy:   r.users[0],
-				RefreshedAt: &currentTime,
+				RefreshedAt: &refreshedAtTime,
 			}
 			id, err := r.repository.Upsert(r.ctx, &ast)
 			r.Equal(asset.BaseVersion, ast.Version)
@@ -1005,7 +1005,7 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 			r.assertAsset(&ast, &assetInDB)
 
 			ast2 := ast
-			ast2.RefreshedAt = &currentTime
+			ast2.RefreshedAt = &refreshedAtTime
 			ast2.Description = "create a new version" // to force fetch from asset_versions.
 			_, err = r.repository.Upsert(r.ctx, &ast2)
 			r.NoError(err)
@@ -1070,13 +1070,12 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 
 	r.Run("on update", func() {
 		r.Run("should not create nor updating the asset if asset is identical", func() {
-			currentTime := time.Now().UTC()
 			ast := asset.Asset{
 				URN:         "urn-u-2",
 				Type:        "table",
 				Service:     "bigquery",
 				UpdatedBy:   r.users[0],
-				RefreshedAt: &currentTime,
+				RefreshedAt: &refreshedAtTime,
 				Version:     "0.1",
 			}
 			identicalAsset := ast
@@ -1095,15 +1094,15 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 			r.Equal(ast.Version, identicalAsset.Version)
 		})
 
-		r.Run("should same asset version if asset only has different in RefreshedAt", func() {
-			currentTime := time.Now().UTC().AddDate(0, 0, -1)
+		r.Run("should same asset version if asset only has different at RefreshedAt", func() {
+			oneDayAgoRefreshedAtTime := refreshedAtTime.AddDate(0, 0, -1)
 			ast := asset.Asset{
 				URN:         "urn-u-2",
 				Type:        "table",
 				Service:     "bigquery",
 				URL:         "https://sample-url-old.com",
 				UpdatedBy:   r.users[0],
-				RefreshedAt: &currentTime,
+				RefreshedAt: &oneDayAgoRefreshedAtTime,
 				Version:     "0.1",
 			}
 
@@ -1113,8 +1112,7 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 			ast.ID = id
 
 			updated := ast
-			currentTime2 := time.Now().UTC()
-			updated.RefreshedAt = &currentTime2
+			updated.RefreshedAt = &refreshedAtTime
 
 			id, err = r.repository.Upsert(r.ctx, &updated)
 			r.Require().NoError(err)
@@ -1364,15 +1362,15 @@ func (r *AssetRepositoryTestSuite) TestDeleteByURN() {
 }
 
 func (r *AssetRepositoryTestSuite) TestDeleteByQueryExpr() {
+	refreshedAtTime := time.Date(2024, time.August, 20, 8, 19, 49, 0, time.UTC)
 	r.Run("should delete correct asset", func() {
-		currentTime := time.Now()
-		oneYearAgoTime := currentTime.AddDate(-1, 0, 0)
+		oneYearAgoRefreshedAtTime := refreshedAtTime.AddDate(-1, 0, 0)
 		asset1 := asset.Asset{
 			URN:         "urn-del-1",
 			Type:        "table",
 			Service:     "bigquery",
 			UpdatedBy:   user.User{ID: defaultAssetUpdaterUserID},
-			RefreshedAt: &oneYearAgoTime,
+			RefreshedAt: &oneYearAgoRefreshedAtTime,
 		}
 		asset2 := asset.Asset{
 			URN:         "urn-del-2",
@@ -1380,7 +1378,7 @@ func (r *AssetRepositoryTestSuite) TestDeleteByQueryExpr() {
 			Service:     "kafka",
 			Version:     asset.BaseVersion,
 			UpdatedBy:   user.User{ID: defaultAssetUpdaterUserID},
-			RefreshedAt: &oneYearAgoTime,
+			RefreshedAt: &oneYearAgoRefreshedAtTime,
 		}
 
 		_, err := r.repository.Upsert(r.ctx, &asset1)
@@ -1389,7 +1387,7 @@ func (r *AssetRepositoryTestSuite) TestDeleteByQueryExpr() {
 		id, err := r.repository.Upsert(r.ctx, &asset2)
 		r.Require().NoError(err)
 
-		query := "refreshed_at <= '" + currentTime.Format("2006-01-02 15:04:05") +
+		query := "refreshed_at <= '" + refreshedAtTime.Format("2006-01-02T15:04:05Z") +
 			"' && service == '" + asset1.Service +
 			"' && type == '" + asset1.Type.String() +
 			"' && urn == '" + asset1.URN + "'"
