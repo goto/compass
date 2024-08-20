@@ -12,8 +12,7 @@ const (
 	TypeMetric       Type = "metric"
 )
 
-// AllSupportedTypes holds a list of all supported types struct
-var AllSupportedTypes = []Type{
+var supportedTypes = []Type{
 	TypeTable,
 	TypeJob,
 	TypeDashboard,
@@ -23,6 +22,24 @@ var AllSupportedTypes = []Type{
 	TypeModel,
 	TypeQuery,
 	TypeMetric,
+}
+
+var isTypeSupported = map[Type]bool{
+	TypeTable:        true,
+	TypeJob:          true,
+	TypeDashboard:    true,
+	TypeTopic:        true,
+	TypeFeatureTable: true,
+	TypeApplication:  true,
+	TypeModel:        true,
+	TypeQuery:        true,
+	TypeMetric:       true,
+}
+
+func GetSupportedTypes() []Type {
+	output := make([]Type, 0, len(supportedTypes))
+	output = append(output, supportedTypes...)
+	return output
 }
 
 // Type specifies a supported type name
@@ -35,10 +52,5 @@ func (t Type) String() string {
 
 // IsValid will validate whether the typename is valid or not
 func (t Type) IsValid() bool {
-	for _, supportedType := range AllSupportedTypes {
-		if t == supportedType {
-			return true
-		}
-	}
-	return false
+	return isTypeSupported[t]
 }
