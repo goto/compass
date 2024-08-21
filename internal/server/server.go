@@ -40,6 +40,8 @@ type Config struct {
 	RequestTimeout time.Duration  `mapstructure:"request_timeout" default:"10s"`
 	// GRPC Config
 	GRPC GRPCConfig `mapstructure:"grpc"`
+
+	AdditionalAssetTypes []string `mapstructure:"additional_asset_types"`
 }
 
 func (cfg Config) addr() string     { return fmt.Sprintf("%s:%d", cfg.Host, cfg.Port) }
