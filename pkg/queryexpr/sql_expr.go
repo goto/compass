@@ -14,7 +14,7 @@ func (s SQLExpr) String() string {
 	return string(s)
 }
 
-// ToQuery default
+// ToQuery default: convert to be SQL query
 func (s SQLExpr) ToQuery() (string, error) {
 	queryExprParsed, err := getTreeNodeFromQueryExpr(s.String())
 	if err != nil {

@@ -1,7 +1,9 @@
 package queryexpr_test
 
 import (
+	"fmt"
 	"testing"
+	"time"
 
 	"github.com/goto/compass/pkg/queryexpr"
 )
@@ -64,6 +66,12 @@ func TestESExpr_ToQuery(t *testing.T) {
 			name:    "complex query expression that can directly produce a value",
 			expr:    queryexpr.ESExpr(`bool_identifier == !(findLast([1, 2, 3, 4], # > 2) == 4)`),
 			want:    `{"query":{"term":{"bool_identifier":false}}}`,
+			wantErr: false,
+		},
+		{
+			name:    "complex query expression that can directly produce a value regarding time",
+			expr:    queryexpr.ESExpr(`refreshed_at <= (now() - duration('1h'))`),
+			want:    fmt.Sprintf(`{"query":{"range":{"refreshed_at":{"lte":"%v"}}}}`, time.Now().Add(-1*time.Hour).Format(time.RFC3339)),
 			wantErr: false,
 		},
 		{
