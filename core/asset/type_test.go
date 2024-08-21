@@ -8,21 +8,53 @@ import (
 )
 
 func TestTypeString(t *testing.T) {
-	t.Run("built_in_types_should_return_expected_string", func(t *testing.T) {
-		for _type, expected := range map[asset.Type]string{
-			asset.TypeDashboard:    "dashboard",
-			asset.TypeJob:          "job",
-			asset.TypeTable:        "table",
-			asset.TypeTopic:        "topic",
-			asset.TypeFeatureTable: "feature_table",
-			asset.TypeApplication:  "application",
-			asset.TypeModel:        "model",
-			asset.TypeQuery:        "query",
-			asset.TypeMetric:       "metric",
-		} {
-			t.Run((string)(_type), func(t *testing.T) {
-				assert.Equal(t, expected, _type.String())
-			})
+	t.Run("should_return_same_string", func(t *testing.T) {
+		testCases := []struct {
+			input    asset.Type
+			expected string
+		}{
+			{
+				input:    asset.Type("dashboard"),
+				expected: "dashboard",
+			},
+			{
+				input:    asset.Type("job"),
+				expected: "job",
+			},
+			{
+				input:    asset.Type("table"),
+				expected: "table",
+			},
+			{
+				input:    asset.Type("topic"),
+				expected: "topic",
+			},
+			{
+				input:    asset.Type("feature_table"),
+				expected: "feature_table",
+			},
+			{
+				input:    asset.Type("application"),
+				expected: "application",
+			},
+			{
+				input:    asset.Type("model"),
+				expected: "model",
+			},
+			{
+				input:    asset.Type("query"),
+				expected: "query",
+			},
+			{
+				input:    asset.Type("metric"),
+				expected: "metric",
+			},
+		}
+
+		for _, tc := range testCases {
+			actual := tc.input.String()
+
+			assert.Equal(t, tc.expected, actual)
 		}
 	})
 }

@@ -1,39 +1,39 @@
 package asset
 
 const (
-	TypeTable        Type = "table"
-	TypeJob          Type = "job"
-	TypeDashboard    Type = "dashboard"
-	TypeTopic        Type = "topic"
-	TypeFeatureTable Type = "feature_table"
-	TypeApplication  Type = "application"
-	TypeModel        Type = "model"
-	TypeQuery        Type = "query"
-	TypeMetric       Type = "metric"
+	typeTable        Type = "table"
+	typeJob          Type = "job"
+	typeDashboard    Type = "dashboard"
+	typeTopic        Type = "topic"
+	typeFeatureTable Type = "feature_table"
+	typeApplication  Type = "application"
+	typeModel        Type = "model"
+	typeQuery        Type = "query"
+	typeMetric       Type = "metric"
 )
 
 var supportedTypes = []Type{
-	TypeTable,
-	TypeJob,
-	TypeDashboard,
-	TypeTopic,
-	TypeFeatureTable,
-	TypeApplication,
-	TypeModel,
-	TypeQuery,
-	TypeMetric,
+	typeTable,
+	typeJob,
+	typeDashboard,
+	typeTopic,
+	typeFeatureTable,
+	typeApplication,
+	typeModel,
+	typeQuery,
+	typeMetric,
 }
 
 var isTypeSupported = map[Type]bool{
-	TypeTable:        true,
-	TypeJob:          true,
-	TypeDashboard:    true,
-	TypeTopic:        true,
-	TypeFeatureTable: true,
-	TypeApplication:  true,
-	TypeModel:        true,
-	TypeQuery:        true,
-	TypeMetric:       true,
+	typeTable:        true,
+	typeJob:          true,
+	typeDashboard:    true,
+	typeTopic:        true,
+	typeFeatureTable: true,
+	typeApplication:  true,
+	typeModel:        true,
+	typeQuery:        true,
+	typeMetric:       true,
 }
 
 func GetSupportedTypes() []Type {

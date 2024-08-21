@@ -137,7 +137,7 @@ func (r *AssetRepositoryTestSuite) TestBuildFilterQuery() {
 		{
 			description: "should return sql query with types filter",
 			config: asset.Filter{
-				Types: []asset.Type{asset.TypeTable},
+				Types: []asset.Type{asset.Type("table")},
 			},
 			expectedQuery: `type IN ($1)`,
 		},
@@ -258,7 +258,7 @@ func (r *AssetRepositoryTestSuite) TestGetAll() {
 
 	r.Run("should filter using type", func() {
 		results, err := r.repository.GetAll(r.ctx, asset.Filter{
-			Types:         []asset.Type{asset.TypeTable},
+			Types:         []asset.Type{asset.Type("table")},
 			SortBy:        "urn",
 			SortDirection: "desc",
 		})
@@ -405,15 +405,22 @@ func (r *AssetRepositoryTestSuite) TestGetTypes() {
 		Expected    map[asset.Type]int
 	}
 
+	const (
+		typeDashboard = asset.Type("dashboard")
+		typeJob       = asset.Type("job")
+		typeTable     = asset.Type("table")
+		typeTopic     = asset.Type("topic")
+	)
+
 	testCases := []testCase{
 		{
 			Description: "should return maps of asset count without filter",
 			Filter:      asset.Filter{},
 			Expected: map[asset.Type]int{
-				asset.TypeDashboard: 5,
-				asset.TypeJob:       1,
-				asset.TypeTable:     3,
-				asset.TypeTopic:     3,
+				typeDashboard: 5,
+				typeJob:       1,
+				typeTable:     3,
+				typeTopic:     3,
 			},
 		},
 		{
@@ -423,8 +430,8 @@ func (r *AssetRepositoryTestSuite) TestGetTypes() {
 				SortBy:   "urn",
 			},
 			Expected: map[asset.Type]int{
-				asset.TypeTable: 1,
-				asset.TypeTopic: 3,
+				typeTable: 1,
+				typeTopic: 3,
 			},
 		},
 		{
@@ -435,8 +442,8 @@ func (r *AssetRepositoryTestSuite) TestGetTypes() {
 				SortBy:      "urn",
 			},
 			Expected: map[asset.Type]int{
-				asset.TypeTable: 1,
-				asset.TypeTopic: 1,
+				typeTable: 1,
+				typeTopic: 1,
 			},
 		},
 		{
@@ -447,8 +454,8 @@ func (r *AssetRepositoryTestSuite) TestGetTypes() {
 				SortBy:      "urn",
 			},
 			Expected: map[asset.Type]int{
-				asset.TypeDashboard: 1,
-				asset.TypeTopic:     1,
+				typeDashboard: 1,
+				typeTopic:     1,
 			},
 		},
 
@@ -460,8 +467,8 @@ func (r *AssetRepositoryTestSuite) TestGetTypes() {
 				SortBy:      "urn",
 			},
 			Expected: map[asset.Type]int{
-				asset.TypeDashboard: 1,
-				asset.TypeJob:       1,
+				typeDashboard: 1,
+				typeJob:       1,
 			},
 		},
 		{
@@ -473,9 +480,9 @@ func (r *AssetRepositoryTestSuite) TestGetTypes() {
 				},
 			},
 			Expected: map[asset.Type]int{
-				asset.TypeJob:   1,
-				asset.TypeTable: 1,
-				asset.TypeTopic: 1,
+				typeJob:   1,
+				typeTable: 1,
+				typeTopic: 1,
 			},
 		},
 		{
@@ -487,7 +494,7 @@ func (r *AssetRepositoryTestSuite) TestGetTypes() {
 				},
 			},
 			Expected: map[asset.Type]int{
-				asset.TypeDashboard: 1,
+				typeDashboard: 1,
 			},
 		},
 		{
@@ -498,7 +505,7 @@ func (r *AssetRepositoryTestSuite) TestGetTypes() {
 				},
 			},
 			Expected: map[asset.Type]int{
-				asset.TypeDashboard: 2,
+				typeDashboard: 2,
 			},
 		},
 		{
@@ -512,7 +519,7 @@ func (r *AssetRepositoryTestSuite) TestGetTypes() {
 				},
 			},
 			Expected: map[asset.Type]int{
-				asset.TypeDashboard: 1,
+				typeDashboard: 1,
 			},
 		},
 	}
@@ -544,7 +551,7 @@ func (r *AssetRepositoryTestSuite) TestGetTypes() {
 func (r *AssetRepositoryTestSuite) TestGetCount() {
 	// populate assets
 	total := 12
-	typ := asset.TypeJob
+	typ := asset.Type("job")
 	service := []string{"service-getcount"}
 	for i := 0; i < total; i++ {
 		ast := asset.Asset{
@@ -1315,6 +1322,8 @@ func (r *AssetRepositoryTestSuite) TestDeleteByURN() {
 }
 
 func (r *AssetRepositoryTestSuite) TestAddProbe() {
+	const typeJob = asset.Type("job")
+
 	r.Run("return NotFoundError if asset does not exist", func() {
 		urn := "invalid-urn"
 		probe := asset.Probe{}
@@ -1325,7 +1334,7 @@ func (r *AssetRepositoryTestSuite) TestAddProbe() {
 	r.Run("should return error if probe already exists", func() {
 		ast := asset.Asset{
 			URN:       "urn-add-probe-1",
-			Type:      asset.TypeJob,
+			Type:      typeJob,
 			Service:   "airflow",
 			UpdatedBy: user.User{ID: defaultAssetUpdaterUserID},
 		}
@@ -1354,7 +1363,7 @@ func (r *AssetRepositoryTestSuite) TestAddProbe() {
 		r.BeforeTest("", "")
 		ast := asset.Asset{
 			URN:       "urn-add-probe-1",
-			Type:      asset.TypeJob,
+			Type:      typeJob,
 			Service:   "airflow",
 			UpdatedBy: user.User{ID: defaultAssetUpdaterUserID},
 		}
@@ -1401,7 +1410,7 @@ func (r *AssetRepositoryTestSuite) TestAddProbe() {
 	r.Run("should insert ID if specified", func() {
 		ast := asset.Asset{
 			URN:       "urn-add-probe-1",
-			Type:      asset.TypeJob,
+			Type:      typeJob,
 			Service:   "airflow",
 			UpdatedBy: user.User{ID: defaultAssetUpdaterUserID},
 		}
@@ -1428,13 +1437,13 @@ func (r *AssetRepositoryTestSuite) TestAddProbe() {
 	r.Run("should populate Timestamp if empty", func() {
 		ast := asset.Asset{
 			URN:       "urn-add-probe-2",
-			Type:      asset.TypeJob,
+			Type:      typeJob,
 			Service:   "optimus",
 			UpdatedBy: user.User{ID: defaultAssetUpdaterUserID},
 		}
 		otherAst := asset.Asset{
 			URN:       "urn-add-probe-3",
-			Type:      asset.TypeJob,
+			Type:      typeJob,
 			Service:   "airflow",
 			UpdatedBy: user.User{ID: defaultAssetUpdaterUserID},
 		}
@@ -1481,7 +1490,7 @@ func (r *AssetRepositoryTestSuite) TestGetProbes() {
 	r.Run("should return list of probes by asset urn", func() {
 		ast := asset.Asset{
 			URN:       "urn-add-probe-1",
-			Type:      asset.TypeJob,
+			Type:      asset.Type("job"),
 			Service:   "airflow",
 			UpdatedBy: user.User{ID: defaultAssetUpdaterUserID},
 		}
