@@ -71,11 +71,9 @@ func (s SQLExpr) convertToSQL(node ast.Node, stringBuilder *strings.Builder) err
 			return err
 		}
 	case *ast.BuiltinNode, *ast.ConditionalNode:
-		result, err := GetQueryExprResult(n.String())
-		if err != nil {
+		if err := s.getQueryExprResult(n.String(), stringBuilder); err != nil {
 			return err
 		}
-		fmt.Fprintf(stringBuilder, "%v", result)
 	default:
 		return s.unsupportedQueryError(n)
 	}
@@ -85,12 +83,10 @@ func (s SQLExpr) convertToSQL(node ast.Node, stringBuilder *strings.Builder) err
 
 func (s SQLExpr) binaryNodeToSQLQuery(n *ast.BinaryNode, stringBuilder *strings.Builder) error {
 	operator := s.operatorToSQL(n)
-	if operator == "" { // most likely the node is operation
-		result, err := GetQueryExprResult(n.String())
-		if err != nil {
+	if operator == "" { // most likely the node is an operation
+		if err := s.getQueryExprResult(n.String(), stringBuilder); err != nil {
 			return err
 		}
-		fmt.Fprintf(stringBuilder, "%v", result)
 	} else {
 		stringBuilder.WriteString("(")
 		if err := s.convertToSQL(n.Left, stringBuilder); err != nil {
@@ -106,6 +102,19 @@ func (s SQLExpr) binaryNodeToSQLQuery(n *ast.BinaryNode, stringBuilder *strings.
 		stringBuilder.WriteString(")")
 	}
 
+	return nil
+}
+
+func (SQLExpr) getQueryExprResult(fn string, stringBuilder *strings.Builder) error {
+	result, err := GetQueryExprResult(fn)
+	if err != nil {
+		return err
+	}
+	if str, ok := result.(string); ok {
+		result = fmt.Sprintf("'%s'", str)
+	}
+
+	fmt.Fprintf(stringBuilder, "%v", result)
 	return nil
 }
 

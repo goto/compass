@@ -3,6 +3,7 @@ package queryexpr
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/expr-lang/expr"
 	"github.com/expr-lang/expr/ast"
@@ -87,6 +88,10 @@ func GetQueryExprResult(fn string) (any, error) {
 	result, err := expr.Run(compile, env)
 	if err != nil {
 		return nil, fmt.Errorf("failed to evaluate function '%s': %w", fn, err)
+	}
+
+	if t, ok := result.(time.Time); ok {
+		return t.Format(time.RFC3339), nil
 	}
 
 	return result, nil
