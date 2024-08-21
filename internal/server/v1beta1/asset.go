@@ -313,7 +313,10 @@ func (server *APIServer) DeleteAssets(ctx context.Context, req *compassv1beta1.D
 		return nil, err
 	}
 	defer func() {
-		server.logger.Warn(fmt.Sprintf("the number of affected rows is %d. delete request: %v", affectedRows, req))
+		server.logger.Warn("delete assets",
+			"the number of affected rows is", affectedRows,
+			"query delete", req.QueryExpr,
+			"dry run", req.DryRun)
 	}()
 
 	deleteAssetsRequest := asset.DeleteAssetsRequest{

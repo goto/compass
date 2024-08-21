@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"testing"
 
-	generichelper "github.com/goto/compass/pkg/generic_helper"
+	"github.com/goto/compass/pkg/generichelper"
 )
 
 func TestContains(t *testing.T) {

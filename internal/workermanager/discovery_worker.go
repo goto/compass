@@ -40,7 +40,7 @@ func (m *Manager) indexAssetHandler() worker.JobHandler {
 	return worker.JobHandler{
 		Handle: m.IndexAsset,
 		JobOpts: worker.JobOptions{
-			MaxAttempts:     3,
+			MaxAttempts:     m.maxAttemptsRetry,
 			Timeout:         m.indexTimeout,
 			BackoffStrategy: worker.DefaultExponentialBackoff,
 		},
@@ -51,7 +51,7 @@ func (m *Manager) syncAssetHandler() worker.JobHandler {
 	return worker.JobHandler{
 		Handle: m.SyncAssets,
 		JobOpts: worker.JobOptions{
-			MaxAttempts:     1,
+			MaxAttempts:     m.maxAttemptsRetry,
 			Timeout:         m.syncTimeout,
 			BackoffStrategy: worker.DefaultExponentialBackoff,
 		},
@@ -142,7 +142,7 @@ func (m *Manager) deleteAssetHandler() worker.JobHandler {
 	return worker.JobHandler{
 		Handle: m.DeleteAsset,
 		JobOpts: worker.JobOptions{
-			MaxAttempts:     3,
+			MaxAttempts:     m.maxAttemptsRetry,
 			Timeout:         m.deleteTimeout,
 			BackoffStrategy: worker.DefaultExponentialBackoff,
 		},
@@ -175,7 +175,7 @@ func (m *Manager) deleteAssetsByQueryHandler() worker.JobHandler {
 	return worker.JobHandler{
 		Handle: m.DeleteAssetsByQueryExpr,
 		JobOpts: worker.JobOptions{
-			MaxAttempts:     3,
+			MaxAttempts:     m.maxAttemptsRetry,
 			Timeout:         m.indexTimeout,
 			BackoffStrategy: worker.DefaultExponentialBackoff,
 		},

@@ -66,6 +66,49 @@ func (_c *LineageRepository_DeleteByURN_Call) RunAndReturn(run func(context.Cont
 	return _c
 }
 
+// DeleteByURNs provides a mock function with given fields: ctx, urns
+func (_m *LineageRepository) DeleteByURNs(ctx context.Context, urns []string) error {
+	ret := _m.Called(ctx, urns)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, []string) error); ok {
+		r0 = rf(ctx, urns)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// LineageRepository_DeleteByURNs_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteByURNs'
+type LineageRepository_DeleteByURNs_Call struct {
+	*mock.Call
+}
+
+// DeleteByURNs is a helper method to define mock.On call
+//   - ctx context.Context
+//   - urns []string
+func (_e *LineageRepository_Expecter) DeleteByURNs(ctx interface{}, urns interface{}) *LineageRepository_DeleteByURNs_Call {
+	return &LineageRepository_DeleteByURNs_Call{Call: _e.mock.On("DeleteByURNs", ctx, urns)}
+}
+
+func (_c *LineageRepository_DeleteByURNs_Call) Run(run func(ctx context.Context, urns []string)) *LineageRepository_DeleteByURNs_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].([]string))
+	})
+	return _c
+}
+
+func (_c *LineageRepository_DeleteByURNs_Call) Return(_a0 error) *LineageRepository_DeleteByURNs_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *LineageRepository_DeleteByURNs_Call) RunAndReturn(run func(context.Context, []string) error) *LineageRepository_DeleteByURNs_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // GetGraph provides a mock function with given fields: ctx, urn, query
 func (_m *LineageRepository) GetGraph(ctx context.Context, urn string, query asset.LineageQuery) (asset.LineageGraph, error) {
 	ret := _m.Called(ctx, urn, query)

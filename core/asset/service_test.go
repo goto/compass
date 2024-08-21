@@ -446,39 +446,60 @@ func TestService_DeleteAsset(t *testing.T) {
 }
 
 func TestService_DeleteAssets(t *testing.T) {
-	dummyRequest := asset.DeleteAssetsRequest{
+	dummyRequestDryRunTrue := asset.DeleteAssetsRequest{
 		QueryExpr: `testing < now()`,
 		DryRun:    true,
+	}
+	dummyRequestDryRunFalse := asset.DeleteAssetsRequest{
+		QueryExpr: `testing < now()`,
+		DryRun:    false,
 	}
 	type testCase struct {
 		Description        string
 		Request            asset.DeleteAssetsRequest
-		Setup              func(context.Context, *mocks.AssetRepository, *mocks.DiscoveryRepository, *mocks.LineageRepository)
+		Setup              func(context.Context, *mocks.AssetRepository, *mocks.Worker, *mocks.LineageRepository)
 		ExpectAffectedRows uint32
 		ExpectErr          error
 	}
 
 	testCases := []testCase{
 		{
-			Description: `should return error if query expr not valid`,
-			Request:     dummyRequest,
-			Setup: func(ctx context.Context, ar *mocks.AssetRepository, _ *mocks.DiscoveryRepository, _ *mocks.LineageRepository) {
-				ar.EXPECT().GetCountByQueryExpr(ctx, mock.AnythingOfType("*asset.DeleteAssetExpr")).
+			Description: `should return error if getting affected rows got error`,
+			Request:     dummyRequestDryRunTrue,
+			Setup: func(ctx context.Context, ar *mocks.AssetRepository, _ *mocks.Worker, _ *mocks.LineageRepository) {
+				ar.EXPECT().GetCountByQueryExpr(ctx, mock.AnythingOfType("asset.DeleteAssetExpr")).
 					Return(0, errors.New("something wrong"))
 			},
 			ExpectAffectedRows: 0,
 			ExpectErr:          errors.New("something wrong"),
 		},
 		{
-			Description: `should only return the numbers of assets that match the given query`,
-			Request:     dummyRequest,
-			Setup: func(ctx context.Context, ar *mocks.AssetRepository, _ *mocks.DiscoveryRepository, _ *mocks.LineageRepository) {
-				ar.EXPECT().GetCountByQueryExpr(ctx, mock.AnythingOfType("*asset.DeleteAssetExpr")).Return(11, nil)
+			Description: `should only return the affected rows that match the given query when getting affected rows successful and dry run is true`,
+			Request:     dummyRequestDryRunTrue,
+			Setup: func(ctx context.Context, ar *mocks.AssetRepository, _ *mocks.Worker, _ *mocks.LineageRepository) {
+				ar.EXPECT().GetCountByQueryExpr(ctx, mock.AnythingOfType("asset.DeleteAssetExpr")).
+					Return(11, nil)
 			},
 			ExpectAffectedRows: 11,
 			ExpectErr:          nil,
 		},
-		// TODO: add case when DryRun = false which regarding goroutine
+		{
+			Description: `should return the affected rows and perform deletion in the background when getting affected rows successful and dry run is false`,
+			Request:     dummyRequestDryRunFalse,
+			Setup: func(ctx context.Context, ar *mocks.AssetRepository, w *mocks.Worker, lr *mocks.LineageRepository) {
+				deletedURNs := []string{"urn1", "urn2"}
+				ar.EXPECT().GetCountByQueryExpr(ctx, mock.AnythingOfType("asset.DeleteAssetExpr")).
+					Return(2, nil)
+				ar.EXPECT().DeleteByQueryExpr(mock.Anything, mock.Anything).
+					Return(deletedURNs, nil)
+				lr.EXPECT().DeleteByURNs(mock.Anything, mock.Anything).
+					Return(nil)
+				w.EXPECT().EnqueueDeleteAssetsByQueryExprJob(mock.Anything, mock.Anything).
+					Return(nil)
+			},
+			ExpectAffectedRows: 2,
+			ExpectErr:          nil,
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.Description, func(t *testing.T) {
@@ -486,19 +507,21 @@ func TestService_DeleteAssets(t *testing.T) {
 
 			assetRepo := mocks.NewAssetRepository(t)
 			discoveryRepo := mocks.NewDiscoveryRepository(t)
+			worker := mocks.NewWorker(t)
 			lineageRepo := mocks.NewLineageRepository(t)
 			if tc.Setup != nil {
-				tc.Setup(ctx, assetRepo, discoveryRepo, lineageRepo)
+				tc.Setup(ctx, assetRepo, worker, lineageRepo)
 			}
 
 			svc := asset.NewService(asset.ServiceDeps{
 				AssetRepo:     assetRepo,
 				DiscoveryRepo: discoveryRepo,
 				LineageRepo:   lineageRepo,
-				Worker:        workermanager.NewInSituWorker(workermanager.Deps{DiscoveryRepo: discoveryRepo}),
+				Worker:        worker,
 			})
 
 			affectedRows, err := svc.DeleteAssets(ctx, tc.Request)
+			time.Sleep(1 * time.Second)
 
 			if tc.ExpectErr != nil {
 				assert.ErrorContains(t, err, tc.ExpectErr.Error())

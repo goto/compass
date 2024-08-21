@@ -1004,28 +1004,17 @@ func TestDeleteAssets(t *testing.T) {
 
 	testCases := []TestCase{
 		{
-			Description:  "should return error when insert empty query expr",
+			Description:  "should return error when delete assets got error",
 			QueryExpr:    dummyQuery,
 			DryRun:       false,
 			ExpectStatus: codes.InvalidArgument,
 			ExpectResult: nil,
 			Setup: func(ctx context.Context, as *mocks.AssetService, astID string) {
-				as.EXPECT().DeleteAssets(ctx, dummyRequest).Return(0, errors.New("error"))
+				as.EXPECT().DeleteAssets(ctx, dummyRequest).Return(0, errors.New("something wrong"))
 			},
 		},
 		{
-			Description:  "should return error when query expr does not meet identifier requirement",
-			QueryExpr:    dummyQuery,
-			DryRun:       false,
-			ExpectStatus: codes.InvalidArgument,
-			ExpectResult: nil,
-			Setup: func(ctx context.Context, as *mocks.AssetService, astID string) {
-				as.EXPECT().DeleteAssets(ctx, dummyRequest).
-					Return(0, errors.New("must exist these identifiers: refreshed_at, type, and service. Current identifiers: refreshed_at"))
-			},
-		},
-		{
-			Description:  `should only return the numbers of assets that match the given query`,
+			Description:  `should return the affected rows that match the given query when delete assets success`,
 			QueryExpr:    dummyQuery,
 			DryRun:       false,
 			ExpectStatus: codes.OK,

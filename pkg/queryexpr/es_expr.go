@@ -9,7 +9,6 @@ import (
 
 var KeywordIdentifiers = [...]string{"service"}
 
-// TODO: Consider not to be pointer
 type ESExpr string
 
 func (e *ESExpr) String() string {

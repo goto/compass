@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	generichelper "github.com/goto/compass/pkg/generic_helper"
+	"github.com/goto/compass/pkg/generichelper"
 	"github.com/goto/compass/pkg/queryexpr"
 )
 
@@ -35,13 +35,13 @@ func (d DeleteAssetExpr) Validate() error {
 	return d.isAllIdentifiersExistInStruct(identifiersWithOperator)
 }
 
-func (DeleteAssetExpr) isAllIdentifiersExistInStruct(identifiersWithOperator map[string]string) error {
-	identifiers := generichelper.GetMapKeys(identifiersWithOperator)
-	for _, identifier := range identifiers {
-		isFieldValid := generichelper.Contains(assetJSONTagsSchema, identifier)
-		if !isFieldValid {
-			return fmt.Errorf("%s is not a valid identifier", identifier)
-		}
+func (DeleteAssetExpr) isRequiredIdentifiersExist(identifiersWithOperator map[string]string) error {
+	isExist := func(jsonTag string) bool {
+		return identifiersWithOperator[jsonTag] != ""
+	}
+	mustExist := isExist("refreshed_at") && isExist("type") && isExist("service")
+	if !mustExist {
+		return fmt.Errorf("must exists these identifiers: refreshed_at, type, and service")
 	}
 	return nil
 }
@@ -56,13 +56,13 @@ func (DeleteAssetExpr) isUsingRightOperator(identifiersWithOperator map[string]s
 	return nil
 }
 
-func (DeleteAssetExpr) isRequiredIdentifiersExist(identifiersWithOperator map[string]string) error {
-	isExist := func(jsonTag string) bool {
-		return identifiersWithOperator[jsonTag] != ""
-	}
-	mustExist := isExist("refreshed_at") && isExist("type") && isExist("service")
-	if !mustExist {
-		return fmt.Errorf("must exists these identifiers: refreshed_at, type, and service")
+func (DeleteAssetExpr) isAllIdentifiersExistInStruct(identifiersWithOperator map[string]string) error {
+	identifiers := generichelper.GetMapKeys(identifiersWithOperator)
+	for _, identifier := range identifiers {
+		isFieldValid := generichelper.Contains(assetJSONTagsSchema, identifier)
+		if !isFieldValid {
+			return fmt.Errorf("%s is not a valid identifier", identifier)
+		}
 	}
 	return nil
 }

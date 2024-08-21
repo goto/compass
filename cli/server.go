@@ -153,6 +153,7 @@ func runServer(ctx context.Context, cfg *Config) error {
 		DiscoveryRepo: discoveryRepository,
 		LineageRepo:   lineageRepository,
 		Worker:        wrkr,
+		Logger:        logger,
 	})
 
 	// init discussion

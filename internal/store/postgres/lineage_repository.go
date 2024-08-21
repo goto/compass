@@ -49,16 +49,23 @@ func (repo *LineageRepository) GetGraph(ctx context.Context, urn string, query a
 }
 
 func (repo *LineageRepository) DeleteByURN(ctx context.Context, urn string) error {
+	return repo.DeleteByURNs(ctx, []string{urn})
+}
+
+func (repo *LineageRepository) DeleteByURNs(ctx context.Context, urns []string) error {
 	qry, args, err := sq.Delete("lineage_graph").
-		Where(sq.Or{sq.Eq{"source": urn}, sq.Eq{"target": urn}}).
+		Where(sq.Or{
+			sq.Eq{"source": urns},
+			sq.Eq{"target": urns},
+		}).
 		PlaceholderFormat(sq.Dollar).
 		ToSql()
 	if err != nil {
-		return fmt.Errorf("build delete query: URN = '%s': %w", urn, err)
+		return fmt.Errorf("build delete query: URN = '%v': %w", urns, err)
 	}
 
 	if _, err := repo.client.db.ExecContext(ctx, qry, args...); err != nil {
-		return fmt.Errorf("delete asset: URN = '%s': %w", urn, err)
+		return fmt.Errorf("delete asset: URN = '%v': %w", urns, err)
 	}
 
 	return nil

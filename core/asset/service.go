@@ -3,11 +3,11 @@ package asset
 import (
 	"context"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/goto/compass/pkg/queryexpr"
+	"github.com/goto/salt/log"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
@@ -18,6 +18,7 @@ type Service struct {
 	discoveryRepository DiscoveryRepository
 	lineageRepository   LineageRepository
 	worker              Worker
+	logger              log.Logger
 
 	assetOpCounter metric.Int64Counter
 }
@@ -37,6 +38,7 @@ type ServiceDeps struct {
 	DiscoveryRepo DiscoveryRepository
 	LineageRepo   LineageRepository
 	Worker        Worker
+	Logger        log.Logger
 }
 
 func NewService(deps ServiceDeps) *Service {
@@ -131,7 +133,7 @@ func (s *Service) DeleteAsset(ctx context.Context, id string) (err error) {
 
 func (s *Service) DeleteAssets(ctx context.Context, request DeleteAssetsRequest) (affectedRows uint32, err error) {
 	expr := queryexpr.SQLExpr(request.QueryExpr)
-	deleteExpr := &DeleteAssetExpr{
+	deleteExpr := DeleteAssetExpr{
 		ExprStr: &expr,
 	}
 	total, err := s.assetRepository.GetCountByQueryExpr(ctx, deleteExpr)
@@ -139,46 +141,28 @@ func (s *Service) DeleteAssets(ctx context.Context, request DeleteAssetsRequest)
 		return 0, err
 	}
 
-	if request.DryRun {
-		return uint32(total), nil
+	if !request.DryRun {
+		newCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		defer cancel()
+		go s.executeDeleteAssets(newCtx, deleteExpr)
 	}
-
-	s.deleteAssetsAsynchronously(request.QueryExpr)
 
 	return uint32(total), nil
 }
 
-func (s *Service) deleteAssetsAsynchronously(queryExpr string) {
-	expr := queryexpr.SQLExpr(queryExpr)
-	deleteExpr := DeleteAssetExpr{
-		ExprStr: &expr,
+func (s *Service) executeDeleteAssets(ctx context.Context, deleteExpr queryexpr.ExprStr) {
+	deletedURNs, err := s.assetRepository.DeleteByQueryExpr(ctx, deleteExpr)
+	if err != nil {
+		s.logger.Error("Asset deletion failed, skipping Elasticsearch and Lineage deletions. Err:", err)
+		return
 	}
 
-	go func() {
-		urnsDeleted, err := s.assetRepository.DeleteByQueryExpr(context.Background(), deleteExpr)
-
-		// Perform Elasticsearch and Lineage deletion asynchronously ONLY IF the Assets deletion is successful
-		if err == nil {
-			go s.deleteAssetsInLineageByQueryExpr(urnsDeleted)
-			s.deleteAssetsInElasticsearchByQueryExpr(queryExpr)
-		} else {
-			// TODO: need to reconsider how to properly handle error
-			log.Printf("Database deletion failed, skipping Elasticsearch and Lineage deletions. Err: %v", err)
-		}
-	}()
-}
-
-func (s *Service) deleteAssetsInElasticsearchByQueryExpr(queryExpr string) {
-	if err := s.worker.EnqueueDeleteAssetsByQueryExprJob(context.Background(), queryExpr); err != nil {
-		log.Printf("Error occurred during Elasticsearch deletion: %s", err)
+	if err := s.lineageRepository.DeleteByURNs(ctx, deletedURNs); err != nil {
+		s.logger.Error("Error occurred during Lineage deletion:", err)
 	}
-}
 
-func (s *Service) deleteAssetsInLineageByQueryExpr(urns []string) {
-	for _, urn := range urns {
-		if err := s.lineageRepository.DeleteByURN(context.Background(), urn); err != nil {
-			log.Printf("Error occurred during Lineage deletion: %s", err)
-		}
+	if err := s.worker.EnqueueDeleteAssetsByQueryExprJob(ctx, deleteExpr.String()); err != nil {
+		s.logger.Error("Error occurred during Elasticsearch deletion:", err)
 	}
 }
 
