@@ -8,6 +8,7 @@ import (
 	"github.com/goto/compass/core/asset"
 	"github.com/goto/compass/internal/workermanager"
 	"github.com/goto/compass/internal/workermanager/mocks"
+	"github.com/goto/compass/pkg/queryexpr"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -96,13 +97,16 @@ func TestInSituWorker_EnqueueDeleteAssetsByQueryExprJob(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			queryExpr := "refreshed_at <= '" + time.Now().Format("2006-01-02 15:04:05") +
+			queryExpr := "refreshed_at <= '" + time.Now().Format("2006-01-02T15:04:05Z") +
 				"' && service == 'test-service'" +
 				"' && type == 'table'" +
 				"' && urn == 'some-urn'"
+			deleteESExpr := asset.DeleteAssetExpr{
+				ExprStr: queryexpr.ESExpr(queryExpr),
+			}
 			discoveryRepo := mocks.NewDiscoveryRepository(t)
 			discoveryRepo.EXPECT().
-				DeleteByQueryExpr(ctx, queryExpr).
+				DeleteByQueryExpr(ctx, deleteESExpr).
 				Return(tc.discoveryErr)
 
 			wrkr := workermanager.NewInSituWorker(workermanager.Deps{

@@ -2,6 +2,7 @@ package queryexpr
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/expr-lang/expr/ast"
@@ -28,7 +29,7 @@ func (e ESExpr) ToQuery() (string, error) {
 	}
 	esQuery, ok := esQueryInterface.(map[string]interface{})
 	if !ok {
-		return "", fmt.Errorf("failed to generate Elasticsearch query")
+		return "", errors.New("failed to generate Elasticsearch query")
 	}
 	esQuery = map[string]interface{}{"query": esQuery}
 

@@ -7,6 +7,7 @@ import (
 	"sync"
 
 	"github.com/goto/compass/core/asset"
+	"github.com/goto/compass/pkg/queryexpr"
 	"github.com/goto/salt/log"
 )
 
@@ -41,7 +42,10 @@ func (m *InSituWorker) EnqueueDeleteAssetJob(ctx context.Context, urn string) er
 }
 
 func (m *InSituWorker) EnqueueDeleteAssetsByQueryExprJob(ctx context.Context, queryExpr string) error {
-	if err := m.discoveryRepo.DeleteByQueryExpr(ctx, queryExpr); err != nil {
+	deleteESExpr := asset.DeleteAssetExpr{
+		ExprStr: queryexpr.ESExpr(queryExpr),
+	}
+	if err := m.discoveryRepo.DeleteByQueryExpr(ctx, deleteESExpr); err != nil {
 		return fmt.Errorf("delete asset from discovery repo: %w: query expr: '%s'", err, queryExpr)
 	}
 	return nil

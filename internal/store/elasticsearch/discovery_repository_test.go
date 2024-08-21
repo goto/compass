@@ -410,7 +410,10 @@ func TestDiscoveryRepositoryDeleteByQueryExpr(t *testing.T) {
 	repo := store.NewDiscoveryRepository(esClient, log.NewNoop(), time.Second*10, []string{"number", "id"})
 
 	t.Run("should return error if the given query expr is empty", func(t *testing.T) {
-		err = repo.DeleteByQueryExpr(ctx, "")
+		queryExpr := asset.DeleteAssetExpr{
+			ExprStr: queryexpr.ESExpr(""),
+		}
+		err = repo.DeleteByQueryExpr(ctx, queryExpr)
 		assert.ErrorIs(t, err, asset.ErrEmptyQuery)
 	})
 
@@ -427,17 +430,16 @@ func TestDiscoveryRepositoryDeleteByQueryExpr(t *testing.T) {
 		err = repo.Upsert(ctx, ast)
 		require.NoError(t, err)
 
-		queryExpr := "refreshed_at <= '" + time.Now().Format("2006-01-02 15:04:05") +
+		query := "refreshed_at <= '" + time.Now().Format("2006-01-02T15:04:05Z") +
 			"' && service == '" + bigqueryService +
 			"' && type == '" + asset.TypeTable.String() + "'"
+		queryExpr := asset.DeleteAssetExpr{
+			ExprStr: queryexpr.ESExpr(query),
+		}
 		err = repo.DeleteByQueryExpr(ctx, queryExpr)
 		assert.NoError(t, err)
 
-		expr := queryexpr.ESExpr(queryExpr)
-		deleteAssetESExpr := asset.DeleteAssetExpr{
-			ExprStr: expr,
-		}
-		esQuery, _ := queryexpr.ValidateAndGetQueryFromExpr(deleteAssetESExpr)
+		esQuery, _ := queryexpr.ValidateAndGetQueryFromExpr(queryExpr)
 
 		res, err := cli.Search(
 			cli.Search.WithBody(strings.NewReader(esQuery)),
@@ -491,9 +493,12 @@ func TestDiscoveryRepositoryDeleteByQueryExpr(t *testing.T) {
 		_, err = cli.Indices.Close([]string{kafkaService})
 		require.NoError(t, err)
 
-		queryExpr := "refreshed_at <= '" + time.Now().Format("2006-01-02 15:04:05") +
+		query := "refreshed_at <= '" + time.Now().Format("2006-01-02T15:04:05Z") +
 			"' && service == '" + kafkaService +
 			"' && type == '" + asset.TypeTopic.String() + "'"
+		queryExpr := asset.DeleteAssetExpr{
+			ExprStr: queryexpr.ESExpr(query),
+		}
 		err = repo.DeleteByQueryExpr(ctx, queryExpr)
 		assert.NoError(t, err)
 	})

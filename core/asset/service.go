@@ -141,10 +141,10 @@ func (s *Service) DeleteAsset(ctx context.Context, id string) (err error) {
 }
 
 func (s *Service) DeleteAssets(ctx context.Context, request DeleteAssetsRequest) (affectedRows uint32, err error) {
-	deleteExpr := DeleteAssetExpr{
+	deleteSQLExpr := DeleteAssetExpr{
 		ExprStr: queryexpr.SQLExpr(request.QueryExpr),
 	}
-	total, err := s.assetRepository.GetCountByQueryExpr(ctx, deleteExpr)
+	total, err := s.assetRepository.GetCountByQueryExpr(ctx, deleteSQLExpr)
 	if err != nil {
 		return 0, err
 	}
@@ -152,14 +152,14 @@ func (s *Service) DeleteAssets(ctx context.Context, request DeleteAssetsRequest)
 	if !request.DryRun {
 		newCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 		s.cancelFnList = append(s.cancelFnList, cancel)
-		go s.executeDeleteAssets(newCtx, deleteExpr)
+		go s.executeDeleteAssets(newCtx, deleteSQLExpr)
 	}
 
 	return uint32(total), nil
 }
 
-func (s *Service) executeDeleteAssets(ctx context.Context, deleteExpr queryexpr.ExprStr) {
-	deletedURNs, err := s.assetRepository.DeleteByQueryExpr(ctx, deleteExpr)
+func (s *Service) executeDeleteAssets(ctx context.Context, deleteSQLExpr queryexpr.ExprStr) {
+	deletedURNs, err := s.assetRepository.DeleteByQueryExpr(ctx, deleteSQLExpr)
 	if err != nil {
 		s.logger.Error("Asset deletion failed, skipping Elasticsearch and Lineage deletions. Err:", err)
 		return
@@ -169,7 +169,7 @@ func (s *Service) executeDeleteAssets(ctx context.Context, deleteExpr queryexpr.
 		s.logger.Error("Error occurred during Lineage deletion:", err)
 	}
 
-	if err := s.worker.EnqueueDeleteAssetsByQueryExprJob(ctx, deleteExpr.String()); err != nil {
+	if err := s.worker.EnqueueDeleteAssetsByQueryExprJob(ctx, deleteSQLExpr.String()); err != nil {
 		s.logger.Error("Error occurred during Elasticsearch deletion:", err)
 	}
 }

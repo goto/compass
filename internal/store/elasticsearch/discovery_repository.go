@@ -145,16 +145,12 @@ func (repo *DiscoveryRepository) DeleteByURN(ctx context.Context, assetURN strin
 	return repo.deleteWithQuery(ctx, "DeleteByURN", fmt.Sprintf(`{"query":{"term":{"urn.keyword": %q}}}`, assetURN))
 }
 
-func (repo *DiscoveryRepository) DeleteByQueryExpr(ctx context.Context, queryExpr string) error {
-	if strings.TrimSpace(queryExpr) == "" {
+func (repo *DiscoveryRepository) DeleteByQueryExpr(ctx context.Context, queryExpr queryexpr.ExprStr) error {
+	if strings.TrimSpace(queryExpr.String()) == "" {
 		return asset.ErrEmptyQuery
 	}
 
-	expr := queryexpr.ESExpr(queryExpr)
-	deleteAssetESExpr := asset.DeleteAssetExpr{
-		ExprStr: expr,
-	}
-	esQuery, err := queryexpr.ValidateAndGetQueryFromExpr(deleteAssetESExpr)
+	esQuery, err := queryexpr.ValidateAndGetQueryFromExpr(queryExpr)
 	if err != nil {
 		return err
 	}
