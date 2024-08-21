@@ -86,10 +86,6 @@ func runServer(ctx context.Context, cfg *Config) error {
 	logger := initLogger(cfg.LogLevel)
 	logger.Info("compass starting", "version", Version)
 
-	if err := registerAdditionalAssetTypes(cfg.Service.AdditionalAssetTypes); err != nil {
-		return fmt.Errorf("error registering additional asset types: %w", err)
-	}
-
 	nrApp, cleanUp, err := telemetry.Init(ctx, cfg.Telemetry, logger)
 	if err != nil {
 		return err
@@ -262,13 +258,4 @@ func migratePostgres(ctx context.Context, logger log.Logger, config *Config) (er
 	}
 
 	return nil
-}
-
-func registerAdditionalAssetTypes(additionalTypes []string) error {
-	transformedTypes := make([]asset.Type, len(additionalTypes))
-	for i := range additionalTypes {
-		transformedTypes[i] = asset.Type(additionalTypes[i])
-	}
-
-	return asset.RegisterSupportedTypes(transformedTypes...)
 }

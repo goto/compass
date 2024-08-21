@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"fmt"
+
 	"github.com/MakeNowJust/heredoc"
 	"github.com/goto/salt/cmdx"
 	"github.com/spf13/cobra"
@@ -43,6 +45,11 @@ func New(cliConfig *Config) *cobra.Command {
 				return err
 			}
 		}
+
+		if err := registerAdditionalAssetTypes(cliConfig.Asset.AdditionalTypes); err != nil {
+			return fmt.Errorf("error registering additional asset types: %w", err)
+		}
+
 		return nil
 	}
 
