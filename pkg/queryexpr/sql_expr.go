@@ -71,7 +71,7 @@ func (s SQLExpr) convertToSQL(node ast.Node, stringBuilder *strings.Builder) err
 			return err
 		}
 	case *ast.BuiltinNode, *ast.ConditionalNode:
-		if err := s.getQueryExprResult(n.String(), stringBuilder); err != nil {
+		if err := s.getQueryExprResultForSQL(n.String(), stringBuilder); err != nil {
 			return err
 		}
 	default:
@@ -84,7 +84,7 @@ func (s SQLExpr) convertToSQL(node ast.Node, stringBuilder *strings.Builder) err
 func (s SQLExpr) binaryNodeToSQLQuery(n *ast.BinaryNode, stringBuilder *strings.Builder) error {
 	operator := s.operatorToSQL(n)
 	if operator == "" { // most likely the node is an operation
-		if err := s.getQueryExprResult(n.String(), stringBuilder); err != nil {
+		if err := s.getQueryExprResultForSQL(n.String(), stringBuilder); err != nil {
 			return err
 		}
 	} else {
@@ -105,8 +105,9 @@ func (s SQLExpr) binaryNodeToSQLQuery(n *ast.BinaryNode, stringBuilder *strings.
 	return nil
 }
 
-func (SQLExpr) getQueryExprResult(fn string, stringBuilder *strings.Builder) error {
-	result, err := getQueryExprResult(fn)
+// getQueryExprResultForSQL using getQueryExprResult to get the result of query expr operation, and make it as SQL syntax
+func (SQLExpr) getQueryExprResultForSQL(queryExprOperation string, stringBuilder *strings.Builder) error {
+	result, err := getQueryExprResult(queryExprOperation)
 	if err != nil {
 		return err
 	}
