@@ -1,6 +1,7 @@
 package asset
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -8,7 +9,11 @@ import (
 	"github.com/goto/compass/pkg/queryexpr"
 )
 
-var assetJSONTagsSchema = generichelper.GetJSONTags(Asset{})
+var (
+	assetJSONTagsSchema              = generichelper.GetJSONTags(Asset{})
+	errTypeOrServiceHasWrongOperator = errors.New("identifier type and service must be equals (==) or IN operator")
+	errMissRequiredIdentifier        = errors.New("must exists these identifiers: refreshed_at, type, and service")
+)
 
 type DeleteAssetExpr struct {
 	queryexpr.ExprStr
@@ -41,7 +46,7 @@ func (DeleteAssetExpr) isRequiredIdentifiersExist(identifiersWithOperator map[st
 	}
 	mustExist := isExist("refreshed_at") && isExist("type") && isExist("service")
 	if !mustExist {
-		return fmt.Errorf("must exists these identifiers: refreshed_at, type, and service")
+		return errMissRequiredIdentifier
 	}
 	return nil
 }
@@ -51,7 +56,7 @@ func (DeleteAssetExpr) isUsingRightOperator(identifiersWithOperator map[string]s
 		return identifiersWithOperator[jsonTag] == "==" || strings.ToUpper(identifiersWithOperator[jsonTag]) == "IN"
 	}
 	if !isOperatorEqualsOrIn("type") || !isOperatorEqualsOrIn("service") {
-		return fmt.Errorf("identifier type and service must be equals (==) or IN operator")
+		return errTypeOrServiceHasWrongOperator
 	}
 	return nil
 }

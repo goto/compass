@@ -1,12 +1,10 @@
 package generichelper
 
-import (
-	"reflect"
-)
+import "reflect"
 
 // Contains checks if a target item exists in an array of any type.
 //
-// Example
+// Example:
 //
 //	names := []string{"Alice", "Bob", "Carol"}
 //	result := Contains(names, "Bob")

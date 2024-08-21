@@ -1,6 +1,7 @@
 package queryexpr
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -10,17 +11,22 @@ import (
 	"github.com/expr-lang/expr/parser"
 )
 
+var (
+	errFailedGenerateESQuery = errors.New("failed to generate Elasticsearch query")
+	errCannotConvertNilQuery = errors.New("cannot convert nil to query")
+)
+
 type ExprStr interface {
 	String() string
 	ToQuery() (string, error)
 	Validate() error
 }
 
-type ExprVisitor struct {
-	IdentifiersWithOperator map[string]string // Key: Identifier, Value: Operator
+type exprVisitor struct {
+	identifiersWithOperator map[string]string // Key: Identifier, Value: Operator
 }
 
-type ExprParam map[string]interface{}
+type exprParam map[string]interface{}
 
 func ValidateAndGetQueryFromExpr(exprStr ExprStr) (string, error) {
 	if err := exprStr.Validate(); err != nil {
@@ -35,24 +41,24 @@ func ValidateAndGetQueryFromExpr(exprStr ExprStr) (string, error) {
 }
 
 // Visit is implementation Visitor interface from expr-lang/expr lib, used by ast.Walk
-func (s *ExprVisitor) Visit(node *ast.Node) { //nolint:gocritic
+func (s *exprVisitor) Visit(node *ast.Node) { //nolint:gocritic
 	switch n := (*node).(type) {
 	case *ast.BinaryNode:
 		if left, ok := (n.Left).(*ast.IdentifierNode); ok {
-			s.IdentifiersWithOperator[left.Value] = n.Operator
+			s.identifiersWithOperator[left.Value] = n.Operator
 		}
 		if right, ok := (n.Right).(*ast.IdentifierNode); ok {
-			s.IdentifiersWithOperator[right.Value] = n.Operator
+			s.identifiersWithOperator[right.Value] = n.Operator
 		}
 	case *ast.UnaryNode:
 		if binaryNode, ok := (n.Node).(*ast.BinaryNode); ok {
 			if strings.ToUpper(binaryNode.Operator) == "IN" {
 				notInOperator := "NOT IN"
 				if left, ok := (binaryNode.Left).(*ast.IdentifierNode); ok {
-					s.IdentifiersWithOperator[left.Value] = notInOperator
+					s.identifiersWithOperator[left.Value] = notInOperator
 				}
 				if right, ok := (binaryNode.Right).(*ast.IdentifierNode); ok {
-					s.IdentifiersWithOperator[right.Value] = notInOperator
+					s.identifiersWithOperator[right.Value] = notInOperator
 				}
 			}
 		}
@@ -64,9 +70,9 @@ func GetIdentifiersMap(queryExpr string) (map[string]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	queryExprVisitor := &ExprVisitor{IdentifiersWithOperator: make(map[string]string)}
+	queryExprVisitor := &exprVisitor{identifiersWithOperator: make(map[string]string)}
 	ast.Walk(&queryExprParsed, queryExprVisitor)
-	return queryExprVisitor.IdentifiersWithOperator, nil
+	return queryExprVisitor.identifiersWithOperator, nil
 }
 
 func getTreeNodeFromQueryExpr(queryExpr string) (ast.Node, error) {
@@ -78,16 +84,27 @@ func getTreeNodeFromQueryExpr(queryExpr string) (ast.Node, error) {
 	return parsed.Node, nil
 }
 
-func GetQueryExprResult(fn string) (any, error) {
-	env := make(ExprParam)
-	compile, err := expr.Compile(fn)
+// getQueryExprResult used for getting the result of query expr operation.
+// The playground can be accessed at https://expr-lang.org/playground
+//
+// Example:
+//
+//	queryExprOperation := findLast([1, 2, 3, 4], # > 2)
+//	result := getQueryExprResult(queryExprOperation)
+//
+// Result:
+//
+//	4
+func getQueryExprResult(queryExprOperation string) (any, error) {
+	env := make(exprParam)
+	compile, err := expr.Compile(queryExprOperation)
 	if err != nil {
-		return nil, fmt.Errorf("failed to compile function '%s': %w", fn, err)
+		return nil, fmt.Errorf("failed to compile function '%s': %w", queryExprOperation, err)
 	}
 
 	result, err := expr.Run(compile, env)
 	if err != nil {
-		return nil, fmt.Errorf("failed to evaluate function '%s': %w", fn, err)
+		return nil, fmt.Errorf("failed to evaluate function '%s': %w", queryExprOperation, err)
 	}
 
 	if t, ok := result.(time.Time); ok {

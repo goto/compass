@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"strings"
 	"time"
 
@@ -17,8 +16,6 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/r3labs/diff/v2"
 )
-
-const batchSize = 1000
 
 // AssetRepository is a type that manages user operation to the primary database
 type AssetRepository struct {
@@ -395,18 +392,13 @@ func (r *AssetRepository) DeleteByQueryExpr(ctx context.Context, queryExpr query
 
 		urns, err = r.deleteByQueryAndReturnURNS(ctx, query)
 		if err != nil {
-			log.Printf("Failed to delete by query expr: %v", err)
 			return err
 		}
 
 		return nil
 	})
 
-	if err != nil {
-		return nil, err
-	}
-
-	return urns, nil
+	return urns, err
 }
 
 // deleteByQueryAndReturnURNS remove all assets that match to query and return array of urn of asset that deleted.

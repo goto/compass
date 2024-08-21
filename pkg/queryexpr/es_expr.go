@@ -2,7 +2,6 @@ package queryexpr
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 
 	"github.com/expr-lang/expr/ast"
@@ -29,7 +28,7 @@ func (e ESExpr) ToQuery() (string, error) {
 	}
 	esQuery, ok := esQueryInterface.(map[string]interface{})
 	if !ok {
-		return "", errors.New("failed to generate Elasticsearch query")
+		return "", errFailedGenerateESQuery
 	}
 	esQuery = map[string]interface{}{"query": esQuery}
 
@@ -50,7 +49,7 @@ func (ESExpr) Validate() error {
 // TODO: implement translator for node type that still not covered right now.
 func (e ESExpr) translateToEsQuery(node ast.Node) (interface{}, error) {
 	if node == nil {
-		return nil, fmt.Errorf("cannot convert nil to Elasticsearch query")
+		return nil, errCannotConvertNilQuery
 	}
 	switch n := (node).(type) {
 	case *ast.BinaryNode:
@@ -77,7 +76,7 @@ func (e ESExpr) translateToEsQuery(node ast.Node) (interface{}, error) {
 	case *ast.ConstantNode:
 		return n.Value, nil
 	case *ast.BuiltinNode, *ast.ConditionalNode:
-		result, err := GetQueryExprResult(n.String())
+		result, err := getQueryExprResult(n.String())
 		if err != nil {
 			return nil, err
 		}
@@ -108,7 +107,7 @@ func (e ESExpr) binaryNodeToEsQuery(n *ast.BinaryNode) (interface{}, error) { //
 		if leftStr, ok := left.(string); ok {
 			return e.termQuery(leftStr, right), nil
 		}
-		result, err := GetQueryExprResult(n.String())
+		result, err := getQueryExprResult(n.String())
 		if err != nil {
 			return nil, err
 		}
@@ -118,7 +117,7 @@ func (e ESExpr) binaryNodeToEsQuery(n *ast.BinaryNode) (interface{}, error) { //
 		if leftStr, ok := left.(string); ok {
 			return e.mustNotQuery(leftStr, right), nil
 		}
-		result, err := GetQueryExprResult(n.String())
+		result, err := getQueryExprResult(n.String())
 		if err != nil {
 			return nil, err
 		}
@@ -128,7 +127,7 @@ func (e ESExpr) binaryNodeToEsQuery(n *ast.BinaryNode) (interface{}, error) { //
 		if leftStr, ok := left.(string); ok {
 			return e.rangeQuery(leftStr, e.operatorToEsQuery(n.Operator), right), nil
 		}
-		result, err := GetQueryExprResult(n.String())
+		result, err := getQueryExprResult(n.String())
 		if err != nil {
 			return nil, err
 		}
@@ -138,14 +137,14 @@ func (e ESExpr) binaryNodeToEsQuery(n *ast.BinaryNode) (interface{}, error) { //
 		if leftStr, ok := left.(string); ok {
 			return e.termsQuery(leftStr, right), nil
 		}
-		result, err := GetQueryExprResult(n.String())
+		result, err := getQueryExprResult(n.String())
 		if err != nil {
 			return nil, err
 		}
 		return result, nil
 
 	default:
-		result, err := GetQueryExprResult(n.String())
+		result, err := getQueryExprResult(n.String())
 		if err != nil {
 			return nil, err
 		}

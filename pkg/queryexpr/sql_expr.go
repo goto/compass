@@ -36,7 +36,7 @@ func (SQLExpr) Validate() error {
 // TODO: implement translator for node type that still not covered right now.
 func (s SQLExpr) convertToSQL(node ast.Node, stringBuilder *strings.Builder) error {
 	if node == nil {
-		return fmt.Errorf("cannot convert nil to SQL query")
+		return errCannotConvertNilQuery
 	}
 	switch n := (node).(type) {
 	case *ast.BinaryNode:
@@ -106,7 +106,7 @@ func (s SQLExpr) binaryNodeToSQLQuery(n *ast.BinaryNode, stringBuilder *strings.
 }
 
 func (SQLExpr) getQueryExprResult(fn string, stringBuilder *strings.Builder) error {
-	result, err := GetQueryExprResult(fn)
+	result, err := getQueryExprResult(fn)
 	if err != nil {
 		return err
 	}
@@ -153,7 +153,7 @@ func (s SQLExpr) patchUnaryNode(n *ast.UnaryNode) error {
 				Value: !nodeV.Value,
 			})
 		default:
-			result, err := GetQueryExprResult(n.String())
+			result, err := getQueryExprResult(n.String())
 			if err != nil {
 				return err
 			}

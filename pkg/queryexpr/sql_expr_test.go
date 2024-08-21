@@ -70,8 +70,8 @@ func TestSQLExpr_ToQuery(t *testing.T) {
 		},
 		{
 			name:    "complex query expression that can directly produce a value regarding time",
-			expr:    queryexpr.SQLExpr(`refreshed_at <= (now() - duration('1h'))`),
-			want:    fmt.Sprintf("(refreshed_at <= '%s')", time.Now().Add(-1*time.Hour).Format(time.RFC3339)),
+			expr:    queryexpr.SQLExpr(`refreshed_at <= (date("2024-08-21T01:00:00Z") - duration('1h'))`),
+			want:    fmt.Sprintf("(refreshed_at <= '%s')", time.Date(2024, 8, 21, 0, 0, 0, 0, time.UTC).Format(time.RFC3339)),
 			wantErr: false,
 		},
 		{

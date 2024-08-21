@@ -69,9 +69,10 @@ func TestESExpr_ToQuery(t *testing.T) {
 			wantErr: false,
 		},
 		{
-			name:    "complex query expression that can directly produce a value regarding time",
-			expr:    queryexpr.ESExpr(`refreshed_at <= (now() - duration('1h'))`),
-			want:    fmt.Sprintf(`{"query":{"range":{"refreshed_at":{"lte":"%v"}}}}`, time.Now().Add(-1*time.Hour).Format(time.RFC3339)),
+			name: "complex query expression that can directly produce a value regarding time",
+			expr: queryexpr.ESExpr(`refreshed_at <= (date("2024-08-21T01:00:00Z") - duration('1h'))`),
+			want: fmt.Sprintf(`{"query":{"range":{"refreshed_at":{"lte":"%v"}}}}`,
+				time.Date(2024, 8, 21, 0, 0, 0, 0, time.UTC).Format(time.RFC3339)),
 			wantErr: false,
 		},
 		{

@@ -314,7 +314,7 @@ func (server *APIServer) DeleteAssets(ctx context.Context, req *compassv1beta1.D
 	}
 	defer func() {
 		server.logger.Warn("delete assets by query",
-			"the number of affected rows is", affectedRows,
+			"affected rows", affectedRows,
 			"query delete", req.QueryExpr,
 			"dry run", req.DryRun)
 	}()

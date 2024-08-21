@@ -119,6 +119,40 @@ func (r *LineageRepositoryTestSuite) TestDeleteByURN() {
 	})
 }
 
+func (r *LineageRepositoryTestSuite) TestDeleteByURNs() {
+	r.Run("should delete assets from lineage", func() {
+		nodeURN1a := "table-1a"
+		nodeURN1b := "table-1b"
+		nodeURNs := []string{nodeURN1a, nodeURN1b}
+
+		// create initial
+		err := r.repository.Upsert(r.ctx, nodeURN1a, []string{"table-2"}, []string{"table-3"})
+		r.NoError(err)
+		err = r.repository.Upsert(r.ctx, nodeURN1b, []string{"table-2"}, []string{"table-3"})
+		r.NoError(err)
+
+		err = r.repository.DeleteByURNs(r.ctx, nodeURNs)
+		r.NoError(err)
+
+		graph, err := r.repository.GetGraph(r.ctx, nodeURN1a, asset.LineageQuery{})
+		r.Require().NoError(err)
+		r.compareGraphs(asset.LineageGraph{}, graph)
+
+		graph, err = r.repository.GetGraph(r.ctx, nodeURN1b, asset.LineageQuery{})
+		r.Require().NoError(err)
+		r.compareGraphs(asset.LineageGraph{}, graph)
+	})
+
+	r.Run("delete when URNs has no lineage", func() {
+		nodeURN1a := "table-1a"
+		nodeURN1b := "table-1b"
+		nodeURNs := []string{nodeURN1a, nodeURN1b}
+
+		err := r.repository.DeleteByURNs(r.ctx, nodeURNs)
+		r.NoError(err)
+	})
+}
+
 func (r *LineageRepositoryTestSuite) TestUpsert() {
 	r.Run("should insert all as graph if upstreams and downstreams are new", func() {
 		nodeURN := "table-1"
