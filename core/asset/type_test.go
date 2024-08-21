@@ -132,8 +132,13 @@ func TestRegisterSupportedTypes(t *testing.T) {
 				expectedErrorMsg: "type length must be 3 to 16 inclusive",
 			},
 			{
-				name:             "contains character outside alphanumeric and underscore",
+				name:             "contains character outside lower case alphanumeric and underscore, with exclamation mark",
 				input:            asset.Type("abcd_efgh!"),
+				expectedErrorMsg: "type must be combination of alphanumeric and underscores",
+			},
+			{
+				name:             "contains character outside lower case alphanumeric and underscore, with upper case A",
+				input:            asset.Type("Abcd_efgh"),
 				expectedErrorMsg: "type must be combination of alphanumeric and underscores",
 			},
 		}
@@ -183,11 +188,13 @@ func TestRegisterSupportedTypes(t *testing.T) {
 			asset.Type("model"),
 			asset.Type("query"),
 			asset.Type("metric"),
-			asset.Type("dataset"),
+			asset.Type("fact_source"),
+			asset.Type("dimension_01a"),
 		}
 
 		inputTypes := []asset.Type{
-			asset.Type("dataset"),
+			asset.Type("fact_source"),
+			asset.Type("dimension_01a"),
 		}
 
 		actualError := asset.RegisterSupportedTypes(inputTypes...)

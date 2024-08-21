@@ -10,7 +10,7 @@ var (
 	errTypeInvalidCharacter = errors.New("type must be combination of alphanumeric and underscores")
 )
 
-var invalidTypePattern = regexp.MustCompile(`[^a-zA-Z0-9-]`)
+var invalidTypePattern = regexp.MustCompile(`[^a-z0-9_]`)
 
 const (
 	typeMinLength = 3
