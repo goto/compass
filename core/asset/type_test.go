@@ -5,6 +5,7 @@ import (
 
 	"github.com/goto/compass/core/asset"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestTypeString(t *testing.T) {
@@ -104,6 +105,95 @@ func TestGetSupportedTypes(t *testing.T) {
 
 		actualTypes := asset.GetSupportedTypes()
 
+		assert.EqualValues(t, expectedTypes, actualTypes)
+	})
+}
+
+func TestRegisterSupportedTypes(t *testing.T) {
+	t.Run("should return error if type is invalid", func(t *testing.T) {
+		testCases := []struct {
+			name             string
+			input            asset.Type
+			expectedErrorMsg string
+		}{
+			{
+				name:             "empty type",
+				input:            asset.Type(""),
+				expectedErrorMsg: "type length must be 3 to 16 inclusive",
+			},
+			{
+				name:             "length less than 3",
+				input:            asset.Type("ab"),
+				expectedErrorMsg: "type length must be 3 to 16 inclusive",
+			},
+			{
+				name:             "length more than 16",
+				input:            asset.Type("abcdefghijklmnopq"),
+				expectedErrorMsg: "type length must be 3 to 16 inclusive",
+			},
+			{
+				name:             "contains character outside alphanumeric and underscore",
+				input:            asset.Type("abcd_efgh!"),
+				expectedErrorMsg: "type must be combination of alphanumeric and underscores",
+			},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				actualError := asset.RegisterSupportedTypes(tc.input)
+
+				assert.EqualError(t, actualError, tc.expectedErrorMsg)
+			})
+		}
+	})
+
+	t.Run("should not update supported types if one or more types are invalid", func(t *testing.T) {
+		expectedTypes := []asset.Type{
+			asset.Type("table"),
+			asset.Type("job"),
+			asset.Type("dashboard"),
+			asset.Type("topic"),
+			asset.Type("feature_table"),
+			asset.Type("application"),
+			asset.Type("model"),
+			asset.Type("query"),
+			asset.Type("metric"),
+		}
+
+		inputTypes := []asset.Type{
+			asset.Type("dataset"),
+			asset.Type("invalid!"),
+		}
+
+		actualError := asset.RegisterSupportedTypes(inputTypes...)
+		require.Error(t, actualError)
+
+		actualTypes := asset.GetSupportedTypes()
+		assert.EqualValues(t, expectedTypes, actualTypes)
+	})
+
+	t.Run("should update supported types if no error is returned", func(t *testing.T) {
+		expectedTypes := []asset.Type{
+			asset.Type("table"),
+			asset.Type("job"),
+			asset.Type("dashboard"),
+			asset.Type("topic"),
+			asset.Type("feature_table"),
+			asset.Type("application"),
+			asset.Type("model"),
+			asset.Type("query"),
+			asset.Type("metric"),
+			asset.Type("dataset"),
+		}
+
+		inputTypes := []asset.Type{
+			asset.Type("dataset"),
+		}
+
+		actualError := asset.RegisterSupportedTypes(inputTypes...)
+		require.NoError(t, actualError)
+
+		actualTypes := asset.GetSupportedTypes()
 		assert.EqualValues(t, expectedTypes, actualTypes)
 	})
 }

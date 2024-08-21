@@ -1,5 +1,22 @@
 package asset
 
+import (
+	"errors"
+	"regexp"
+)
+
+var (
+	errTypeInvalidLength    = errors.New("type length must be 3 to 16 inclusive")
+	errTypeInvalidCharacter = errors.New("type must be combination of alphanumeric and underscores")
+)
+
+var invalidTypePattern = regexp.MustCompile(`[^a-zA-Z0-9-]`)
+
+const (
+	typeMinLength = 3
+	typeMaxLength = 16
+)
+
 const (
 	typeTable        Type = "table"
 	typeJob          Type = "job"
@@ -42,6 +59,23 @@ func GetSupportedTypes() []Type {
 	return output
 }
 
+func RegisterSupportedTypes(types ...Type) error {
+	for _, t := range types {
+		if err := t.validate(); err != nil {
+			return err
+		}
+	}
+
+	for _, t := range types {
+		if supported := isTypeSupported[t]; !supported {
+			supportedTypes = append(supportedTypes, t)
+			isTypeSupported[t] = true
+		}
+	}
+
+	return nil
+}
+
 // Type specifies a supported type name
 type Type string
 
@@ -53,4 +87,16 @@ func (t Type) String() string {
 // IsValid will validate whether the typename is valid or not
 func (t Type) IsValid() bool {
 	return isTypeSupported[t]
+}
+
+func (t Type) validate() error {
+	if l := len(t.String()); l < typeMinLength || l > typeMaxLength {
+		return errTypeInvalidLength
+	}
+
+	if invalidTypePattern.FindStringSubmatch(t.String()) != nil {
+		return errTypeInvalidCharacter
+	}
+
+	return nil
 }
