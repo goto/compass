@@ -90,11 +90,12 @@ func TestService_GetAllAssets(t *testing.T) {
 				tc.Setup(ctx, mockAssetRepo, mockDiscoveryRepo, mockLineageRepo)
 			}
 
-			svc := asset.NewService(asset.ServiceDeps{
+			svc, cancel := asset.NewService(asset.ServiceDeps{
 				AssetRepo:     mockAssetRepo,
 				DiscoveryRepo: mockDiscoveryRepo,
 				LineageRepo:   mockLineageRepo,
 			})
+			defer cancel()
 
 			got, cnt, err := svc.GetAllAssets(ctx, tc.Filter, tc.WithTotal)
 			if err != nil && errors.Is(tc.Err, err) {
@@ -154,7 +155,8 @@ func TestService_GetTypes(t *testing.T) {
 				tc.Setup(ctx, mockAssetRepo)
 			}
 
-			svc := asset.NewService(asset.ServiceDeps{AssetRepo: mockAssetRepo})
+			svc, cancel := asset.NewService(asset.ServiceDeps{AssetRepo: mockAssetRepo})
+			defer cancel()
 
 			got, err := svc.GetTypes(ctx, tc.Filter)
 			if err != nil && errors.Is(tc.Err, err) {
@@ -239,12 +241,13 @@ func TestService_UpsertAsset(t *testing.T) {
 				tc.Setup(ctx, assetRepo, discoveryRepo, lineageRepo)
 			}
 
-			svc := asset.NewService(asset.ServiceDeps{
+			svc, cancel := asset.NewService(asset.ServiceDeps{
 				AssetRepo:     assetRepo,
 				DiscoveryRepo: discoveryRepo,
 				LineageRepo:   lineageRepo,
 				Worker:        workermanager.NewInSituWorker(workermanager.Deps{DiscoveryRepo: discoveryRepo}),
 			})
+			defer cancel()
 
 			rid, err := svc.UpsertAsset(ctx, tc.Asset, tc.Upstreams, tc.Downstreams)
 			if tc.Err != nil {
@@ -303,12 +306,13 @@ func TestService_UpsertAssetWithoutLineage(t *testing.T) {
 				tc.Setup(ctx, assetRepo, discoveryRepo)
 			}
 
-			svc := asset.NewService(asset.ServiceDeps{
+			svc, cancel := asset.NewService(asset.ServiceDeps{
 				AssetRepo:     assetRepo,
 				DiscoveryRepo: discoveryRepo,
 				LineageRepo:   mocks.NewLineageRepository(t),
 				Worker:        workermanager.NewInSituWorker(workermanager.Deps{DiscoveryRepo: discoveryRepo}),
 			})
+			defer cancel()
 
 			rid, err := svc.UpsertAssetWithoutLineage(ctx, tc.Asset)
 			if tc.Err != nil {
@@ -430,12 +434,13 @@ func TestService_DeleteAsset(t *testing.T) {
 				tc.Setup(ctx, assetRepo, discoveryRepo, lineageRepo)
 			}
 
-			svc := asset.NewService(asset.ServiceDeps{
+			svc, cancel := asset.NewService(asset.ServiceDeps{
 				AssetRepo:     assetRepo,
 				DiscoveryRepo: discoveryRepo,
 				LineageRepo:   lineageRepo,
 				Worker:        workermanager.NewInSituWorker(workermanager.Deps{DiscoveryRepo: discoveryRepo}),
 			})
+			defer cancel()
 
 			err := svc.DeleteAsset(ctx, tc.ID)
 			if err != nil && errors.Is(tc.Err, err) {
@@ -513,12 +518,13 @@ func TestService_DeleteAssets(t *testing.T) {
 				tc.Setup(ctx, assetRepo, worker, lineageRepo)
 			}
 
-			svc := asset.NewService(asset.ServiceDeps{
+			svc, cancel := asset.NewService(asset.ServiceDeps{
 				AssetRepo:     assetRepo,
 				DiscoveryRepo: discoveryRepo,
 				LineageRepo:   lineageRepo,
 				Worker:        worker,
 			})
+			defer cancel()
 
 			affectedRows, err := svc.DeleteAssets(ctx, tc.Request)
 			time.Sleep(1 * time.Second)
@@ -640,11 +646,12 @@ func TestService_GetAssetByID(t *testing.T) {
 				tc.Setup(ctx, mockAssetRepo)
 			}
 
-			svc := asset.NewService(asset.ServiceDeps{
+			svc, cancel := asset.NewService(asset.ServiceDeps{
 				AssetRepo:     mockAssetRepo,
 				DiscoveryRepo: mocks.NewDiscoveryRepository(t),
 				LineageRepo:   mocks.NewLineageRepository(t),
 			})
+			defer cancel()
 
 			actual, err := svc.GetAssetByID(ctx, tc.ID)
 			if tc.Expected != nil {
@@ -749,11 +756,12 @@ func TestService_GetAssetByIDWithoutProbes(t *testing.T) {
 				tc.Setup(ctx, mockAssetRepo)
 			}
 
-			svc := asset.NewService(asset.ServiceDeps{
+			svc, cancel := asset.NewService(asset.ServiceDeps{
 				AssetRepo:     mockAssetRepo,
 				DiscoveryRepo: mocks.NewDiscoveryRepository(t),
 				LineageRepo:   mocks.NewLineageRepository(t),
 			})
+			defer cancel()
 
 			actual, err := svc.GetAssetByIDWithoutProbes(ctx, tc.ID)
 			if tc.Expected != nil {
@@ -822,11 +830,12 @@ func TestService_GetAssetByVersion(t *testing.T) {
 				tc.Setup(ctx, mockAssetRepo)
 			}
 
-			svc := asset.NewService(asset.ServiceDeps{
+			svc, cancel := asset.NewService(asset.ServiceDeps{
 				AssetRepo:     mockAssetRepo,
 				DiscoveryRepo: mocks.NewDiscoveryRepository(t),
 				LineageRepo:   mocks.NewLineageRepository(t),
 			})
+			defer cancel()
 
 			_, err := svc.GetAssetByVersion(ctx, tc.ID, "v0.0.2")
 			if tc.ExpectedErr != nil {
@@ -875,11 +884,12 @@ func TestService_GetAssetVersionHistory(t *testing.T) {
 				tc.Setup(ctx, mockAssetRepo)
 			}
 
-			svc := asset.NewService(asset.ServiceDeps{
+			svc, cancel := asset.NewService(asset.ServiceDeps{
 				AssetRepo:     mockAssetRepo,
 				DiscoveryRepo: mockDiscoveryRepo,
 				LineageRepo:   mockLineageRepo,
 			})
+			defer cancel()
 
 			_, err := svc.GetAssetVersionHistory(ctx, asset.Filter{}, tc.ID)
 			if err != nil && errors.Is(tc.Err, err) {
@@ -1061,11 +1071,12 @@ func TestService_GetLineage(t *testing.T) {
 				tc.Setup(ctx, mockAssetRepo, mockDiscoveryRepo, mockLineageRepo)
 			}
 
-			svc := asset.NewService(asset.ServiceDeps{
+			svc, cancel := asset.NewService(asset.ServiceDeps{
 				AssetRepo:     mockAssetRepo,
 				DiscoveryRepo: mockDiscoveryRepo,
 				LineageRepo:   mockLineageRepo,
 			})
+			defer cancel()
 
 			actual, err := svc.GetLineage(ctx, "urn-source-1", tc.Query)
 			if tc.Err == nil {
@@ -1135,11 +1146,12 @@ func TestService_SearchSuggestGroupAssets(t *testing.T) {
 				tc.Setup(ctx, mockDiscoveryRepo)
 			}
 
-			svc := asset.NewService(asset.ServiceDeps{
+			svc, cancel := asset.NewService(asset.ServiceDeps{
 				AssetRepo:     mockAssetRepo,
 				DiscoveryRepo: mockDiscoveryRepo,
 				LineageRepo:   mockLineageRepo,
 			})
+			defer cancel()
 
 			_, err := svc.SearchAssets(ctx, asset.SearchConfig{})
 			if err != nil && !assert.Equal(t, tc.ErrSearch, err) {
@@ -1171,7 +1183,8 @@ func TestService_CreateAssetProbe(t *testing.T) {
 		mockAssetRepo := mocks.NewAssetRepository(t)
 		mockAssetRepo.EXPECT().AddProbe(ctx, assetURN, &probe).Return(nil)
 
-		svc := asset.NewService(asset.ServiceDeps{AssetRepo: mockAssetRepo})
+		svc, cancel := asset.NewService(asset.ServiceDeps{AssetRepo: mockAssetRepo})
+		defer cancel()
 
 		err := svc.AddProbe(ctx, assetURN, &probe)
 		assert.NoError(t, err)
@@ -1183,7 +1196,8 @@ func TestService_CreateAssetProbe(t *testing.T) {
 		mockAssetRepo := mocks.NewAssetRepository(t)
 		mockAssetRepo.EXPECT().AddProbe(ctx, assetURN, &probe).Return(expectedErr)
 
-		svc := asset.NewService(asset.ServiceDeps{AssetRepo: mockAssetRepo})
+		svc, cancel := asset.NewService(asset.ServiceDeps{AssetRepo: mockAssetRepo})
+		defer cancel()
 
 		err := svc.AddProbe(ctx, assetURN, &probe)
 		assert.Equal(t, expectedErr, err)
