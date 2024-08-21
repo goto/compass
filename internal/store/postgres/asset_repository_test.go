@@ -1392,8 +1392,8 @@ func (r *AssetRepositoryTestSuite) TestDeleteByQueryExpr() {
 			"' && type == '" + asset1.Type.String() +
 			"' && urn == '" + asset1.URN + "'"
 		sqlExpr := queryexpr.SQLExpr(query)
-		queryExpr := &asset.DeleteAssetExpr{
-			ExprStr: &sqlExpr,
+		queryExpr := asset.DeleteAssetExpr{
+			ExprStr: sqlExpr,
 		}
 		urns, err := r.repository.DeleteByQueryExpr(r.ctx, queryExpr)
 		r.NoError(err)

@@ -151,8 +151,8 @@ func (repo *DiscoveryRepository) DeleteByQueryExpr(ctx context.Context, queryExp
 	}
 
 	expr := queryexpr.ESExpr(queryExpr)
-	deleteAssetESExpr := &asset.DeleteAssetExpr{
-		ExprStr: &expr,
+	deleteAssetESExpr := asset.DeleteAssetExpr{
+		ExprStr: expr,
 	}
 	esQuery, err := queryexpr.ValidateAndGetQueryFromExpr(deleteAssetESExpr)
 	if err != nil {

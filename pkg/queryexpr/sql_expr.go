@@ -10,12 +10,12 @@ import (
 
 type SQLExpr string
 
-func (s *SQLExpr) String() string {
-	return string(*s)
+func (s SQLExpr) String() string {
+	return string(s)
 }
 
 // ToQuery default
-func (s *SQLExpr) ToQuery() (string, error) {
+func (s SQLExpr) ToQuery() (string, error) {
 	queryExprParsed, err := getTreeNodeFromQueryExpr(s.String())
 	if err != nil {
 		return "", err
@@ -28,13 +28,13 @@ func (s *SQLExpr) ToQuery() (string, error) {
 }
 
 // Validate default: no validation
-func (*SQLExpr) Validate() error {
+func (SQLExpr) Validate() error {
 	return nil
 }
 
 // convertToSQL The idea came from ast.Walk. Currently, the development focus implement for the node type that most likely used in our needs.
 // TODO: implement translator for node type that still not covered right now.
-func (s *SQLExpr) convertToSQL(node ast.Node, stringBuilder *strings.Builder) error {
+func (s SQLExpr) convertToSQL(node ast.Node, stringBuilder *strings.Builder) error {
 	if node == nil {
 		return fmt.Errorf("cannot convert nil to SQL query")
 	}
@@ -83,7 +83,7 @@ func (s *SQLExpr) convertToSQL(node ast.Node, stringBuilder *strings.Builder) er
 	return nil
 }
 
-func (s *SQLExpr) binaryNodeToSQLQuery(n *ast.BinaryNode, stringBuilder *strings.Builder) error {
+func (s SQLExpr) binaryNodeToSQLQuery(n *ast.BinaryNode, stringBuilder *strings.Builder) error {
 	operator := s.operatorToSQL(n)
 	if operator == "" { // most likely the node is operation
 		result, err := GetQueryExprResult(n.String())
@@ -109,7 +109,7 @@ func (s *SQLExpr) binaryNodeToSQLQuery(n *ast.BinaryNode, stringBuilder *strings
 	return nil
 }
 
-func (s *SQLExpr) arrayNodeToSQLQuery(n *ast.ArrayNode, stringBuilder *strings.Builder) error {
+func (s SQLExpr) arrayNodeToSQLQuery(n *ast.ArrayNode, stringBuilder *strings.Builder) error {
 	stringBuilder.WriteString("(")
 	for i := range n.Nodes {
 		if err := s.convertToSQL(n.Nodes[i], stringBuilder); err != nil {
@@ -123,7 +123,7 @@ func (s *SQLExpr) arrayNodeToSQLQuery(n *ast.ArrayNode, stringBuilder *strings.B
 	return nil
 }
 
-func (s *SQLExpr) patchUnaryNode(n *ast.UnaryNode) error {
+func (s SQLExpr) patchUnaryNode(n *ast.UnaryNode) error {
 	switch n.Operator {
 	case "not":
 		binaryNode, ok := (n.Node).(*ast.BinaryNode)
@@ -161,7 +161,7 @@ func (s *SQLExpr) patchUnaryNode(n *ast.UnaryNode) error {
 	return nil
 }
 
-func (*SQLExpr) operatorToSQL(bn *ast.BinaryNode) string {
+func (SQLExpr) operatorToSQL(bn *ast.BinaryNode) string {
 	switch strings.ToUpper(bn.Operator) {
 	case "&&":
 		return "AND"
@@ -186,6 +186,6 @@ func (*SQLExpr) operatorToSQL(bn *ast.BinaryNode) string {
 	return "" // identify operation, like: +, -, *, etc
 }
 
-func (*SQLExpr) unsupportedQueryError(node ast.Node) error {
+func (SQLExpr) unsupportedQueryError(node ast.Node) error {
 	return fmt.Errorf("unsupported query expr: %s to SQL query", node.String())
 }

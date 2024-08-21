@@ -19,6 +19,7 @@ type Service struct {
 	lineageRepository   LineageRepository
 	worker              Worker
 	logger              log.Logger
+	cancelFnList        []func()
 
 	assetOpCounter metric.Int64Counter
 }
@@ -41,20 +42,28 @@ type ServiceDeps struct {
 	Logger        log.Logger
 }
 
-func NewService(deps ServiceDeps) *Service {
+func NewService(deps ServiceDeps) (*Service, func()) {
 	assetOpCounter, err := otel.Meter("github.com/goto/compass/core/asset").
 		Int64Counter("compass.asset.operation")
 	if err != nil {
 		otel.Handle(err)
 	}
 
-	return &Service{
+	service := &Service{
 		assetRepository:     deps.AssetRepo,
 		discoveryRepository: deps.DiscoveryRepo,
 		lineageRepository:   deps.LineageRepo,
 		worker:              deps.Worker,
+		logger:              deps.Logger,
+		cancelFnList:        make([]func(), 0),
 
 		assetOpCounter: assetOpCounter,
+	}
+
+	return service, func() {
+		for i := range service.cancelFnList {
+			service.cancelFnList[i]()
+		}
 	}
 }
 
@@ -132,9 +141,8 @@ func (s *Service) DeleteAsset(ctx context.Context, id string) (err error) {
 }
 
 func (s *Service) DeleteAssets(ctx context.Context, request DeleteAssetsRequest) (affectedRows uint32, err error) {
-	expr := queryexpr.SQLExpr(request.QueryExpr)
 	deleteExpr := DeleteAssetExpr{
-		ExprStr: &expr,
+		ExprStr: queryexpr.SQLExpr(request.QueryExpr),
 	}
 	total, err := s.assetRepository.GetCountByQueryExpr(ctx, deleteExpr)
 	if err != nil {
@@ -143,7 +151,7 @@ func (s *Service) DeleteAssets(ctx context.Context, request DeleteAssetsRequest)
 
 	if !request.DryRun {
 		newCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
-		defer cancel()
+		s.cancelFnList = append(s.cancelFnList, cancel)
 		go s.executeDeleteAssets(newCtx, deleteExpr)
 	}
 
