@@ -42,14 +42,14 @@ type ServiceDeps struct {
 	Logger        log.Logger
 }
 
-func NewService(deps ServiceDeps) (*Service, func()) {
+func NewService(deps ServiceDeps) (service *Service, cancel func()) {
 	assetOpCounter, err := otel.Meter("github.com/goto/compass/core/asset").
 		Int64Counter("compass.asset.operation")
 	if err != nil {
 		otel.Handle(err)
 	}
 
-	service := &Service{
+	newService := &Service{
 		assetRepository:     deps.AssetRepo,
 		discoveryRepository: deps.DiscoveryRepo,
 		lineageRepository:   deps.LineageRepo,
@@ -60,9 +60,9 @@ func NewService(deps ServiceDeps) (*Service, func()) {
 		assetOpCounter: assetOpCounter,
 	}
 
-	return service, func() {
-		for i := range service.cancelFnList {
-			service.cancelFnList[i]()
+	return newService, func() {
+		for i := range newService.cancelFnList {
+			newService.cancelFnList[i]()
 		}
 	}
 }
