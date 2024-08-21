@@ -52,6 +52,8 @@ service:
         max_send_msg_size: 33554432
         max_recv_msg_size: 33554432
         request_timeout: 5s
+    additional_asset_types:
+        - fact_source
 
 worker:
     enabled: true
