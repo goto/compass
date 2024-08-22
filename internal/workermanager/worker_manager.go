@@ -19,16 +19,17 @@ import (
 )
 
 type Manager struct {
-	processor      *pgq.Processor
-	initDone       atomic.Bool
-	worker         Worker
-	jobManagerPort int
-	discoveryRepo  DiscoveryRepository
-	assetRepo      asset.Repository
-	logger         log.Logger
-	syncTimeout    time.Duration
-	indexTimeout   time.Duration
-	deleteTimeout  time.Duration
+	processor        *pgq.Processor
+	initDone         atomic.Bool
+	worker           Worker
+	jobManagerPort   int
+	discoveryRepo    DiscoveryRepository
+	assetRepo        asset.Repository
+	logger           log.Logger
+	syncTimeout      time.Duration
+	indexTimeout     time.Duration
+	deleteTimeout    time.Duration
+	maxAttemptsRetry int
 }
 
 //go:generate mockery --name=Worker -r --case underscore --with-expecter --structname Worker --filename worker_mock.go --output=./mocks
@@ -50,6 +51,7 @@ type Config struct {
 	SyncJobTimeout    time.Duration `mapstructure:"sync_job_timeout" default:"15m"`
 	IndexJobTimeout   time.Duration `mapstructure:"index_job_timeout" default:"5s"`
 	DeleteJobTimeout  time.Duration `mapstructure:"delete_job_timeout" default:"5s"`
+	MaxAttemptRetry   int           `mapstructure:"max_attempt_retry" default:"3"`
 }
 
 type Deps struct {
@@ -77,15 +79,16 @@ func New(ctx context.Context, deps Deps) (*Manager, error) {
 	}
 
 	return &Manager{
-		processor:      processor,
-		worker:         w,
-		jobManagerPort: cfg.JobManagerPort,
-		discoveryRepo:  deps.DiscoveryRepo,
-		assetRepo:      deps.AssetRepo,
-		logger:         deps.Logger,
-		syncTimeout:    cfg.SyncJobTimeout,
-		indexTimeout:   cfg.IndexJobTimeout,
-		deleteTimeout:  cfg.DeleteJobTimeout,
+		processor:        processor,
+		worker:           w,
+		jobManagerPort:   cfg.JobManagerPort,
+		discoveryRepo:    deps.DiscoveryRepo,
+		assetRepo:        deps.AssetRepo,
+		logger:           deps.Logger,
+		syncTimeout:      cfg.SyncJobTimeout,
+		indexTimeout:     cfg.IndexJobTimeout,
+		deleteTimeout:    cfg.DeleteJobTimeout,
+		maxAttemptsRetry: cfg.MaxAttemptRetry,
 	}, nil
 }
 
@@ -124,9 +127,10 @@ func (m *Manager) init() error {
 	m.initDone.Store(true)
 
 	jobHandlers := map[string]worker.JobHandler{
-		jobIndexAsset:  m.indexAssetHandler(),
-		jobDeleteAsset: m.deleteAssetHandler(),
-		jobSyncAsset:   m.syncAssetHandler(),
+		jobIndexAsset:          m.indexAssetHandler(),
+		jobDeleteAsset:         m.deleteAssetHandler(),
+		jobDeleteAssetsByQuery: m.deleteAssetsByQueryHandler(),
+		jobSyncAsset:           m.syncAssetHandler(),
 	}
 	for typ, h := range jobHandlers {
 		if err := m.worker.Register(typ, h); err != nil {

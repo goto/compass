@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/goto/compass/core/asset"
+	queryexpr "github.com/goto/compass/pkg/queryexpr"
 	"github.com/goto/salt/log"
 )
 
@@ -142,6 +143,19 @@ func (repo *DiscoveryRepository) DeleteByURN(ctx context.Context, assetURN strin
 	}
 
 	return repo.deleteWithQuery(ctx, "DeleteByURN", fmt.Sprintf(`{"query":{"term":{"urn.keyword": %q}}}`, assetURN))
+}
+
+func (repo *DiscoveryRepository) DeleteByQueryExpr(ctx context.Context, queryExpr queryexpr.ExprStr) error {
+	if strings.TrimSpace(queryExpr.String()) == "" {
+		return asset.ErrEmptyQuery
+	}
+
+	esQuery, err := queryexpr.ValidateAndGetQueryFromExpr(queryExpr)
+	if err != nil {
+		return err
+	}
+
+	return repo.deleteWithQuery(ctx, "DeleteByQueryExpr", esQuery)
 }
 
 func (repo *DiscoveryRepository) deleteWithQuery(ctx context.Context, discoveryOp, qry string) (err error) {

@@ -80,7 +80,7 @@ func (_m *DiscoveryRepository) DeleteByURN(ctx context.Context, assetURN string)
 	return r0
 }
 
-// DiscoveryRepository_DeleteByURN_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteByURN'
+// DiscoveryRepository_DeleteByURN_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteByURNs'
 type DiscoveryRepository_DeleteByURN_Call struct {
 	*mock.Call
 }
@@ -89,7 +89,7 @@ type DiscoveryRepository_DeleteByURN_Call struct {
 //   - ctx context.Context
 //   - assetURN string
 func (_e *DiscoveryRepository_Expecter) DeleteByURN(ctx interface{}, assetURN interface{}) *DiscoveryRepository_DeleteByURN_Call {
-	return &DiscoveryRepository_DeleteByURN_Call{Call: _e.mock.On("DeleteByURN", ctx, assetURN)}
+	return &DiscoveryRepository_DeleteByURN_Call{Call: _e.mock.On("DeleteByURNs", ctx, assetURN)}
 }
 
 func (_c *DiscoveryRepository_DeleteByURN_Call) Run(run func(ctx context.Context, assetURN string)) *DiscoveryRepository_DeleteByURN_Call {

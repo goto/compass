@@ -38,6 +38,7 @@ const (
 	CompassService_UpsertAsset_FullMethodName              = "/gotocompany.compass.v1beta1.CompassService/UpsertAsset"
 	CompassService_UpsertPatchAsset_FullMethodName         = "/gotocompany.compass.v1beta1.CompassService/UpsertPatchAsset"
 	CompassService_DeleteAsset_FullMethodName              = "/gotocompany.compass.v1beta1.CompassService/DeleteAsset"
+	CompassService_DeleteAssets_FullMethodName             = "/gotocompany.compass.v1beta1.CompassService/DeleteAssets"
 	CompassService_GetAssetStargazers_FullMethodName       = "/gotocompany.compass.v1beta1.CompassService/GetAssetStargazers"
 	CompassService_GetAssetVersionHistory_FullMethodName   = "/gotocompany.compass.v1beta1.CompassService/GetAssetVersionHistory"
 	CompassService_GetAssetByVersion_FullMethodName        = "/gotocompany.compass.v1beta1.CompassService/GetAssetByVersion"
@@ -87,6 +88,7 @@ type CompassServiceClient interface {
 	UpsertAsset(ctx context.Context, in *UpsertAssetRequest, opts ...grpc.CallOption) (*UpsertAssetResponse, error)
 	UpsertPatchAsset(ctx context.Context, in *UpsertPatchAssetRequest, opts ...grpc.CallOption) (*UpsertPatchAssetResponse, error)
 	DeleteAsset(ctx context.Context, in *DeleteAssetRequest, opts ...grpc.CallOption) (*DeleteAssetResponse, error)
+	DeleteAssets(ctx context.Context, in *DeleteAssetsRequest, opts ...grpc.CallOption) (*DeleteAssetsResponse, error)
 	GetAssetStargazers(ctx context.Context, in *GetAssetStargazersRequest, opts ...grpc.CallOption) (*GetAssetStargazersResponse, error)
 	GetAssetVersionHistory(ctx context.Context, in *GetAssetVersionHistoryRequest, opts ...grpc.CallOption) (*GetAssetVersionHistoryResponse, error)
 	GetAssetByVersion(ctx context.Context, in *GetAssetByVersionRequest, opts ...grpc.CallOption) (*GetAssetByVersionResponse, error)
@@ -285,6 +287,15 @@ func (c *compassServiceClient) UpsertPatchAsset(ctx context.Context, in *UpsertP
 func (c *compassServiceClient) DeleteAsset(ctx context.Context, in *DeleteAssetRequest, opts ...grpc.CallOption) (*DeleteAssetResponse, error) {
 	out := new(DeleteAssetResponse)
 	err := c.cc.Invoke(ctx, CompassService_DeleteAsset_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *compassServiceClient) DeleteAssets(ctx context.Context, in *DeleteAssetsRequest, opts ...grpc.CallOption) (*DeleteAssetsResponse, error) {
+	out := new(DeleteAssetsResponse)
+	err := c.cc.Invoke(ctx, CompassService_DeleteAssets_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -506,6 +517,7 @@ type CompassServiceServer interface {
 	UpsertAsset(context.Context, *UpsertAssetRequest) (*UpsertAssetResponse, error)
 	UpsertPatchAsset(context.Context, *UpsertPatchAssetRequest) (*UpsertPatchAssetResponse, error)
 	DeleteAsset(context.Context, *DeleteAssetRequest) (*DeleteAssetResponse, error)
+	DeleteAssets(context.Context, *DeleteAssetsRequest) (*DeleteAssetsResponse, error)
 	GetAssetStargazers(context.Context, *GetAssetStargazersRequest) (*GetAssetStargazersResponse, error)
 	GetAssetVersionHistory(context.Context, *GetAssetVersionHistoryRequest) (*GetAssetVersionHistoryResponse, error)
 	GetAssetByVersion(context.Context, *GetAssetByVersionRequest) (*GetAssetByVersionResponse, error)
@@ -592,6 +604,9 @@ func (UnimplementedCompassServiceServer) UpsertPatchAsset(context.Context, *Upse
 }
 func (UnimplementedCompassServiceServer) DeleteAsset(context.Context, *DeleteAssetRequest) (*DeleteAssetResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DeleteAsset not implemented")
+}
+func (UnimplementedCompassServiceServer) DeleteAssets(context.Context, *DeleteAssetsRequest) (*DeleteAssetsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteAssets not implemented")
 }
 func (UnimplementedCompassServiceServer) GetAssetStargazers(context.Context, *GetAssetStargazersRequest) (*GetAssetStargazersResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetAssetStargazers not implemented")
@@ -1007,6 +1022,24 @@ func _CompassService_DeleteAsset_Handler(srv interface{}, ctx context.Context, d
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(CompassServiceServer).DeleteAsset(ctx, req.(*DeleteAssetRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CompassService_DeleteAssets_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteAssetsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CompassServiceServer).DeleteAssets(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CompassService_DeleteAssets_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CompassServiceServer).DeleteAssets(ctx, req.(*DeleteAssetsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1471,6 +1504,10 @@ var CompassService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteAsset",
 			Handler:    _CompassService_DeleteAsset_Handler,
+		},
+		{
+			MethodName: "DeleteAssets",
+			Handler:    _CompassService_DeleteAssets_Handler,
 		},
 		{
 			MethodName: "GetAssetStargazers",

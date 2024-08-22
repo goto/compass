@@ -3,11 +3,13 @@ package workermanager_test
 import (
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/goto/compass/core/asset"
 	"github.com/goto/compass/internal/testutils"
 	"github.com/goto/compass/internal/workermanager"
 	"github.com/goto/compass/internal/workermanager/mocks"
+	"github.com/goto/compass/pkg/queryexpr"
 	"github.com/goto/compass/pkg/worker"
 	"github.com/stretchr/testify/assert"
 )
@@ -146,8 +148,91 @@ func TestManager_DeleteAsset(t *testing.T) {
 				DiscoveryRepo: discoveryRepo,
 			})
 			err := mgr.DeleteAsset(ctx, worker.JobSpec{
-				Type:    "index-asset",
+				Type:    "delete-asset",
 				Payload: []byte("some-urn"),
+			})
+			if tc.expectedErr {
+				var re *worker.RetryableError
+				assert.ErrorAs(t, err, &re)
+				assert.ErrorIs(t, err, tc.discoveryErr)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestManager_EnqueueDeleteAssetsByQueryExprJob(t *testing.T) {
+	cases := []struct {
+		name        string
+		enqueueErr  error
+		expectedErr string
+	}{
+		{name: "Success"},
+		{
+			name:        "Failure",
+			enqueueErr:  errors.New("fail"),
+			expectedErr: "enqueue delete asset job: fail: query expr:",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			queryExpr := "refreshed_at <= '" + time.Now().Format("2006-01-02T15:04:05Z") +
+				"' && service == 'test-service'" +
+				"' && type == 'table'" +
+				"' && urn == 'some-urn'"
+			wrkr := mocks.NewWorker(t)
+			wrkr.EXPECT().
+				Enqueue(ctx, worker.JobSpec{
+					Type:    "delete-assets-by-query",
+					Payload: []byte(queryExpr),
+				}).
+				Return(tc.enqueueErr)
+
+			mgr := workermanager.NewWithWorker(wrkr, workermanager.Deps{})
+			err := mgr.EnqueueDeleteAssetsByQueryExprJob(ctx, queryExpr)
+			if tc.expectedErr != "" {
+				assert.ErrorContains(t, err, tc.expectedErr)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestManager_DeleteAssets(t *testing.T) {
+	cases := []struct {
+		name         string
+		discoveryErr error
+		expectedErr  bool
+	}{
+		{name: "Success"},
+		{
+			name:         "failure",
+			discoveryErr: errors.New("fail"),
+			expectedErr:  true,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			queryExpr := "refreshed_at <= '" + time.Now().Format("2006-01-02T15:04:05Z") +
+				"' && service == 'test-service'" +
+				"' && type == 'table'" +
+				"' && urn == 'some-urn'"
+			deleteESExpr := asset.DeleteAssetExpr{
+				ExprStr: queryexpr.ESExpr(queryExpr),
+			}
+			discoveryRepo := mocks.NewDiscoveryRepository(t)
+			discoveryRepo.EXPECT().
+				DeleteByQueryExpr(ctx, deleteESExpr).
+				Return(tc.discoveryErr)
+
+			mgr := workermanager.NewWithWorker(mocks.NewWorker(t), workermanager.Deps{
+				DiscoveryRepo: discoveryRepo,
+			})
+			err := mgr.DeleteAssetsByQueryExpr(ctx, worker.JobSpec{
+				Type:    "delete-assets-by-query",
+				Payload: []byte(queryExpr),
 			})
 			if tc.expectedErr {
 				var re *worker.RetryableError

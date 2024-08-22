@@ -68,6 +68,7 @@ worker:
     sync_job_timeout: 15m
     index_job_timeout: 5s
     delete_job_timeout: 5s
+    max_attempt_retry: 3
 
 client:
     host: localhost:8081

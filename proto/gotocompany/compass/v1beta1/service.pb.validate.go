@@ -5463,6 +5463,225 @@ var _ interface {
 	ErrorName() string
 } = DeleteAssetResponseValidationError{}
 
+// Validate checks the field values on DeleteAssetsRequest with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *DeleteAssetsRequest) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on DeleteAssetsRequest with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// DeleteAssetsRequestMultiError, or nil if none found.
+func (m *DeleteAssetsRequest) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *DeleteAssetsRequest) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	if utf8.RuneCountInString(m.GetQueryExpr()) < 3 {
+		err := DeleteAssetsRequestValidationError{
+			field:  "QueryExpr",
+			reason: "value length must be at least 3 runes",
+		}
+		if !all {
+			return err
+		}
+		errors = append(errors, err)
+	}
+
+	// no validation rules for DryRun
+
+	if len(errors) > 0 {
+		return DeleteAssetsRequestMultiError(errors)
+	}
+
+	return nil
+}
+
+// DeleteAssetsRequestMultiError is an error wrapping multiple validation
+// errors returned by DeleteAssetsRequest.ValidateAll() if the designated
+// constraints aren't met.
+type DeleteAssetsRequestMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m DeleteAssetsRequestMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m DeleteAssetsRequestMultiError) AllErrors() []error { return m }
+
+// DeleteAssetsRequestValidationError is the validation error returned by
+// DeleteAssetsRequest.Validate if the designated constraints aren't met.
+type DeleteAssetsRequestValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e DeleteAssetsRequestValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e DeleteAssetsRequestValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e DeleteAssetsRequestValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e DeleteAssetsRequestValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e DeleteAssetsRequestValidationError) ErrorName() string {
+	return "DeleteAssetsRequestValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e DeleteAssetsRequestValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sDeleteAssetsRequest.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = DeleteAssetsRequestValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = DeleteAssetsRequestValidationError{}
+
+// Validate checks the field values on DeleteAssetsResponse with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the first error encountered is returned, or nil if there are no violations.
+func (m *DeleteAssetsResponse) Validate() error {
+	return m.validate(false)
+}
+
+// ValidateAll checks the field values on DeleteAssetsResponse with the rules
+// defined in the proto definition for this message. If any rules are
+// violated, the result is a list of violation errors wrapped in
+// DeleteAssetsResponseMultiError, or nil if none found.
+func (m *DeleteAssetsResponse) ValidateAll() error {
+	return m.validate(true)
+}
+
+func (m *DeleteAssetsResponse) validate(all bool) error {
+	if m == nil {
+		return nil
+	}
+
+	var errors []error
+
+	// no validation rules for AffectedRows
+
+	if len(errors) > 0 {
+		return DeleteAssetsResponseMultiError(errors)
+	}
+
+	return nil
+}
+
+// DeleteAssetsResponseMultiError is an error wrapping multiple validation
+// errors returned by DeleteAssetsResponse.ValidateAll() if the designated
+// constraints aren't met.
+type DeleteAssetsResponseMultiError []error
+
+// Error returns a concatenation of all the error messages it wraps.
+func (m DeleteAssetsResponseMultiError) Error() string {
+	var msgs []string
+	for _, err := range m {
+		msgs = append(msgs, err.Error())
+	}
+	return strings.Join(msgs, "; ")
+}
+
+// AllErrors returns a list of validation violation errors.
+func (m DeleteAssetsResponseMultiError) AllErrors() []error { return m }
+
+// DeleteAssetsResponseValidationError is the validation error returned by
+// DeleteAssetsResponse.Validate if the designated constraints aren't met.
+type DeleteAssetsResponseValidationError struct {
+	field  string
+	reason string
+	cause  error
+	key    bool
+}
+
+// Field function returns field value.
+func (e DeleteAssetsResponseValidationError) Field() string { return e.field }
+
+// Reason function returns reason value.
+func (e DeleteAssetsResponseValidationError) Reason() string { return e.reason }
+
+// Cause function returns cause value.
+func (e DeleteAssetsResponseValidationError) Cause() error { return e.cause }
+
+// Key function returns key value.
+func (e DeleteAssetsResponseValidationError) Key() bool { return e.key }
+
+// ErrorName returns error name.
+func (e DeleteAssetsResponseValidationError) ErrorName() string {
+	return "DeleteAssetsResponseValidationError"
+}
+
+// Error satisfies the builtin error interface
+func (e DeleteAssetsResponseValidationError) Error() string {
+	cause := ""
+	if e.cause != nil {
+		cause = fmt.Sprintf(" | caused by: %v", e.cause)
+	}
+
+	key := ""
+	if e.key {
+		key = "key for "
+	}
+
+	return fmt.Sprintf(
+		"invalid %sDeleteAssetsResponse.%s: %s%s",
+		key,
+		e.field,
+		e.reason,
+		cause)
+}
+
+var _ error = DeleteAssetsResponseValidationError{}
+
+var _ interface {
+	Field() string
+	Reason() string
+	Key() bool
+	Cause() error
+	ErrorName() string
+} = DeleteAssetsResponseValidationError{}
+
 // Validate checks the field values on GetAssetStargazersRequest with the rules
 // defined in the proto definition for this message. If any rules are
 // violated, the first error encountered is returned, or nil if there are no violations.

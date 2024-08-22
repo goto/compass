@@ -148,12 +148,14 @@ func runServer(ctx context.Context, cfg *Config) error {
 		}
 	}()
 
-	assetService := asset.NewService(asset.ServiceDeps{
+	assetService, cancel := asset.NewService(asset.ServiceDeps{
 		AssetRepo:     assetRepository,
 		DiscoveryRepo: discoveryRepository,
 		LineageRepo:   lineageRepository,
 		Worker:        wrkr,
+		Logger:        logger,
 	})
+	defer cancel()
 
 	// init discussion
 	discussionRepository, err := postgres.NewDiscussionRepository(pgClient, 0)

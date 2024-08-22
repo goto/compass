@@ -420,6 +420,44 @@ paths:
           type: string
       tags:
         - Asset
+  /v1beta1/assets/delete-by-query:
+    post:
+      summary: Delete assets
+      description: Delete all assets that match with specified query expr
+      operationId: CompassService_DeleteAssets
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            $ref: '#/definitions/DeleteAssetsResponse'
+        "400":
+          description: Returned when the data that user input is wrong.
+          schema:
+            $ref: '#/definitions/Status'
+        "404":
+          description: Returned when the resource does not exist.
+          schema:
+            $ref: '#/definitions/Status'
+        "409":
+          description: Returned when the resource already exist.
+          schema:
+            $ref: '#/definitions/Status'
+        "500":
+          description: Returned when theres is something wrong on the server side.
+          schema:
+            $ref: '#/definitions/Status'
+        default:
+          description: An unexpected error response.
+          schema:
+            $ref: '#/definitions/Status'
+      parameters:
+        - name: body
+          in: body
+          required: true
+          schema:
+            $ref: '#/definitions/DeleteAssetsRequest'
+      tags:
+        - Asset
   /v1beta1/assets/sync:
     post:
       summary: Syncs assets in elasticsearch
@@ -2046,6 +2084,21 @@ definitions:
         $ref: '#/definitions/TagTemplate'
   DeleteAssetResponse:
     type: object
+  DeleteAssetsRequest:
+    type: object
+    properties:
+      query_expr:
+        type: string
+        description: 'filter by query expr, example: refreshed_at <= "2024-08-05T23:59:59"'
+      dry_run:
+        type: boolean
+        description: if set to true, then deletion should not proceed and only return the affected rows. else, will perform deletion in the background
+  DeleteAssetsResponse:
+    type: object
+    properties:
+      affected_rows:
+        type: integer
+        format: int64
   DeleteCommentResponse:
     type: object
   DeleteTagAssetResponse:

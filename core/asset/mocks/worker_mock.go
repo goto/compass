@@ -107,6 +107,49 @@ func (_c *Worker_EnqueueDeleteAssetJob_Call) RunAndReturn(run func(context.Conte
 	return _c
 }
 
+// EnqueueDeleteAssetsByQueryExprJob provides a mock function with given fields: ctx, queryExpr
+func (_m *Worker) EnqueueDeleteAssetsByQueryExprJob(ctx context.Context, queryExpr string) error {
+	ret := _m.Called(ctx, queryExpr)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) error); ok {
+		r0 = rf(ctx, queryExpr)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// Worker_EnqueueDeleteAssetsByQueryExprJob_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'EnqueueDeleteAssetsByQueryExprJob'
+type Worker_EnqueueDeleteAssetsByQueryExprJob_Call struct {
+	*mock.Call
+}
+
+// EnqueueDeleteAssetsByQueryExprJob is a helper method to define mock.On call
+//   - ctx context.Context
+//   - queryExpr string
+func (_e *Worker_Expecter) EnqueueDeleteAssetsByQueryExprJob(ctx interface{}, queryExpr interface{}) *Worker_EnqueueDeleteAssetsByQueryExprJob_Call {
+	return &Worker_EnqueueDeleteAssetsByQueryExprJob_Call{Call: _e.mock.On("EnqueueDeleteAssetsByQueryExprJob", ctx, queryExpr)}
+}
+
+func (_c *Worker_EnqueueDeleteAssetsByQueryExprJob_Call) Run(run func(ctx context.Context, queryExpr string)) *Worker_EnqueueDeleteAssetsByQueryExprJob_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *Worker_EnqueueDeleteAssetsByQueryExprJob_Call) Return(_a0 error) *Worker_EnqueueDeleteAssetsByQueryExprJob_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *Worker_EnqueueDeleteAssetsByQueryExprJob_Call) RunAndReturn(run func(context.Context, string) error) *Worker_EnqueueDeleteAssetsByQueryExprJob_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // EnqueueIndexAssetJob provides a mock function with given fields: ctx, ast
 func (_m *Worker) EnqueueIndexAssetJob(ctx context.Context, ast asset.Asset) error {
 	ret := _m.Called(ctx, ast)

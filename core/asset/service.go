@@ -3,8 +3,11 @@ package asset
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/goto/compass/pkg/queryexpr"
+	"github.com/goto/salt/log"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
@@ -15,6 +18,8 @@ type Service struct {
 	discoveryRepository DiscoveryRepository
 	lineageRepository   LineageRepository
 	worker              Worker
+	logger              log.Logger
+	cancelFnList        []func()
 
 	assetOpCounter metric.Int64Counter
 }
@@ -24,6 +29,7 @@ type Service struct {
 type Worker interface {
 	EnqueueIndexAssetJob(ctx context.Context, ast Asset) error
 	EnqueueDeleteAssetJob(ctx context.Context, urn string) error
+	EnqueueDeleteAssetsByQueryExprJob(ctx context.Context, queryExpr string) error
 	EnqueueSyncAssetJob(ctx context.Context, service string) error
 	Close() error
 }
@@ -33,22 +39,31 @@ type ServiceDeps struct {
 	DiscoveryRepo DiscoveryRepository
 	LineageRepo   LineageRepository
 	Worker        Worker
+	Logger        log.Logger
 }
 
-func NewService(deps ServiceDeps) *Service {
+func NewService(deps ServiceDeps) (service *Service, cancel func()) {
 	assetOpCounter, err := otel.Meter("github.com/goto/compass/core/asset").
 		Int64Counter("compass.asset.operation")
 	if err != nil {
 		otel.Handle(err)
 	}
 
-	return &Service{
+	newService := &Service{
 		assetRepository:     deps.AssetRepo,
 		discoveryRepository: deps.DiscoveryRepo,
 		lineageRepository:   deps.LineageRepo,
 		worker:              deps.Worker,
+		logger:              deps.Logger,
+		cancelFnList:        make([]func(), 0),
 
 		assetOpCounter: assetOpCounter,
+	}
+
+	return newService, func() {
+		for i := range newService.cancelFnList {
+			newService.cancelFnList[i]()
+		}
 	}
 }
 
@@ -83,6 +98,9 @@ func (s *Service) UpsertAsset(ctx context.Context, ast *Asset, upstreams, downst
 }
 
 func (s *Service) UpsertAssetWithoutLineage(ctx context.Context, ast *Asset) (string, error) {
+	currentTime := time.Now()
+	ast.RefreshedAt = &currentTime
+
 	assetID, err := s.assetRepository.Upsert(ctx, ast)
 	if err != nil {
 		return "", err
@@ -120,6 +138,40 @@ func (s *Service) DeleteAsset(ctx context.Context, id string) (err error) {
 	}
 
 	return s.lineageRepository.DeleteByURN(ctx, urn)
+}
+
+func (s *Service) DeleteAssets(ctx context.Context, request DeleteAssetsRequest) (affectedRows uint32, err error) {
+	deleteSQLExpr := DeleteAssetExpr{
+		ExprStr: queryexpr.SQLExpr(request.QueryExpr),
+	}
+	total, err := s.assetRepository.GetCountByQueryExpr(ctx, deleteSQLExpr)
+	if err != nil {
+		return 0, err
+	}
+
+	if !request.DryRun {
+		newCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		s.cancelFnList = append(s.cancelFnList, cancel)
+		go s.executeDeleteAssets(newCtx, deleteSQLExpr)
+	}
+
+	return uint32(total), nil
+}
+
+func (s *Service) executeDeleteAssets(ctx context.Context, deleteSQLExpr queryexpr.ExprStr) {
+	deletedURNs, err := s.assetRepository.DeleteByQueryExpr(ctx, deleteSQLExpr)
+	if err != nil {
+		s.logger.Error("Asset deletion failed, skipping Elasticsearch and Lineage deletions. Err:", err)
+		return
+	}
+
+	if err := s.lineageRepository.DeleteByURNs(ctx, deletedURNs); err != nil {
+		s.logger.Error("Error occurred during Lineage deletion:", err)
+	}
+
+	if err := s.worker.EnqueueDeleteAssetsByQueryExprJob(ctx, deleteSQLExpr.String()); err != nil {
+		s.logger.Error("Error occurred during Elasticsearch deletion:", err)
+	}
 }
 
 func (s *Service) GetAssetByID(ctx context.Context, id string) (Asset, error) {

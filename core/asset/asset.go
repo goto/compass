@@ -6,12 +6,14 @@ import (
 	"time"
 
 	"github.com/goto/compass/core/user"
+	"github.com/goto/compass/pkg/queryexpr"
 	"github.com/r3labs/diff/v2"
 )
 
 type Repository interface {
 	GetAll(context.Context, Filter) ([]Asset, error)
 	GetCount(context.Context, Filter) (int, error)
+	GetCountByQueryExpr(ctx context.Context, queryExpr queryexpr.ExprStr) (int, error)
 	GetByID(ctx context.Context, id string) (Asset, error)
 	GetByURN(ctx context.Context, urn string) (Asset, error)
 	GetVersionHistory(ctx context.Context, flt Filter, id string) ([]Asset, error)
@@ -21,6 +23,7 @@ type Repository interface {
 	Upsert(ctx context.Context, ast *Asset) (string, error)
 	DeleteByID(ctx context.Context, id string) error
 	DeleteByURN(ctx context.Context, urn string) error
+	DeleteByQueryExpr(ctx context.Context, queryExpr queryexpr.ExprStr) ([]string, error)
 	AddProbe(ctx context.Context, assetURN string, probe *Probe) error
 	GetProbes(ctx context.Context, assetURN string) ([]Probe, error)
 	GetProbesWithFilter(ctx context.Context, flt ProbesFilter) (map[string][]Probe, error)
@@ -40,6 +43,7 @@ type Asset struct {
 	Owners      []user.User            `json:"owners,omitempty" diff:"owners"`
 	CreatedAt   time.Time              `json:"created_at" diff:"-"`
 	UpdatedAt   time.Time              `json:"updated_at" diff:"-"`
+	RefreshedAt *time.Time             `json:"refreshed_at" diff:"-"`
 	Version     string                 `json:"version" diff:"-"`
 	UpdatedBy   user.User              `json:"updated_by" diff:"-"`
 	Changelog   diff.Changelog         `json:"changelog,omitempty" diff:"-"`

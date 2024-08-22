@@ -12,6 +12,7 @@ import (
 	sq "github.com/Masterminds/squirrel"
 	"github.com/goto/compass/core/asset"
 	"github.com/goto/compass/core/user"
+	"github.com/goto/compass/pkg/queryexpr"
 	"github.com/jmoiron/sqlx"
 	"github.com/r3labs/diff/v2"
 )
@@ -99,6 +100,39 @@ func (r *AssetRepository) GetTypes(ctx context.Context, flt asset.Filter) (map[a
 func (r *AssetRepository) GetCount(ctx context.Context, flt asset.Filter) (int, error) {
 	builder := sq.Select("count(1)").From("assets")
 	builder = r.BuildFilterQuery(builder, flt)
+	query, args, err := builder.PlaceholderFormat(sq.Dollar).ToSql()
+	if err != nil {
+		return 0, fmt.Errorf("build count query: %w", err)
+	}
+
+	var total int
+	if err := r.client.db.GetContext(ctx, &total, query, args...); err != nil {
+		return 0, fmt.Errorf("get asset list: %w", err)
+	}
+
+	return total, nil
+}
+
+// GetCountByQueryExpr retrieves number of assets for every type based on query expr
+func (r *AssetRepository) GetCountByQueryExpr(ctx context.Context, queryExpr queryexpr.ExprStr) (int, error) {
+	query, err := queryexpr.ValidateAndGetQueryFromExpr(queryExpr)
+	if err != nil {
+		return 0, err
+	}
+
+	total, err := r.getCountByQuery(ctx, query)
+	if err != nil {
+		return 0, err
+	}
+
+	return total, err
+}
+
+// GetCountByQueryExpr retrieves number of assets for every type based on query expr
+func (r *AssetRepository) getCountByQuery(ctx context.Context, sqlQuery string) (int, error) {
+	builder := sq.Select("count(1)").
+		From("assets").
+		Where(sqlQuery)
 	query, args, err := builder.PlaceholderFormat(sq.Dollar).ToSql()
 	if err != nil {
 		return 0, fmt.Errorf("build count query: %w", err)
@@ -348,6 +382,41 @@ func (r *AssetRepository) DeleteByURN(ctx context.Context, urn string) error {
 	return nil
 }
 
+func (r *AssetRepository) DeleteByQueryExpr(ctx context.Context, queryExpr queryexpr.ExprStr) ([]string, error) {
+	var urns []string
+	err := r.client.RunWithinTx(ctx, func(tx *sqlx.Tx) error {
+		query, err := queryexpr.ValidateAndGetQueryFromExpr(queryExpr)
+		if err != nil {
+			return err
+		}
+
+		urns, err = r.deleteByQueryAndReturnURNS(ctx, query)
+
+		return err
+	})
+
+	return urns, err
+}
+
+// deleteByQueryAndReturnURNS remove all assets that match to query and return array of urn of asset that deleted.
+func (r *AssetRepository) deleteByQueryAndReturnURNS(ctx context.Context, whereCondition string) ([]string, error) {
+	builder := sq.Delete("assets").
+		Where(whereCondition).
+		Suffix("RETURNING urn")
+
+	query, args, err := builder.PlaceholderFormat(sq.Dollar).ToSql()
+	if err != nil {
+		return nil, fmt.Errorf("error building query: %w", err)
+	}
+
+	var urns []string
+	if err := r.client.db.SelectContext(ctx, &urns, query, args...); err != nil {
+		return nil, err
+	}
+
+	return urns, nil
+}
+
 func (r *AssetRepository) AddProbe(ctx context.Context, assetURN string, probe *asset.Probe) error {
 	probe.AssetURN = assetURN
 	probe.CreatedAt = time.Now().UTC()
@@ -479,11 +548,17 @@ func (r *AssetRepository) deleteWithPredicate(ctx context.Context, pred sq.Eq) (
 func (r *AssetRepository) insert(ctx context.Context, ast *asset.Asset) (string, error) {
 	var id string
 	err := r.client.RunWithinTx(ctx, func(tx *sqlx.Tx) error {
-		ast.CreatedAt = time.Now()
-		ast.UpdatedAt = ast.CreatedAt
+		currentTime := time.Now()
+		if ast.RefreshedAt != nil {
+			currentTime = *ast.RefreshedAt
+		}
+		ast.CreatedAt = currentTime
+		ast.UpdatedAt = currentTime
 		query, args, err := sq.Insert("assets").
-			Columns("urn", "type", "service", "name", "description", "data", "url", "labels", "created_at", "updated_by", "updated_at", "version").
-			Values(ast.URN, ast.Type, ast.Service, ast.Name, ast.Description, ast.Data, ast.URL, ast.Labels, ast.CreatedAt, ast.UpdatedBy.ID, ast.UpdatedAt, asset.BaseVersion).
+			Columns("urn", "type", "service", "name", "description", "data", "url", "labels",
+				"created_at", "updated_by", "updated_at", "refreshed_at", "version").
+			Values(ast.URN, ast.Type, ast.Service, ast.Name, ast.Description, ast.Data, ast.URL, ast.Labels,
+				ast.CreatedAt, ast.UpdatedBy.ID, ast.UpdatedAt, currentTime, asset.BaseVersion).
 			Suffix("RETURNING \"id\"").
 			PlaceholderFormat(sq.Dollar).
 			ToSql()
@@ -528,8 +603,20 @@ func (r *AssetRepository) update(ctx context.Context, assetID string, newAsset, 
 		return asset.InvalidError{AssetID: assetID}
 	}
 
+	currentTime := time.Now()
+	if newAsset.RefreshedAt != nil {
+		currentTime = *newAsset.RefreshedAt
+	}
+
 	if len(clog) == 0 {
-		return nil
+		if newAsset.RefreshedAt == nil || newAsset.RefreshedAt == oldAsset.RefreshedAt {
+			return nil
+		}
+
+		return r.client.RunWithinTx(ctx, func(tx *sqlx.Tx) error {
+			newAsset.RefreshedAt = &currentTime
+			return r.updateAsset(ctx, tx, assetID, newAsset)
+		})
 	}
 
 	return r.client.RunWithinTx(ctx, func(tx *sqlx.Tx) error {
@@ -540,33 +627,15 @@ func (r *AssetRepository) update(ctx context.Context, assetID string, newAsset, 
 		}
 		newAsset.Version = newVersion
 		newAsset.ID = oldAsset.ID
-		newAsset.UpdatedAt = time.Now()
+		newAsset.UpdatedAt = currentTime
+		newAsset.RefreshedAt = &currentTime
 
-		query, args, err := sq.Update("assets").
-			Set("urn", newAsset.URN).
-			Set("type", newAsset.Type).
-			Set("service", newAsset.Service).
-			Set("name", newAsset.Name).
-			Set("description", newAsset.Description).
-			Set("data", newAsset.Data).
-			Set("url", newAsset.URL).
-			Set("labels", newAsset.Labels).
-			Set("updated_at", newAsset.UpdatedAt).
-			Set("updated_by", newAsset.UpdatedBy.ID).
-			Set("version", newAsset.Version).
-			Where(sq.Eq{"id": assetID}).
-			PlaceholderFormat(sq.Dollar).
-			ToSql()
-		if err != nil {
-			return fmt.Errorf("build query: %w", err)
-		}
-
-		if err := r.execContext(ctx, tx, query, args...); err != nil {
-			return fmt.Errorf("error running update asset query: %w", err)
+		if err := r.updateAsset(ctx, tx, assetID, newAsset); err != nil {
+			return err
 		}
 
 		// insert versions
-		if err = r.insertAssetVersion(ctx, tx, newAsset, clog); err != nil {
+		if err := r.insertAssetVersion(ctx, tx, newAsset, clog); err != nil {
 			return err
 		}
 
@@ -585,6 +654,34 @@ func (r *AssetRepository) update(ctx context.Context, assetID string, newAsset, 
 
 		return nil
 	})
+}
+
+func (r *AssetRepository) updateAsset(ctx context.Context, tx *sqlx.Tx, assetID string, newAsset *asset.Asset) error {
+	query, args, err := sq.Update("assets").
+		Set("urn", newAsset.URN).
+		Set("type", newAsset.Type).
+		Set("service", newAsset.Service).
+		Set("name", newAsset.Name).
+		Set("description", newAsset.Description).
+		Set("data", newAsset.Data).
+		Set("url", newAsset.URL).
+		Set("labels", newAsset.Labels).
+		Set("updated_at", newAsset.UpdatedAt).
+		Set("refreshed_at", *newAsset.RefreshedAt).
+		Set("updated_by", newAsset.UpdatedBy.ID).
+		Set("version", newAsset.Version).
+		Where(sq.Eq{"id": assetID}).
+		PlaceholderFormat(sq.Dollar).
+		ToSql()
+	if err != nil {
+		return fmt.Errorf("build query: %w", err)
+	}
+
+	if err := r.execContext(ctx, tx, query, args...); err != nil {
+		return fmt.Errorf("error running update asset query: %w", err)
+	}
+
+	return nil
 }
 
 func (r *AssetRepository) insertAssetVersion(ctx context.Context, execer sqlx.ExecerContext, oldAsset *asset.Asset, clog diff.Changelog) error {
@@ -812,6 +909,7 @@ func (r *AssetRepository) getAssetSQL() sq.SelectBuilder {
 		a.version as version,
 		a.created_at as created_at,
 		a.updated_at as updated_at,
+		a.refreshed_at as refreshed_at,
 		u.id as "updated_by.id",
 		u.uuid as "updated_by.uuid",
 		u.email as "updated_by.email",

@@ -17,6 +17,7 @@ import (
 	compassv1beta1 "github.com/goto/compass/proto/gotocompany/compass/v1beta1"
 	"github.com/goto/salt/log"
 	"github.com/r3labs/diff/v2"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
@@ -975,9 +976,78 @@ func TestDeleteAsset(t *testing.T) {
 			_, err := handler.DeleteAsset(ctx, &compassv1beta1.DeleteAssetRequest{Id: tc.AssetID})
 			code := status.Code(err)
 			if code != tc.ExpectStatus {
-				t.Errorf("expected handler to return Code %s, returned Code %sinstead", tc.ExpectStatus.String(), code.String())
+				t.Errorf("expected handler to return Code %s, returned Code %s instead", tc.ExpectStatus.String(), code.String())
 				return
 			}
+		})
+	}
+}
+
+func TestDeleteAssets(t *testing.T) {
+	var (
+		userID       = uuid.NewString()
+		userUUID     = uuid.NewString()
+		dummyQuery   = "testing < now()"
+		dummyRequest = asset.DeleteAssetsRequest{
+			QueryExpr: dummyQuery,
+			DryRun:    false,
+		}
+	)
+	type TestCase struct {
+		Description  string
+		QueryExpr    string
+		DryRun       bool
+		ExpectStatus codes.Code
+		ExpectResult *compassv1beta1.DeleteAssetsResponse
+		Setup        func(ctx context.Context, as *mocks.AssetService, astID string)
+	}
+
+	testCases := []TestCase{
+		{
+			Description:  "should return error when delete assets got error",
+			QueryExpr:    dummyQuery,
+			DryRun:       false,
+			ExpectStatus: codes.InvalidArgument,
+			ExpectResult: nil,
+			Setup: func(ctx context.Context, as *mocks.AssetService, astID string) {
+				as.EXPECT().DeleteAssets(ctx, dummyRequest).Return(0, errors.New("something wrong"))
+			},
+		},
+		{
+			Description:  `should return the affected rows that match the given query when delete assets success`,
+			QueryExpr:    dummyQuery,
+			DryRun:       false,
+			ExpectStatus: codes.OK,
+			ExpectResult: &compassv1beta1.DeleteAssetsResponse{AffectedRows: 11},
+			Setup: func(ctx context.Context, as *mocks.AssetService, astID string) {
+				as.EXPECT().DeleteAssets(ctx, dummyRequest).Return(11, nil)
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.Description, func(t *testing.T) {
+			ctx := user.NewContext(context.Background(), user.User{UUID: userUUID})
+
+			logger := log.NewNoop()
+			mockUserSvc := new(mocks.UserService)
+			mockAssetSvc := new(mocks.AssetService)
+			if tc.Setup != nil {
+				tc.Setup(ctx, mockAssetSvc, assetID)
+			}
+			defer mockUserSvc.AssertExpectations(t)
+			defer mockAssetSvc.AssertExpectations(t)
+
+			mockUserSvc.EXPECT().ValidateUser(ctx, userUUID, "").Return(userID, nil)
+
+			handler := NewAPIServer(APIServerDeps{AssetSvc: mockAssetSvc, UserSvc: mockUserSvc, Logger: logger})
+
+			result, err := handler.DeleteAssets(ctx, &compassv1beta1.DeleteAssetsRequest{QueryExpr: tc.QueryExpr, DryRun: tc.DryRun})
+			code := status.Code(err)
+			if code != tc.ExpectStatus {
+				t.Errorf("expected handler to return Code %s, returned Code %s instead", tc.ExpectStatus.String(), code.String())
+				return
+			}
+			assert.Equal(t, tc.ExpectResult, result)
 		})
 	}
 }
