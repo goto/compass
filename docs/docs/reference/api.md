@@ -192,7 +192,10 @@ The query expr at least must consist `refreshed_at`, `type`, and `service` ident
 `type` and `service` identifiers valid only if it's using equals (`==`) or `IN` operator, to prevent human error on deleting assets.
 For example of the correct query:
 ```
-refreshed_at <= "2023-12-12 23:59:59" && service in ["service-1", "service-2"] && (type == "table" || data.foo != "bar")
+refreshed_at <= "2023-12-12 23:59:59" && service in ["service-1", "service-2"] && type == "table"
+```
+```
+refreshed_at <= (now() - duration('24h') && service == "service-1" && (type == "table" || data.foo != "bar")
 ```
 
 The idea of query expr converter is convert `query_expr` to AST (Abstract Syntax Tree), then make it as SQL Query and Elasticsearch Query so can used as filter query on deletion process.
