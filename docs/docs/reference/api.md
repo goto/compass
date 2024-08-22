@@ -192,11 +192,11 @@ The query expr at least must consist `refreshed_at`, `type`, and `service` ident
 `type` and `service` identifiers valid only if it's using equals (`==`) or `IN` operator, to prevent human error on deleting assets.
 For example of the correct query:
 ```
-refreshed_at <= "2023-12-12 23:59:59" && service in ["service-1", "service-2"] && (type == "table") || description != "definitely-active-asset")
+refreshed_at <= "2023-12-12 23:59:59" && service in ["service-1", "service-2"] && (type == "table") || data.foo != "bar")
 ```
 
 The idea of query expr converter is convert `query_expr` to AST (Abstract Syntax Tree), then make it as SQL Query and Elasticsearch Query so can used as filter query on deletion process.
-Currently, the expr query **already support most of the frequently used cases, except** ChainNode, MemberNode, SliceNode, CallNode, ClosureNode, PointerNode, VariableDeclaratorNode, MapNode, and PairNode.
+Currently, the expr query **already support most of the frequently used cases, except** ChainNode, SliceNode, CallNode, ClosureNode, PointerNode, VariableDeclaratorNode, MapNode, and PairNode.
 For more contexts, please refer to [AST Node](https://github.com/expr-lang/expr/blob/master/ast/node.go) in expr-lang library and [Query Expr Converter](https://github.com/goto/compass/tree/main/pkg/query_expr) in Compass.
 Example of **unsupported query for now** due to not directly produce a value is
 ```
