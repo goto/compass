@@ -384,7 +384,7 @@ func (r *AssetRepository) DeleteByURN(ctx context.Context, urn string) error {
 
 func (r *AssetRepository) DeleteByQueryExpr(ctx context.Context, queryExpr queryexpr.ExprStr) ([]string, error) {
 	var urns []string
-	err := r.client.RunWithinTx(ctx, func(tx *sqlx.Tx) error {
+	err := r.client.RunWithinTx(ctx, func(*sqlx.Tx) error {
 		query, err := queryexpr.ValidateAndGetQueryFromExpr(queryExpr)
 		if err != nil {
 			return err
