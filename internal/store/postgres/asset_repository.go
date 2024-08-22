@@ -391,11 +391,8 @@ func (r *AssetRepository) DeleteByQueryExpr(ctx context.Context, queryExpr query
 		}
 
 		urns, err = r.deleteByQueryAndReturnURNS(ctx, query)
-		if err != nil {
-			return err
-		}
 
-		return nil
+		return err
 	})
 
 	return urns, err
