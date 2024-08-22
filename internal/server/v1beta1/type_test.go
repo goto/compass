@@ -6,16 +6,15 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/google/go-cmp/cmp"
 	"github.com/google/uuid"
 	"github.com/goto/compass/core/asset"
 	"github.com/goto/compass/core/user"
 	"github.com/goto/compass/internal/server/v1beta1/mocks"
+	"github.com/goto/compass/internal/testutils"
 	compassv1beta1 "github.com/goto/compass/proto/gotocompany/compass/v1beta1"
 	"github.com/goto/salt/log"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/testing/protocmp"
 )
 
 func TestGetTypes(t *testing.T) {
@@ -56,6 +55,16 @@ func TestGetTypes(t *testing.T) {
 				}, nil)
 			},
 			PostCheck: func(resp *compassv1beta1.GetAllTypesResponse) error {
+				compare := func(left, right *compassv1beta1.Type) int {
+					if left.Name == right.Name && left.Count == right.Count {
+						return 0
+					}
+					if left.Name < right.Name {
+						return -1
+					}
+					return 1
+				}
+
 				expected := &compassv1beta1.GetAllTypesResponse{
 					Data: []*compassv1beta1.Type{
 						{
@@ -97,7 +106,7 @@ func TestGetTypes(t *testing.T) {
 					},
 				}
 
-				if diff := cmp.Diff(resp, expected, protocmp.Transform()); diff != "" {
+				if !testutils.AreSlicesEqualIgnoringOrder(resp.Data, expected.Data, compare) {
 					return fmt.Errorf("expected response to be %+v, was %+v", expected, resp)
 				}
 				return nil

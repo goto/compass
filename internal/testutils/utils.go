@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"testing"
 
 	"github.com/google/go-cmp/cmp"
@@ -42,4 +43,31 @@ type ArgMatcher interface{ Matches(interface{}) bool }
 
 func OfTypeContext() ArgMatcher {
 	return mock.MatchedBy(func(ctx context.Context) bool { return ctx != nil })
+}
+
+func AreSlicesEqualIgnoringOrder[T any](s1, s2 []T, compare func(l, r T) int) bool {
+	if len(s1) != len(s2) {
+		return false
+	}
+
+	s1Duplicate := make([]T, len(s1))
+	copy(s1Duplicate, s1)
+	s2Duplicate := make([]T, len(s2))
+	copy(s2Duplicate, s2)
+
+	sort.Slice(s1Duplicate, func(i, j int) bool {
+		return compare(s1Duplicate[i], s1Duplicate[j]) < 0
+	})
+
+	sort.Slice(s2Duplicate, func(i, j int) bool {
+		return compare(s2Duplicate[i], s2Duplicate[j]) < 0
+	})
+
+	for i := 0; i < len(s1Duplicate); i++ {
+		if compare(s1Duplicate[i], s2Duplicate[i]) != 0 {
+			return false
+		}
+	}
+
+	return true
 }

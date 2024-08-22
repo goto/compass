@@ -13,7 +13,7 @@ import (
 )
 
 func TestInSituWorker_EnqueueIndexAssetJob(t *testing.T) {
-	sampleAsset := asset.Asset{ID: "some-id", URN: "some-urn", Type: asset.TypeDashboard, Service: "some-service"}
+	sampleAsset := asset.Asset{ID: "some-id", URN: "some-urn", Type: asset.Type("dashboard"), Service: "some-service"}
 
 	cases := []struct {
 		name         string

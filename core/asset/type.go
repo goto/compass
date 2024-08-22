@@ -1,28 +1,68 @@
 package asset
 
-const (
-	TypeTable        Type = "table"
-	TypeJob          Type = "job"
-	TypeDashboard    Type = "dashboard"
-	TypeTopic        Type = "topic"
-	TypeFeatureTable Type = "feature_table"
-	TypeApplication  Type = "application"
-	TypeModel        Type = "model"
-	TypeQuery        Type = "query"
-	TypeMetric       Type = "metric"
+import (
+	"errors"
+	"regexp"
 )
 
-// AllSupportedTypes holds a list of all supported types struct
-var AllSupportedTypes = []Type{
-	TypeTable,
-	TypeJob,
-	TypeDashboard,
-	TypeTopic,
-	TypeFeatureTable,
-	TypeApplication,
-	TypeModel,
-	TypeQuery,
-	TypeMetric,
+var (
+	errTypeInvalidLength    = errors.New("type length must be 3 to 16 inclusive")
+	errTypeInvalidCharacter = errors.New("type must be combination of alphanumeric and underscores")
+)
+
+var invalidTypePattern = regexp.MustCompile(`[^a-z0-9_]`)
+
+const (
+	typeMinLength = 3
+	typeMaxLength = 16
+)
+
+const (
+	typeTable        Type = "table"
+	typeJob          Type = "job"
+	typeDashboard    Type = "dashboard"
+	typeTopic        Type = "topic"
+	typeFeatureTable Type = "feature_table"
+	typeApplication  Type = "application"
+	typeModel        Type = "model"
+	typeQuery        Type = "query"
+	typeMetric       Type = "metric"
+)
+
+var supportedTypeMap = map[Type]bool{
+	typeTable:        true,
+	typeJob:          true,
+	typeDashboard:    true,
+	typeTopic:        true,
+	typeFeatureTable: true,
+	typeApplication:  true,
+	typeModel:        true,
+	typeQuery:        true,
+	typeMetric:       true,
+}
+
+func GetSupportedTypes() []Type {
+	output := make([]Type, 0, len(supportedTypeMap))
+	for _type := range supportedTypeMap {
+		output = append(output, _type)
+	}
+	return output
+}
+
+func RegisterSupportedTypes(types ...Type) error {
+	for _, t := range types {
+		if err := t.validate(); err != nil {
+			return err
+		}
+	}
+
+	for _, t := range types {
+		if supported := supportedTypeMap[t]; !supported {
+			supportedTypeMap[t] = true
+		}
+	}
+
+	return nil
 }
 
 // Type specifies a supported type name
@@ -35,10 +75,17 @@ func (t Type) String() string {
 
 // IsValid will validate whether the typename is valid or not
 func (t Type) IsValid() bool {
-	for _, supportedType := range AllSupportedTypes {
-		if t == supportedType {
-			return true
-		}
+	return supportedTypeMap[t]
+}
+
+func (t Type) validate() error {
+	if l := len(t.String()); l < typeMinLength || l > typeMaxLength {
+		return errTypeInvalidLength
 	}
-	return false
+
+	if invalidTypePattern.FindStringSubmatch(t.String()) != nil {
+		return errTypeInvalidCharacter
+	}
+
+	return nil
 }
