@@ -37,7 +37,7 @@ func (server *APIServer) GetAllTypes(ctx context.Context, req *compassv1beta1.Ge
 	}
 
 	results := []*compassv1beta1.Type{}
-	for _, typName := range asset.AllSupportedTypes {
+	for _, typName := range asset.GetSupportedTypes() {
 		count := typesNameMap[typName]
 		results = append(results, &compassv1beta1.Type{
 			Name:  typName.String(),

@@ -32,7 +32,7 @@ func TestToAsset(t *testing.T) {
 				ID:          "an-id",
 				URN:         "an-urn",
 				Name:        "a-title",
-				Type:        asset.TypeTable,
+				Type:        asset.Type("table"),
 				Service:     "a-service",
 				Description: "a-description",
 				Labels: map[string]string{

@@ -56,7 +56,7 @@ func (r *DiscussionRepositoryTestSuite) SetupSuite() {
 		r.T().Fatal(err)
 	}
 
-	r.assets, err = createAssets(r.assetRepo, r.users, asset.Type(asset.TypeTable.String()))
+	r.assets, err = createAssets(r.assetRepo, r.users, asset.Type("table"))
 	if err != nil {
 		r.T().Fatal(err)
 	}

@@ -69,7 +69,7 @@ func (repo *DiscoveryRepository) Upsert(ctx context.Context, ast asset.Asset) er
 		return asset.ErrEmptyID
 	}
 	if !ast.Type.IsValid() {
-		return asset.ErrUnknownType
+		return fmt.Errorf("type [%s] is invalid: %w", ast.Type, asset.ErrUnknownType)
 	}
 
 	if err := repo.createIndexIfNotExists(ctx, "Upsert", ast.Service, defaultSearchIndex); err != nil {

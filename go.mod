@@ -1,9 +1,8 @@
 module github.com/goto/compass
 
-go 1.20
+go 1.21
 
 require (
-	github.com/DataDog/datadog-go/v5 v5.1.1
 	github.com/MakeNowJust/heredoc v1.0.0
 	github.com/Masterminds/semver/v3 v3.1.1
 	github.com/Masterminds/squirrel v1.5.2

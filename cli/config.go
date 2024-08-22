@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/goto/compass/core/asset"
 	"github.com/goto/compass/internal/client"
 	"github.com/goto/compass/internal/server"
 	esStore "github.com/goto/compass/internal/store/elasticsearch"
@@ -102,6 +103,12 @@ type Config struct {
 
 	// Column search excluded keyword list
 	ColSearchExclusionKeywords string `yaml:"col_search_excluded_keywords" mapstructure:"col_search_excluded_keywords"`
+
+	Asset Asset `mapstructure:"asset"`
+}
+
+type Asset struct {
+	AdditionalTypes []string `mapstructure:"additional_types"`
 }
 
 func LoadConfig() (*Config, error) {
@@ -147,4 +154,13 @@ func LoadConfigFromFlag(cfgFile string, cfg *Config) error {
 	opts = append(opts, config.WithFile(cfgFile))
 
 	return config.NewLoader(opts...).Load(cfg)
+}
+
+func registerAdditionalAssetTypes(additionalTypes []string) error {
+	transformedTypes := make([]asset.Type, len(additionalTypes))
+	for i := range additionalTypes {
+		transformedTypes[i] = asset.Type(additionalTypes[i])
+	}
+
+	return asset.RegisterSupportedTypes(transformedTypes...)
 }

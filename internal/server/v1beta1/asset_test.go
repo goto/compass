@@ -496,7 +496,7 @@ func TestUpsertAsset(t *testing.T) {
 			Setup: func(ctx context.Context, as *mocks.AssetService, _ *mocks.UserService) {
 				ast := asset.Asset{
 					URN:       "test dagger",
-					Type:      asset.TypeTable,
+					Type:      asset.Type("table"),
 					Name:      "new-name",
 					Service:   "kafka",
 					UpdatedBy: user.User{ID: userID},
@@ -613,7 +613,7 @@ func TestUpsertPatchAsset(t *testing.T) {
 		}
 		currentAsset = asset.Asset{
 			URN:       "test dagger",
-			Type:      asset.TypeTable,
+			Type:      asset.Type("table"),
 			Name:      "old-name", // this value will be updated
 			Service:   "kafka",
 			UpdatedBy: user.User{ID: userID},
@@ -623,7 +623,7 @@ func TestUpsertPatchAsset(t *testing.T) {
 		}
 		currentAssetNew = asset.Asset{
 			URN:       "test dagger",
-			Type:      asset.TypeTable,
+			Type:      asset.Type("table"),
 			Name:      "new-name", // this value will be updated
 			Service:   "kafka",
 			UpdatedBy: user.User{ID: userID},
@@ -753,7 +753,7 @@ func TestUpsertPatchAsset(t *testing.T) {
 			Setup: func(ctx context.Context, as *mocks.AssetService, _ *mocks.UserService) {
 				patchedAsset := asset.Asset{
 					URN:       "test dagger",
-					Type:      asset.TypeTable,
+					Type:      asset.Type("table"),
 					Name:      "new-name",
 					Service:   "kafka",
 					UpdatedBy: user.User{ID: userID},
@@ -789,7 +789,7 @@ func TestUpsertPatchAsset(t *testing.T) {
 			Setup: func(ctx context.Context, as *mocks.AssetService, _ *mocks.UserService) {
 				patchedAsset := asset.Asset{
 					URN:       "test dagger",
-					Type:      asset.TypeTable,
+					Type:      asset.Type("table"),
 					Name:      "new-name",
 					Service:   "kafka",
 					UpdatedBy: user.User{ID: userID},
@@ -834,7 +834,7 @@ func TestUpsertPatchAsset(t *testing.T) {
 			Setup: func(ctx context.Context, as *mocks.AssetService, _ *mocks.UserService) {
 				patchedAsset := asset.Asset{
 					URN:       "test dagger",
-					Type:      asset.TypeTable,
+					Type:      asset.Type("table"),
 					Name:      "new-name",
 					Service:   "kafka",
 					UpdatedBy: user.User{ID: userID},

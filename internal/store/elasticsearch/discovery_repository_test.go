@@ -33,7 +33,7 @@ func TestDiscoveryRepositoryUpsert(t *testing.T) {
 		repo := store.NewDiscoveryRepository(esClient, log.NewNoop(), time.Second*10, []string{"number", "id"})
 		err = repo.Upsert(ctx, asset.Asset{
 			ID:      "",
-			Type:    asset.TypeTable,
+			Type:    asset.Type("table"),
 			Service: bigqueryService,
 		})
 		assert.ErrorIs(t, err, asset.ErrEmptyID)
@@ -72,7 +72,7 @@ func TestDiscoveryRepositoryUpsert(t *testing.T) {
 		// upsert with create_time as a object
 		err = repo.Upsert(ctx, asset.Asset{
 			ID:      "sample-id",
-			Type:    asset.TypeTable,
+			Type:    asset.Type("table"),
 			Service: bigqueryService,
 			Data: map[string]interface{}{
 				"create_time": map[string]interface{}{
@@ -86,7 +86,7 @@ func TestDiscoveryRepositoryUpsert(t *testing.T) {
 		// upsert with create_time as a string
 		err = repo.Upsert(ctx, asset.Asset{
 			ID:      "sample-id",
-			Type:    asset.TypeTable,
+			Type:    asset.Type("table"),
 			Service: bigqueryService,
 			Data: map[string]interface{}{
 				"create_time": "2023-04-10T22:33:57.897Z",
@@ -102,7 +102,7 @@ func TestDiscoveryRepositoryUpsert(t *testing.T) {
 		ast := asset.Asset{
 			ID:          "sample-id",
 			URN:         "sample-urn",
-			Type:        asset.TypeTable,
+			Type:        asset.Type("table"),
 			Service:     bigqueryService,
 			Name:        "sample-name",
 			Description: "sample-description",
@@ -157,7 +157,7 @@ func TestDiscoveryRepositoryUpsert(t *testing.T) {
 		existingAsset := asset.Asset{
 			ID:          "existing-id",
 			URN:         "existing-urn",
-			Type:        asset.TypeTable,
+			Type:        asset.Type("table"),
 			Service:     bigqueryService,
 			Name:        "existing-name",
 			Description: "existing-description",
@@ -224,7 +224,7 @@ func TestDiscoveryRepositoryDeleteByID(t *testing.T) {
 	t.Run("should not return error on success", func(t *testing.T) {
 		ast := asset.Asset{
 			ID:      "delete-id",
-			Type:    asset.TypeTable,
+			Type:    asset.Type("table"),
 			Service: bigqueryService,
 			URN:     "some-urn",
 		}
@@ -266,13 +266,13 @@ func TestDiscoveryRepositoryDeleteByID(t *testing.T) {
 	t.Run("should ignore unavailable indices", func(t *testing.T) {
 		ast1 := asset.Asset{
 			ID:      "id1",
-			Type:    asset.TypeTable,
+			Type:    asset.Type("table"),
 			Service: bigqueryService,
 			URN:     "urn1",
 		}
 		ast2 := asset.Asset{
 			ID:      "id2",
-			Type:    asset.TypeTopic,
+			Type:    asset.Type("topic"),
 			Service: kafkaService,
 			URN:     "urn2",
 		}
@@ -326,7 +326,7 @@ func TestDiscoveryRepositoryDeleteByURN(t *testing.T) {
 	t.Run("should not return error on success", func(t *testing.T) {
 		ast := asset.Asset{
 			ID:      "delete-id",
-			Type:    asset.TypeTable,
+			Type:    asset.Type("table"),
 			Service: bigqueryService,
 			URN:     "some-urn",
 		}
@@ -356,13 +356,13 @@ func TestDiscoveryRepositoryDeleteByURN(t *testing.T) {
 	t.Run("should ignore unavailable indices", func(t *testing.T) {
 		ast1 := asset.Asset{
 			ID:      "id1",
-			Type:    asset.TypeTable,
+			Type:    asset.Type("table"),
 			Service: bigqueryService,
 			URN:     "urn1",
 		}
 		ast2 := asset.Asset{
 			ID:      "id2",
-			Type:    asset.TypeTopic,
+			Type:    asset.Type("topic"),
 			Service: kafkaService,
 			URN:     "urn2",
 		}

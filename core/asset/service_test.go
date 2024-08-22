@@ -118,6 +118,12 @@ func TestService_GetTypes(t *testing.T) {
 		Setup       func(context.Context, *mocks.AssetRepository)
 	}
 
+	const (
+		typeJob   = asset.Type("job")
+		typeTable = asset.Type("table")
+		typeTopic = asset.Type("topic")
+	)
+
 	testCases := []testCase{
 		{
 			Description: `should return error if asset repository get types return error`,
@@ -131,15 +137,15 @@ func TestService_GetTypes(t *testing.T) {
 			Description: `should return map types if asset repository get types return no error`,
 			Setup: func(ctx context.Context, ar *mocks.AssetRepository) {
 				ar.EXPECT().GetTypes(ctx, asset.Filter{}).Return(map[asset.Type]int{
-					asset.TypeJob:   1,
-					asset.TypeTable: 1,
-					asset.TypeTopic: 1,
+					typeJob:   1,
+					typeTable: 1,
+					typeTopic: 1,
 				}, nil)
 			},
 			Result: map[asset.Type]int{
-				asset.TypeJob:   1,
-				asset.TypeTable: 1,
-				asset.TypeTopic: 1,
+				typeJob:   1,
+				typeTable: 1,
+				typeTopic: 1,
 			},
 			Err: nil,
 		},
@@ -167,7 +173,7 @@ func TestService_GetTypes(t *testing.T) {
 }
 
 func TestService_UpsertAsset(t *testing.T) {
-	sampleAsset := &asset.Asset{ID: "some-id", URN: "some-urn", Type: asset.TypeDashboard, Service: "some-service"}
+	sampleAsset := &asset.Asset{ID: "some-id", URN: "some-urn", Type: asset.Type("dashboard"), Service: "some-service"}
 	sampleNodes1 := []string{"1-urn-1", "1-urn-2"}
 	sampleNodes2 := []string{"2-urn-1", "2-urn-2"}
 	type testCase struct {
@@ -257,7 +263,7 @@ func TestService_UpsertAsset(t *testing.T) {
 }
 
 func TestService_UpsertAssetWithoutLineage(t *testing.T) {
-	sampleAsset := &asset.Asset{ID: "some-id", URN: "some-urn", Type: asset.TypeDashboard, Service: "some-service"}
+	sampleAsset := &asset.Asset{ID: "some-id", URN: "some-urn", Type: asset.Type("dashboard"), Service: "some-service"}
 	testCases := []struct {
 		Description string
 		Asset       *asset.Asset

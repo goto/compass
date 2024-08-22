@@ -273,7 +273,7 @@ func TestAssetPatch(t *testing.T) {
 			description: "should patch all allowed fields",
 			asset: asset.Asset{
 				URN:         "some-urn",
-				Type:        asset.TypeJob,
+				Type:        asset.Type("job"),
 				Service:     "optimus",
 				Description: "sample-description",
 				Name:        "old-name",
@@ -302,7 +302,7 @@ func TestAssetPatch(t *testing.T) {
 			},
 			expected: asset.Asset{
 				URN:         "new-urn",
-				Type:        asset.TypeTable,
+				Type:        asset.Type("table"),
 				Service:     "firehose",
 				Description: "new-description",
 				Name:        "new-name",
@@ -321,7 +321,7 @@ func TestAssetPatch(t *testing.T) {
 			description: "should patch all allowed fields without JSON",
 			asset: asset.Asset{
 				URN:         "some-urn",
-				Type:        asset.TypeJob,
+				Type:        asset.Type("job"),
 				Service:     "optimus",
 				Description: "sample-description",
 				Name:        "old-name",
@@ -351,7 +351,7 @@ func TestAssetPatch(t *testing.T) {
 			},
 			expected: asset.Asset{
 				URN:         "new-urn",
-				Type:        asset.TypeTable,
+				Type:        asset.Type("table"),
 				Service:     "firehose",
 				Description: "new-description",
 				Name:        "new-name",
@@ -370,7 +370,7 @@ func TestAssetPatch(t *testing.T) {
 			description: "should patch all allowed fields without labels and owners",
 			asset: asset.Asset{
 				URN:         "some-urn",
-				Type:        asset.TypeJob,
+				Type:        asset.Type("job"),
 				Service:     "optimus",
 				Description: "sample-description",
 				Name:        "old-name",
@@ -392,7 +392,7 @@ func TestAssetPatch(t *testing.T) {
 			},
 			expected: asset.Asset{
 				URN:         "new-urn",
-				Type:        asset.TypeTable,
+				Type:        asset.Type("table"),
 				Service:     "firehose",
 				Description: "new-description",
 				Name:        "new-name",
