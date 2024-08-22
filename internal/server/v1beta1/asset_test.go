@@ -999,7 +999,7 @@ func TestDeleteAssets(t *testing.T) {
 		DryRun       bool
 		ExpectStatus codes.Code
 		ExpectResult *compassv1beta1.DeleteAssetsResponse
-		Setup        func(ctx context.Context, as *mocks.AssetService, astID string)
+		Setup        func(ctx context.Context, as *mocks.AssetService)
 	}
 
 	testCases := []TestCase{
@@ -1009,7 +1009,7 @@ func TestDeleteAssets(t *testing.T) {
 			DryRun:       false,
 			ExpectStatus: codes.InvalidArgument,
 			ExpectResult: nil,
-			Setup: func(ctx context.Context, as *mocks.AssetService, astID string) {
+			Setup: func(ctx context.Context, as *mocks.AssetService) {
 				as.EXPECT().DeleteAssets(ctx, dummyRequest).Return(0, errors.New("something wrong"))
 			},
 		},
@@ -1019,7 +1019,7 @@ func TestDeleteAssets(t *testing.T) {
 			DryRun:       false,
 			ExpectStatus: codes.OK,
 			ExpectResult: &compassv1beta1.DeleteAssetsResponse{AffectedRows: 11},
-			Setup: func(ctx context.Context, as *mocks.AssetService, astID string) {
+			Setup: func(ctx context.Context, as *mocks.AssetService) {
 				as.EXPECT().DeleteAssets(ctx, dummyRequest).Return(11, nil)
 			},
 		},
@@ -1032,7 +1032,7 @@ func TestDeleteAssets(t *testing.T) {
 			mockUserSvc := new(mocks.UserService)
 			mockAssetSvc := new(mocks.AssetService)
 			if tc.Setup != nil {
-				tc.Setup(ctx, mockAssetSvc, assetID)
+				tc.Setup(ctx, mockAssetSvc)
 			}
 			defer mockUserSvc.AssertExpectations(t)
 			defer mockAssetSvc.AssertExpectations(t)
