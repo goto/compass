@@ -75,6 +75,12 @@ func TestSQLExpr_ToQuery(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name:    "nested column query",
+			expr:    queryexpr.SQLExpr(`foo.bar.abc.def == 'example'`),
+			want:    `(foo->'bar'->'abc'->>'def' = 'example')`,
+			wantErr: false,
+		},
+		{
 			name:    "complex query expression that can NOT directly produce a value",
 			expr:    queryexpr.SQLExpr(`service in filter(assets, .Service startsWith "T")`),
 			want:    "",

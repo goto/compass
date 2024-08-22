@@ -81,6 +81,8 @@ func (e ESExpr) translateToEsQuery(node ast.Node) (interface{}, error) {
 			return nil, err
 		}
 		return result, nil
+	case *ast.MemberNode:
+		return n.String(), nil
 	default:
 		return nil, e.unsupportedQueryError(n)
 	}

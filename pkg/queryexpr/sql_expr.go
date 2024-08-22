@@ -74,6 +74,14 @@ func (s SQLExpr) convertToSQL(node ast.Node, stringBuilder *strings.Builder) err
 		if err := s.getQueryExprResultForSQL(n.String(), stringBuilder); err != nil {
 			return err
 		}
+	case *ast.MemberNode:
+		memberIdentifiers := strings.Split(n.String(), ".")
+		identifier := memberIdentifiers[0]
+		for i := 1; i <= len(memberIdentifiers)-2; i++ {
+			identifier += fmt.Sprintf("->'%s'", memberIdentifiers[i])
+		}
+		identifier += fmt.Sprintf("->>'%s'", memberIdentifiers[len(memberIdentifiers)-1])
+		stringBuilder.WriteString(identifier)
 	default:
 		return s.unsupportedQueryError(n)
 	}
