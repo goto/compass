@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/goto/compass/core/asset"
+	"github.com/goto/compass/internal/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -105,7 +106,7 @@ func TestGetSupportedTypes(t *testing.T) {
 
 		actualTypes := asset.GetSupportedTypes()
 
-		assert.EqualValues(t, expectedTypes, actualTypes)
+		assert.True(t, testutils.AreSlicesEqualIgnoringOrder(expectedTypes, actualTypes, compareTypes))
 	})
 }
 
@@ -174,7 +175,7 @@ func TestRegisterSupportedTypes(t *testing.T) {
 		require.Error(t, actualError)
 
 		actualTypes := asset.GetSupportedTypes()
-		assert.EqualValues(t, expectedTypes, actualTypes)
+		assert.True(t, testutils.AreSlicesEqualIgnoringOrder(expectedTypes, actualTypes, compareTypes))
 	})
 
 	t.Run("should update supported types if no error is returned", func(t *testing.T) {
@@ -201,6 +202,16 @@ func TestRegisterSupportedTypes(t *testing.T) {
 		require.NoError(t, actualError)
 
 		actualTypes := asset.GetSupportedTypes()
-		assert.EqualValues(t, expectedTypes, actualTypes)
+		assert.True(t, testutils.AreSlicesEqualIgnoringOrder(expectedTypes, actualTypes, compareTypes))
 	})
+}
+
+func compareTypes(left, right asset.Type) int {
+	if left < right {
+		return -1
+	}
+	if right > left {
+		return 1
+	}
+	return 0
 }

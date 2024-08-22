@@ -29,19 +29,7 @@ const (
 	typeMetric       Type = "metric"
 )
 
-var supportedTypes = []Type{
-	typeTable,
-	typeJob,
-	typeDashboard,
-	typeTopic,
-	typeFeatureTable,
-	typeApplication,
-	typeModel,
-	typeQuery,
-	typeMetric,
-}
-
-var isTypeSupported = map[Type]bool{
+var supportedTypeMap = map[Type]bool{
 	typeTable:        true,
 	typeJob:          true,
 	typeDashboard:    true,
@@ -54,8 +42,10 @@ var isTypeSupported = map[Type]bool{
 }
 
 func GetSupportedTypes() []Type {
-	output := make([]Type, 0, len(supportedTypes))
-	output = append(output, supportedTypes...)
+	output := make([]Type, 0, len(supportedTypeMap))
+	for _type := range supportedTypeMap {
+		output = append(output, _type)
+	}
 	return output
 }
 
@@ -67,9 +57,8 @@ func RegisterSupportedTypes(types ...Type) error {
 	}
 
 	for _, t := range types {
-		if supported := isTypeSupported[t]; !supported {
-			supportedTypes = append(supportedTypes, t)
-			isTypeSupported[t] = true
+		if supported := supportedTypeMap[t]; !supported {
+			supportedTypeMap[t] = true
 		}
 	}
 
@@ -86,7 +75,7 @@ func (t Type) String() string {
 
 // IsValid will validate whether the typename is valid or not
 func (t Type) IsValid() bool {
-	return isTypeSupported[t]
+	return supportedTypeMap[t]
 }
 
 func (t Type) validate() error {
