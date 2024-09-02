@@ -83,6 +83,10 @@ func serverMigrateCommand(cfg *Config) *cobra.Command {
 }
 
 func runServer(ctx context.Context, cfg *Config) error {
+	if err := cfg.Asset.Validate(); err != nil {
+		return err
+	}
+
 	logger := initLogger(cfg.LogLevel)
 	logger.Info("compass starting", "version", Version)
 
@@ -154,6 +158,7 @@ func runServer(ctx context.Context, cfg *Config) error {
 		LineageRepo:   lineageRepository,
 		Worker:        wrkr,
 		Logger:        logger,
+		Config:        cfg.Asset,
 	})
 	defer cancel()
 

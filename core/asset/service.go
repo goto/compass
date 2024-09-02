@@ -19,6 +19,7 @@ type Service struct {
 	lineageRepository   LineageRepository
 	worker              Worker
 	logger              log.Logger
+	config              Config
 	cancelFnList        []func()
 
 	assetOpCounter metric.Int64Counter
@@ -40,6 +41,7 @@ type ServiceDeps struct {
 	LineageRepo   LineageRepository
 	Worker        Worker
 	Logger        log.Logger
+	Config        Config
 }
 
 func NewService(deps ServiceDeps) (service *Service, cancel func()) {
@@ -55,6 +57,7 @@ func NewService(deps ServiceDeps) (service *Service, cancel func()) {
 		lineageRepository:   deps.LineageRepo,
 		worker:              deps.Worker,
 		logger:              deps.Logger,
+		config:              deps.Config,
 		cancelFnList:        make([]func(), 0),
 
 		assetOpCounter: assetOpCounter,
@@ -149,8 +152,8 @@ func (s *Service) DeleteAssets(ctx context.Context, request DeleteAssetsRequest)
 		return 0, err
 	}
 
-	if !request.DryRun {
-		newCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	if !request.DryRun && total > 0 {
+		newCtx, cancel := context.WithTimeout(context.Background(), s.config.DeleteAssetsTimeout)
 		s.cancelFnList = append(s.cancelFnList, cancel)
 		go s.executeDeleteAssets(newCtx, deleteSQLExpr)
 	}
@@ -161,16 +164,16 @@ func (s *Service) DeleteAssets(ctx context.Context, request DeleteAssetsRequest)
 func (s *Service) executeDeleteAssets(ctx context.Context, deleteSQLExpr queryexpr.ExprStr) {
 	deletedURNs, err := s.assetRepository.DeleteByQueryExpr(ctx, deleteSQLExpr)
 	if err != nil {
-		s.logger.Error("Asset deletion failed, skipping Elasticsearch and Lineage deletions. Err:", err)
+		s.logger.Error("asset deletion failed, skipping elasticsearch and lineage deletions", "err:", err)
 		return
 	}
 
 	if err := s.lineageRepository.DeleteByURNs(ctx, deletedURNs); err != nil {
-		s.logger.Error("Error occurred during Lineage deletion:", err)
+		s.logger.Error("error occurred during lineage deletion", "err:", err)
 	}
 
 	if err := s.worker.EnqueueDeleteAssetsByQueryExprJob(ctx, deleteSQLExpr.String()); err != nil {
-		s.logger.Error("Error occurred during Elasticsearch deletion:", err)
+		s.logger.Error("error occurred during elasticsearch deletion", "err:", err)
 	}
 }
 
