@@ -83,6 +83,10 @@ func serverMigrateCommand(cfg *Config) *cobra.Command {
 }
 
 func runServer(ctx context.Context, cfg *Config) error {
+	if err := cfg.Asset.Validate(); err != nil {
+		return err
+	}
+
 	logger := initLogger(cfg.LogLevel)
 	logger.Info("compass starting", "version", Version)
 
@@ -147,10 +151,6 @@ func runServer(ctx context.Context, cfg *Config) error {
 			logger.Error("Close worker", "err", err)
 		}
 	}()
-
-	if err = cfg.Asset.Validate(); err != nil {
-		return err
-	}
 
 	assetService, cancel := asset.NewService(asset.ServiceDeps{
 		AssetRepo:           assetRepository,
