@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/goto/compass/cli"
 	"github.com/goto/compass/pkg/queryexpr"
 	"github.com/goto/salt/log"
 	"go.opentelemetry.io/otel"
@@ -20,7 +19,7 @@ type Service struct {
 	lineageRepository   LineageRepository
 	worker              Worker
 	logger              log.Logger
-	assetConfig         cli.Asset
+	deleteAssetsTimeout time.Duration
 	cancelFnList        []func()
 
 	assetOpCounter metric.Int64Counter
@@ -37,12 +36,12 @@ type Worker interface {
 }
 
 type ServiceDeps struct {
-	AssetRepo     Repository
-	DiscoveryRepo DiscoveryRepository
-	LineageRepo   LineageRepository
-	Worker        Worker
-	Logger        log.Logger
-	AssetConfig   cli.Asset
+	AssetRepo           Repository
+	DiscoveryRepo       DiscoveryRepository
+	LineageRepo         LineageRepository
+	Worker              Worker
+	Logger              log.Logger
+	DeleteAssetsTimeout time.Duration
 }
 
 func NewService(deps ServiceDeps) (service *Service, cancel func()) {
@@ -58,7 +57,7 @@ func NewService(deps ServiceDeps) (service *Service, cancel func()) {
 		lineageRepository:   deps.LineageRepo,
 		worker:              deps.Worker,
 		logger:              deps.Logger,
-		assetConfig:         deps.AssetConfig,
+		deleteAssetsTimeout: deps.DeleteAssetsTimeout,
 		cancelFnList:        make([]func(), 0),
 
 		assetOpCounter: assetOpCounter,
@@ -154,7 +153,7 @@ func (s *Service) DeleteAssets(ctx context.Context, request DeleteAssetsRequest)
 	}
 
 	if !request.DryRun && total > 0 {
-		newCtx, cancel := context.WithTimeout(context.Background(), s.assetConfig.DeleteAssetsTimeout)
+		newCtx, cancel := context.WithTimeout(context.Background(), s.deleteAssetsTimeout)
 		s.cancelFnList = append(s.cancelFnList, cancel)
 		go s.executeDeleteAssets(newCtx, deleteSQLExpr)
 	}

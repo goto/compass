@@ -110,7 +110,7 @@ type Config struct {
 
 type Asset struct {
 	AdditionalTypes     []string      `mapstructure:"additional_types"`
-	DeleteAssetsTimeout time.Duration `mapstructure:"delete_assets_timeout"`
+	DeleteAssetsTimeout time.Duration `mapstructure:"delete_assets_timeout" default:"5m"`
 }
 
 func LoadConfig() (*Config, error) {

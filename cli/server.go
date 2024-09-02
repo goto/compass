@@ -149,12 +149,12 @@ func runServer(ctx context.Context, cfg *Config) error {
 	}()
 
 	assetService, cancel := asset.NewService(asset.ServiceDeps{
-		AssetRepo:     assetRepository,
-		DiscoveryRepo: discoveryRepository,
-		LineageRepo:   lineageRepository,
-		Worker:        wrkr,
-		Logger:        logger,
-		AssetConfig:   cfg.Asset,
+		AssetRepo:           assetRepository,
+		DiscoveryRepo:       discoveryRepository,
+		LineageRepo:         lineageRepository,
+		Worker:              wrkr,
+		Logger:              logger,
+		DeleteAssetsTimeout: cfg.Asset.DeleteAssetsTimeout,
 	})
 	defer cancel()
 
