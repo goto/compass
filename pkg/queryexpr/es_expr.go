@@ -107,6 +107,9 @@ func (e ESExpr) binaryNodeToEsQuery(n *ast.BinaryNode) (interface{}, error) { //
 
 	case "==":
 		if leftStr, ok := left.(string); ok {
+			if right == nil {
+				return e.mustNotExistQuery(leftStr), nil
+			}
 			return e.termQuery(leftStr, right), nil
 		}
 		result, err := getQueryExprResult(n.String())
@@ -117,6 +120,9 @@ func (e ESExpr) binaryNodeToEsQuery(n *ast.BinaryNode) (interface{}, error) { //
 
 	case "!=":
 		if leftStr, ok := left.(string); ok {
+			if right == nil {
+				return e.mustExistQuery(leftStr), nil
+			}
 			return e.mustNotQuery(leftStr, right), nil
 		}
 		result, err := getQueryExprResult(n.String())
@@ -251,6 +257,30 @@ func (ESExpr) mustNotQuery(field string, value interface{}) map[string]interface
 					"term": map[string]interface{}{
 						field: value,
 					},
+				},
+			},
+		},
+	}
+}
+
+func (ESExpr) mustExistQuery(field string) map[string]interface{} {
+	return map[string]interface{}{
+		"bool": map[string]interface{}{
+			"must": map[string]interface{}{
+				"exists": map[string]interface{}{
+					"field": field,
+				},
+			},
+		},
+	}
+}
+
+func (ESExpr) mustNotExistQuery(field string) map[string]interface{} {
+	return map[string]interface{}{
+		"bool": map[string]interface{}{
+			"must_not": map[string]interface{}{
+				"exists": map[string]interface{}{
+					"field": field,
 				},
 			},
 		},
