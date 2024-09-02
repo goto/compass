@@ -113,6 +113,14 @@ type Asset struct {
 	DeleteAssetsTimeout time.Duration `mapstructure:"delete_assets_timeout" default:"5m"`
 }
 
+func (a *Asset) Validate() error {
+	if a.DeleteAssetsTimeout == 0 {
+		return errors.New("delete assets timeout is required")
+	}
+
+	return nil
+}
+
 func LoadConfig() (*Config, error) {
 	var cfg Config
 	defer func() {

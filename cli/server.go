@@ -148,6 +148,10 @@ func runServer(ctx context.Context, cfg *Config) error {
 		}
 	}()
 
+	if err = cfg.Asset.Validate(); err != nil {
+		return err
+	}
+
 	assetService, cancel := asset.NewService(asset.ServiceDeps{
 		AssetRepo:           assetRepository,
 		DiscoveryRepo:       discoveryRepository,
