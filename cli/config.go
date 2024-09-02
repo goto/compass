@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"time"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/goto/compass/core/asset"
@@ -21,8 +20,6 @@ import (
 )
 
 const configFlag = "config"
-
-var errDeleteAssetsTimeoutIsZero = errors.New("delete assets timeout must greater than 0 second")
 
 func configCommand(cfg *Config) *cobra.Command {
 	cmd := &cobra.Command{
@@ -106,21 +103,6 @@ type Config struct {
 
 	// Column search excluded keyword list
 	ColSearchExclusionKeywords string `yaml:"col_search_excluded_keywords" mapstructure:"col_search_excluded_keywords"`
-
-	Asset Asset `mapstructure:"asset"`
-}
-
-type Asset struct {
-	AdditionalTypes     []string      `mapstructure:"additional_types"`
-	DeleteAssetsTimeout time.Duration `mapstructure:"delete_assets_timeout" default:"5m"`
-}
-
-func (a *Asset) Validate() error {
-	if a.DeleteAssetsTimeout == 0 {
-		return errDeleteAssetsTimeoutIsZero
-	}
-
-	return nil
 }
 
 func LoadConfig() (*Config, error) {

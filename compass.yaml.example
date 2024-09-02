@@ -52,6 +52,10 @@ service:
         max_send_msg_size: 33554432
         max_recv_msg_size: 33554432
         request_timeout: 5s
+    asset:
+        additional_types:
+            - fact_source
+        delete_assets_timeout: 5m
 
 worker:
     enabled: true
@@ -74,8 +78,3 @@ client:
     host: localhost:8081
     serverheaderkey_uuid: Compass-User-UUID // if ommited, will use value on service.identity.headerkey_uuid
     serverheadervalue_uuid: gotocompany@email.com
-
-asset:
-    additional_types:
-        - fact_source
-    delete_assets_timeout: 5m

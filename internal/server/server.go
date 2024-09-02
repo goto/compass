@@ -30,6 +30,8 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 )
 
+var errDeleteAssetsTimeoutIsZero = errors.New("delete assets timeout must greater than 0 second")
+
 type Config struct {
 	Host    string `mapstructure:"host" default:"0.0.0.0"`
 	Port    int    `mapstructure:"port" default:"8080"`
@@ -40,6 +42,21 @@ type Config struct {
 	RequestTimeout time.Duration  `mapstructure:"request_timeout" default:"10s"`
 	// GRPC Config
 	GRPC GRPCConfig `mapstructure:"grpc"`
+
+	Asset AssetConfig `mapstructure:"asset"`
+}
+
+type AssetConfig struct {
+	AdditionalTypes     []string      `mapstructure:"additional_types"`
+	DeleteAssetsTimeout time.Duration `mapstructure:"delete_assets_timeout" default:"5m"`
+}
+
+func (a *AssetConfig) Validate() error {
+	if a.DeleteAssetsTimeout == 0 {
+		return errDeleteAssetsTimeoutIsZero
+	}
+
+	return nil
 }
 
 func (cfg Config) addr() string     { return fmt.Sprintf("%s:%d", cfg.Host, cfg.Port) }

@@ -83,7 +83,7 @@ func serverMigrateCommand(cfg *Config) *cobra.Command {
 }
 
 func runServer(ctx context.Context, cfg *Config) error {
-	if err := cfg.Asset.Validate(); err != nil {
+	if err := cfg.Service.Asset.Validate(); err != nil {
 		return err
 	}
 
@@ -153,12 +153,12 @@ func runServer(ctx context.Context, cfg *Config) error {
 	}()
 
 	assetService, cancel := asset.NewService(asset.ServiceDeps{
-		AssetRepo:           assetRepository,
-		DiscoveryRepo:       discoveryRepository,
-		LineageRepo:         lineageRepository,
-		Worker:              wrkr,
-		Logger:              logger,
-		DeleteAssetsTimeout: cfg.Asset.DeleteAssetsTimeout,
+		AssetRepo:     assetRepository,
+		DiscoveryRepo: discoveryRepository,
+		LineageRepo:   lineageRepository,
+		Worker:        wrkr,
+		Logger:        logger,
+		AssetConfig:   cfg.Service.Asset,
 	})
 	defer cancel()
 
