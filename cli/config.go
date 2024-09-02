@@ -22,6 +22,8 @@ import (
 
 const configFlag = "config"
 
+var errDeleteAssetsTimeoutIsZero = errors.New("delete assets timeout must greater than 0 second")
+
 func configCommand(cfg *Config) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "config <command>",
@@ -115,7 +117,7 @@ type Asset struct {
 
 func (a *Asset) Validate() error {
 	if a.DeleteAssetsTimeout == 0 {
-		return errors.New("delete assets timeout must greater than 0 second")
+		return errDeleteAssetsTimeoutIsZero
 	}
 
 	return nil
