@@ -115,7 +115,7 @@ type Asset struct {
 
 func (a *Asset) Validate() error {
 	if a.DeleteAssetsTimeout == 0 {
-		return errors.New("delete assets timeout is required")
+		return errors.New("delete assets timeout must greater than 0 second")
 	}
 
 	return nil
