@@ -104,11 +104,7 @@ type Config struct {
 	// Column search excluded keyword list
 	ColSearchExclusionKeywords string `yaml:"col_search_excluded_keywords" mapstructure:"col_search_excluded_keywords"`
 
-	Asset Asset `mapstructure:"asset"`
-}
-
-type Asset struct {
-	AdditionalTypes []string `mapstructure:"additional_types"`
+	Asset asset.Config `mapstructure:"asset"`
 }
 
 func LoadConfig() (*Config, error) {
