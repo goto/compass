@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/goto/compass/internal/server"
 	"github.com/goto/compass/pkg/queryexpr"
 	"github.com/goto/salt/log"
 	"go.opentelemetry.io/otel"
@@ -20,7 +19,7 @@ type Service struct {
 	lineageRepository   LineageRepository
 	worker              Worker
 	logger              log.Logger
-	assetConfig         server.AssetConfig
+	assetConfig         Config
 	cancelFnList        []func()
 
 	assetOpCounter metric.Int64Counter
@@ -42,7 +41,7 @@ type ServiceDeps struct {
 	LineageRepo   LineageRepository
 	Worker        Worker
 	Logger        log.Logger
-	AssetConfig   server.AssetConfig
+	AssetConfig   Config
 }
 
 func NewService(deps ServiceDeps) (service *Service, cancel func()) {

@@ -46,7 +46,7 @@ func New(cliConfig *Config) *cobra.Command {
 			}
 		}
 
-		if err := registerAdditionalAssetTypes(cliConfig.Service.Asset.AdditionalTypes); err != nil {
+		if err := registerAdditionalAssetTypes(cliConfig.Asset.AdditionalTypes); err != nil {
 			return fmt.Errorf("error registering additional asset types: %w", err)
 		}
 
