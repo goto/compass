@@ -158,7 +158,7 @@ func runServer(ctx context.Context, cfg *Config) error {
 		LineageRepo:   lineageRepository,
 		Worker:        wrkr,
 		Logger:        logger,
-		AssetConfig:   cfg.Asset,
+		Config:        cfg.Asset,
 	})
 	defer cancel()
 

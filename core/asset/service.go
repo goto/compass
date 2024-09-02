@@ -19,7 +19,7 @@ type Service struct {
 	lineageRepository   LineageRepository
 	worker              Worker
 	logger              log.Logger
-	assetConfig         Config
+	config              Config
 	cancelFnList        []func()
 
 	assetOpCounter metric.Int64Counter
@@ -41,7 +41,7 @@ type ServiceDeps struct {
 	LineageRepo   LineageRepository
 	Worker        Worker
 	Logger        log.Logger
-	AssetConfig   Config
+	Config        Config
 }
 
 func NewService(deps ServiceDeps) (service *Service, cancel func()) {
@@ -57,7 +57,7 @@ func NewService(deps ServiceDeps) (service *Service, cancel func()) {
 		lineageRepository:   deps.LineageRepo,
 		worker:              deps.Worker,
 		logger:              deps.Logger,
-		assetConfig:         deps.AssetConfig,
+		config:              deps.Config,
 		cancelFnList:        make([]func(), 0),
 
 		assetOpCounter: assetOpCounter,
@@ -153,7 +153,7 @@ func (s *Service) DeleteAssets(ctx context.Context, request DeleteAssetsRequest)
 	}
 
 	if !request.DryRun && total > 0 {
-		newCtx, cancel := context.WithTimeout(context.Background(), s.assetConfig.DeleteAssetsTimeout)
+		newCtx, cancel := context.WithTimeout(context.Background(), s.config.DeleteAssetsTimeout)
 		s.cancelFnList = append(s.cancelFnList, cancel)
 		go s.executeDeleteAssets(newCtx, deleteSQLExpr)
 	}
