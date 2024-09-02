@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/goto/compass/core/asset"
@@ -108,7 +109,8 @@ type Config struct {
 }
 
 type Asset struct {
-	AdditionalTypes []string `mapstructure:"additional_types"`
+	AdditionalTypes     []string      `mapstructure:"additional_types"`
+	DeleteAssetsTimeout time.Duration `mapstructure:"delete_assets_timeout"`
 }
 
 func LoadConfig() (*Config, error) {
