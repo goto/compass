@@ -51,6 +51,24 @@ func TestESExpr_ToQuery(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name:    "equals to nil",
+			expr:    queryexpr.ESExpr(`refreshed_at == nil`),
+			want:    `{"query":{"bool":{"must_not":{"exists":{"field":"refreshed_at"}}}}}`,
+			wantErr: false,
+		},
+		{
+			name:    "not equals to nil",
+			expr:    queryexpr.ESExpr(`refreshed_at != nil`),
+			want:    `{"query":{"bool":{"must":{"exists":{"field":"refreshed_at"}}}}}`,
+			wantErr: false,
+		},
+		{
+			name:    "equals to nil and not equal to nil",
+			expr:    queryexpr.ESExpr(`refreshed_at == nil && updated_at != nil`),
+			want:    `{"query":{"bool":{"must":[{"bool":{"must_not":{"exists":{"field":"refreshed_at"}}}},{"bool":{"must":{"exists":{"field":"updated_at"}}}}]}}}`,
+			wantErr: false,
+		},
+		{
 			name:    "in condition",
 			expr:    queryexpr.ESExpr(`service in ["test1","test2","test3"]`),
 			want:    `{"query":{"terms":{"service.keyword":["test1","test2","test3"]}}}`,
