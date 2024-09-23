@@ -59,7 +59,10 @@ func NewService(deps ServiceDeps) (service *Service, cancel func()) {
 		otel.Handle(err)
 	}
 
-	cancelFnListPtr := cancelFnListPool.Get().(*[]func())
+	cancelFnListPtr, ok := cancelFnListPool.Get().(*[]func())
+	if !ok {
+		cancelFnListPtr = &[]func(){}
+	}
 
 	newService := &Service{
 		assetRepository:     deps.AssetRepo,
@@ -78,7 +81,7 @@ func NewService(deps ServiceDeps) (service *Service, cancel func()) {
 			newService.cancelFnList[i]()
 		}
 		newService.cancelFnList = newService.cancelFnList[:0]
-		cancelFnListPool.Put(&newService.cancelFnList) 
+		cancelFnListPool.Put(&newService.cancelFnList)
 	}
 }
 
