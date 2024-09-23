@@ -3,6 +3,7 @@ package asset
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -44,12 +45,21 @@ type ServiceDeps struct {
 	Config        Config
 }
 
+var cancelFnListPool = sync.Pool{
+	New: func() interface{} {
+		list := make([]func(), 0)
+		return &list
+	},
+}
+
 func NewService(deps ServiceDeps) (service *Service, cancel func()) {
 	assetOpCounter, err := otel.Meter("github.com/goto/compass/core/asset").
 		Int64Counter("compass.asset.operation")
 	if err != nil {
 		otel.Handle(err)
 	}
+
+	cancelFnListPtr := cancelFnListPool.Get().(*[]func())
 
 	newService := &Service{
 		assetRepository:     deps.AssetRepo,
@@ -58,7 +68,7 @@ func NewService(deps ServiceDeps) (service *Service, cancel func()) {
 		worker:              deps.Worker,
 		logger:              deps.Logger,
 		config:              deps.Config,
-		cancelFnList:        make([]func(), 0),
+		cancelFnList:        *cancelFnListPtr,
 
 		assetOpCounter: assetOpCounter,
 	}
@@ -67,6 +77,8 @@ func NewService(deps ServiceDeps) (service *Service, cancel func()) {
 		for i := range newService.cancelFnList {
 			newService.cancelFnList[i]()
 		}
+		newService.cancelFnList = newService.cancelFnList[:0]
+		cancelFnListPool.Put(&newService.cancelFnList) 
 	}
 }
 
