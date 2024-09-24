@@ -154,11 +154,21 @@ func (s *Service) DeleteAssets(ctx context.Context, request DeleteAssetsRequest)
 
 	if !request.DryRun && total > 0 {
 		newCtx, cancel := context.WithTimeout(context.Background(), s.config.DeleteAssetsTimeout)
+		idx := len(s.cancelFnList)
 		s.cancelFnList = append(s.cancelFnList, cancel)
-		go s.executeDeleteAssets(newCtx, deleteSQLExpr)
+		go func(index int) {
+			s.executeDeleteAssets(newCtx, deleteSQLExpr)
+			s.removeCancelFnByIndex(index)
+		}(idx)
 	}
 
 	return uint32(total), nil
+}
+
+func (s *Service) removeCancelFnByIndex(index int) {
+	if index < len(s.cancelFnList) {
+		s.cancelFnList = append(s.cancelFnList[:index], s.cancelFnList[index+1:]...)
+	}
 }
 
 func (s *Service) executeDeleteAssets(ctx context.Context, deleteSQLExpr queryexpr.ExprStr) {
