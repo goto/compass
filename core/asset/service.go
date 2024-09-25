@@ -20,7 +20,6 @@ type Service struct {
 	worker              Worker
 	logger              log.Logger
 	config              Config
-	cancelFnList        []func()
 
 	assetOpCounter metric.Int64Counter
 }
@@ -44,7 +43,7 @@ type ServiceDeps struct {
 	Config        Config
 }
 
-func NewService(deps ServiceDeps) (service *Service, cancel func()) {
+func NewService(deps ServiceDeps) (service *Service) {
 	assetOpCounter, err := otel.Meter("github.com/goto/compass/core/asset").
 		Int64Counter("compass.asset.operation")
 	if err != nil {
@@ -58,16 +57,11 @@ func NewService(deps ServiceDeps) (service *Service, cancel func()) {
 		worker:              deps.Worker,
 		logger:              deps.Logger,
 		config:              deps.Config,
-		cancelFnList:        make([]func(), 0),
 
 		assetOpCounter: assetOpCounter,
 	}
 
-	return newService, func() {
-		for i := range newService.cancelFnList {
-			newService.cancelFnList[i]()
-		}
-	}
+	return newService
 }
 
 func (s *Service) GetAllAssets(ctx context.Context, flt Filter, withTotal bool) ([]Asset, uint32, error) {
@@ -154,21 +148,13 @@ func (s *Service) DeleteAssets(ctx context.Context, request DeleteAssetsRequest)
 
 	if !request.DryRun && total > 0 {
 		newCtx, cancel := context.WithTimeout(context.Background(), s.config.DeleteAssetsTimeout)
-		idx := len(s.cancelFnList)
-		s.cancelFnList = append(s.cancelFnList, cancel)
-		go func(index int) {
+		go func() {
+			defer cancel()
 			s.executeDeleteAssets(newCtx, deleteSQLExpr)
-			s.removeCancelFnByIndex(index)
-		}(idx)
+		}()
 	}
 
 	return uint32(total), nil
-}
-
-func (s *Service) removeCancelFnByIndex(index int) {
-	if index < len(s.cancelFnList) {
-		s.cancelFnList = append(s.cancelFnList[:index], s.cancelFnList[index+1:]...)
-	}
 }
 
 func (s *Service) executeDeleteAssets(ctx context.Context, deleteSQLExpr queryexpr.ExprStr) {
