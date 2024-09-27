@@ -3,6 +3,7 @@ package asset
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -20,8 +21,8 @@ type Service struct {
 	worker              Worker
 	logger              log.Logger
 	config              Config
-
-	assetOpCounter metric.Int64Counter
+	cancelFnMap         sync.Map
+	assetOpCounter      metric.Int64Counter
 }
 
 //go:generate mockery --name=Worker -r --case underscore --with-expecter --structname Worker --filename worker_mock.go --output=./mocks
@@ -43,7 +44,7 @@ type ServiceDeps struct {
 	Config        Config
 }
 
-func NewService(deps ServiceDeps) (service *Service) {
+func NewService(deps ServiceDeps) (service *Service, cancel func()) {
 	assetOpCounter, err := otel.Meter("github.com/goto/compass/core/asset").
 		Int64Counter("compass.asset.operation")
 	if err != nil {
@@ -57,11 +58,18 @@ func NewService(deps ServiceDeps) (service *Service) {
 		worker:              deps.Worker,
 		logger:              deps.Logger,
 		config:              deps.Config,
-
-		assetOpCounter: assetOpCounter,
+		cancelFnMap:         sync.Map{},
+		assetOpCounter:      assetOpCounter,
 	}
 
-	return newService
+	return newService, func() {
+		newService.cancelFnMap.Range(func(_, value interface{}) bool {
+			if cancelFn, ok := value.(func()); ok {
+				cancelFn()
+			}
+			return true
+		})
+	}
 }
 
 func (s *Service) GetAllAssets(ctx context.Context, flt Filter, withTotal bool) ([]Asset, uint32, error) {
@@ -148,13 +156,20 @@ func (s *Service) DeleteAssets(ctx context.Context, request DeleteAssetsRequest)
 
 	if !request.DryRun && total > 0 {
 		newCtx, cancel := context.WithTimeout(context.Background(), s.config.DeleteAssetsTimeout)
-		go func() {
-			defer cancel()
+		cancelID := generateUniqueCancelID()
+		s.cancelFnMap.Store(cancelID, cancel)
+		go func(id string) {
 			s.executeDeleteAssets(newCtx, deleteSQLExpr)
-		}()
+			cancel()
+			s.cancelFnMap.Delete(id)
+		}(cancelID)
 	}
 
 	return uint32(total), nil
+}
+
+func generateUniqueCancelID() string {
+	return uuid.New().String()
 }
 
 func (s *Service) executeDeleteAssets(ctx context.Context, deleteSQLExpr queryexpr.ExprStr) {
