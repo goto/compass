@@ -21,7 +21,7 @@ type Service struct {
 	worker              Worker
 	logger              log.Logger
 	config              Config
-	cancelFnMap         sync.Map
+	cancelFnMap         *sync.Map
 	assetOpCounter      metric.Int64Counter
 }
 
@@ -58,7 +58,7 @@ func NewService(deps ServiceDeps) (service *Service, cancel func()) {
 		worker:              deps.Worker,
 		logger:              deps.Logger,
 		config:              deps.Config,
-		cancelFnMap:         sync.Map{},
+		cancelFnMap:         new(sync.Map),
 		assetOpCounter:      assetOpCounter,
 	}
 
@@ -156,7 +156,7 @@ func (s *Service) DeleteAssets(ctx context.Context, request DeleteAssetsRequest)
 
 	if !request.DryRun && total > 0 {
 		newCtx, cancel := context.WithTimeout(context.Background(), s.config.DeleteAssetsTimeout)
-		cancelID := generateUniqueCancelID()
+		cancelID := uuid.New().String()
 		s.cancelFnMap.Store(cancelID, cancel)
 		go func(id string) {
 			s.executeDeleteAssets(newCtx, deleteSQLExpr)
@@ -166,10 +166,6 @@ func (s *Service) DeleteAssets(ctx context.Context, request DeleteAssetsRequest)
 	}
 
 	return uint32(total), nil
-}
-
-func generateUniqueCancelID() string {
-	return uuid.New().String()
 }
 
 func (s *Service) executeDeleteAssets(ctx context.Context, deleteSQLExpr queryexpr.ExprStr) {
