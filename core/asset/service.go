@@ -3,6 +3,7 @@ package asset
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -20,9 +21,8 @@ type Service struct {
 	worker              Worker
 	logger              log.Logger
 	config              Config
-	cancelFnList        []func()
-
-	assetOpCounter metric.Int64Counter
+	cancelFnMap         *sync.Map
+	assetOpCounter      metric.Int64Counter
 }
 
 //go:generate mockery --name=Worker -r --case underscore --with-expecter --structname Worker --filename worker_mock.go --output=./mocks
@@ -58,15 +58,17 @@ func NewService(deps ServiceDeps) (service *Service, cancel func()) {
 		worker:              deps.Worker,
 		logger:              deps.Logger,
 		config:              deps.Config,
-		cancelFnList:        make([]func(), 0),
-
-		assetOpCounter: assetOpCounter,
+		cancelFnMap:         new(sync.Map),
+		assetOpCounter:      assetOpCounter,
 	}
 
 	return newService, func() {
-		for i := range newService.cancelFnList {
-			newService.cancelFnList[i]()
-		}
+		newService.cancelFnMap.Range(func(_, value interface{}) bool {
+			if cancelFn, ok := value.(func()); ok {
+				cancelFn()
+			}
+			return true
+		})
 	}
 }
 
@@ -154,8 +156,13 @@ func (s *Service) DeleteAssets(ctx context.Context, request DeleteAssetsRequest)
 
 	if !request.DryRun && total > 0 {
 		newCtx, cancel := context.WithTimeout(context.Background(), s.config.DeleteAssetsTimeout)
-		s.cancelFnList = append(s.cancelFnList, cancel)
-		go s.executeDeleteAssets(newCtx, deleteSQLExpr)
+		cancelID := uuid.New().String()
+		s.cancelFnMap.Store(cancelID, cancel)
+		go func(id string) {
+			s.executeDeleteAssets(newCtx, deleteSQLExpr)
+			cancel()
+			s.cancelFnMap.Delete(id)
+		}(cancelID)
 	}
 
 	return uint32(total), nil
