@@ -8,7 +8,6 @@ import (
 
 type UserModel struct {
 	ID        sql.NullString `db:"id"`
-	UUID      sql.NullString `db:"uuid"`
 	Email     sql.NullString `db:"email"`
 	Provider  sql.NullString `db:"provider"`
 	CreatedAt sql.NullTime   `db:"created_at"`
@@ -18,7 +17,6 @@ type UserModel struct {
 func (u *UserModel) toUser() user.User {
 	return user.User{
 		ID:        u.ID.String,
-		UUID:      u.UUID.String,
 		Email:     u.Email.String,
 		Provider:  u.Provider.String,
 		CreatedAt: u.CreatedAt.Time,
@@ -30,9 +28,6 @@ func newUserModel(u *user.User) UserModel {
 	um := UserModel{}
 	if u.ID != "" {
 		um.ID = sql.NullString{String: u.ID, Valid: true}
-	}
-	if u.UUID != "" {
-		um.UUID = sql.NullString{String: u.UUID, Valid: true}
 	}
 	if u.Email != "" {
 		um.Email = sql.NullString{String: u.Email, Valid: true}

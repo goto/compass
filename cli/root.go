@@ -33,8 +33,8 @@ var rootCmd = &cobra.Command{
 }
 
 func New(cliConfig *Config) *cobra.Command {
-	if cliConfig.Client.ServerHeaderKeyUUID == "" {
-		cliConfig.Client.ServerHeaderKeyUUID = cliConfig.Service.Identity.HeaderKeyUUID
+	if cliConfig.Client.ServerHeaderKeyEmail == "" {
+		cliConfig.Client.ServerHeaderKeyEmail = cliConfig.Service.Identity.HeaderValueEmail
 	}
 
 	rootCmd.PersistentPreRunE = func(subCmd *cobra.Command, args []string) error {

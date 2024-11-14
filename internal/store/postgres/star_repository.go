@@ -79,7 +79,6 @@ func (r *StarRepository) GetStargazers(ctx context.Context, flt star.Filter, ass
 	if err := r.client.db.SelectContext(ctx, &userModels, `
 		SELECT
 			DISTINCT ON (u.id) u.id,
-      u.uuid,
 			u.email,
 			u.provider,
 			u.created_at,
@@ -130,7 +129,6 @@ func (r *StarRepository) GetAllAssetsByUserID(ctx context.Context, flt star.Filt
 			a.created_at as created_at,
 			a.updated_at as updated_at,
 			u.id as "updated_by.id",
-			u.uuid as "updated_by.uuid",
 			u.email as "updated_by.email",
 			u.provider as "updated_by.provider",
 			u.created_at as "updated_by.created_at",
@@ -195,7 +193,6 @@ func (r *StarRepository) GetAssetByUserID(ctx context.Context, userID, assetID s
 			a.created_at,
 			a.updated_at,
 			u.id as "updated_by.id",
-			u.uuid as "updated_by.uuid",
 			u.email as "updated_by.email",
 			u.provider as "updated_by.provider",
 			u.created_at as "updated_by.created_at",

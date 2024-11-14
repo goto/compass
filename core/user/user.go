@@ -9,7 +9,6 @@ import (
 // User is a basic entity of a user
 type User struct {
 	ID        string    `json:"-" diff:"-" db:"id"`
-	UUID      string    `json:"uuid,omitempty" diff:"-" db:"uuid"`
 	Email     string    `json:"email" diff:"email" db:"email"`
 	Provider  string    `json:"provider" diff:"-" db:"provider"`
 	CreatedAt time.Time `json:"-" diff:"-" db:"created_at"`
@@ -22,8 +21,8 @@ func (u *User) Validate() error {
 		return ErrNoUserInformation
 	}
 
-	if u.UUID == "" {
-		return InvalidError{UUID: u.UUID}
+	if u.Email == "" {
+		return InvalidError{Email: u.Email}
 	}
 
 	return nil
@@ -33,6 +32,6 @@ func (u *User) Validate() error {
 type Repository interface {
 	Create(ctx context.Context, u *User) (string, error)
 	GetByEmail(ctx context.Context, email string) (User, error)
-	GetByUUID(ctx context.Context, uuid string) (User, error)
-	UpsertByEmail(ctx context.Context, u *User) (string, error)
+	InsertByEmail(ctx context.Context, u *User) (string, error)
+	GetOrInsertByEmail(ctx context.Context, u *User) (string, error)
 }

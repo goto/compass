@@ -21,23 +21,23 @@ func (_m *UserService) EXPECT() *UserService_Expecter {
 	return &UserService_Expecter{mock: &_m.Mock}
 }
 
-// ValidateUser provides a mock function with given fields: ctx, uuid, email
-func (_m *UserService) ValidateUser(ctx context.Context, uuid string, email string) (string, error) {
-	ret := _m.Called(ctx, uuid, email)
+// ValidateUser provides a mock function with given fields: ctx, email
+func (_m *UserService) ValidateUser(ctx context.Context, email string) (string, error) {
+	ret := _m.Called(ctx, email)
 
 	var r0 string
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) (string, error)); ok {
-		return rf(ctx, uuid, email)
+	if rf, ok := ret.Get(0).(func(context.Context, string) (string, error)); ok {
+		return rf(ctx, email)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, string, string) string); ok {
-		r0 = rf(ctx, uuid, email)
+	if rf, ok := ret.Get(0).(func(context.Context, string) string); ok {
+		r0 = rf(ctx, email)
 	} else {
 		r0 = ret.Get(0).(string)
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, string, string) error); ok {
-		r1 = rf(ctx, uuid, email)
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, email)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -52,15 +52,14 @@ type UserService_ValidateUser_Call struct {
 
 // ValidateUser is a helper method to define mock.On call
 //   - ctx context.Context
-//   - uuid string
 //   - email string
-func (_e *UserService_Expecter) ValidateUser(ctx interface{}, uuid interface{}, email interface{}) *UserService_ValidateUser_Call {
-	return &UserService_ValidateUser_Call{Call: _e.mock.On("ValidateUser", ctx, uuid, email)}
+func (_e *UserService_Expecter) ValidateUser(ctx interface{}, email interface{}) *UserService_ValidateUser_Call {
+	return &UserService_ValidateUser_Call{Call: _e.mock.On("ValidateUser", ctx, email)}
 }
 
-func (_c *UserService_ValidateUser_Call) Run(run func(ctx context.Context, uuid string, email string)) *UserService_ValidateUser_Call {
+func (_c *UserService_ValidateUser_Call) Run(run func(ctx context.Context, email string)) *UserService_ValidateUser_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(string), args[2].(string))
+		run(args[0].(context.Context), args[1].(string))
 	})
 	return _c
 }
@@ -70,7 +69,7 @@ func (_c *UserService_ValidateUser_Call) Return(_a0 string, _a1 error) *UserServ
 	return _c
 }
 
-func (_c *UserService_ValidateUser_Call) RunAndReturn(run func(context.Context, string, string) (string, error)) *UserService_ValidateUser_Call {
+func (_c *UserService_ValidateUser_Call) RunAndReturn(run func(context.Context, string) (string, error)) *UserService_ValidateUser_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -12,9 +12,9 @@ import (
 )
 
 type Config struct {
-	Host                  string `mapstructure:"host" default:"localhost:8081"`
-	ServerHeaderKeyUUID   string `yaml:"serverheaderkey_uuid" mapstructure:"serverheaderkey_uuid" default:"Compass-User-UUID"`
-	ServerHeaderValueUUID string `yaml:"serverheadervalue_uuid" mapstructure:"serverheadervalue_uuid" default:"compass@gotocompany.com"`
+	Host                   string `mapstructure:"host" default:"localhost:8081"`
+	ServerHeaderKeyEmail   string `yaml:"serverheaderkey_email" mapstructure:"serverheaderkey_email" default:"Compass-User-Email"`
+	ServerHeaderValueEmail string `yaml:"serverheadervalue_email" mapstructure:"serverheadervalue_email" default:"compass@gotocompany.com"`
 }
 
 func Create(ctx context.Context, cfg Config) (compassv1beta1.CompassServiceClient, func(), error) {
@@ -35,7 +35,7 @@ func Create(ctx context.Context, cfg Config) (compassv1beta1.CompassServiceClien
 }
 
 func SetMetadata(ctx context.Context, cfg Config) context.Context {
-	md := metadata.New(map[string]string{cfg.ServerHeaderKeyUUID: cfg.ServerHeaderValueUUID})
+	md := metadata.New(map[string]string{cfg.ServerHeaderKeyEmail: cfg.ServerHeaderValueEmail})
 	ctx = metadata.NewOutgoingContext(ctx, md)
 
 	return ctx

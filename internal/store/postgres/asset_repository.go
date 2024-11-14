@@ -724,7 +724,6 @@ func (r *AssetRepository) getOwners(ctx context.Context, assetID string) ([]user
 	query := `
 		SELECT
 			u.id as "id",
-			u.uuid as "uuid",
 			u.email as "email",
 			u.provider as "provider"
 		FROM asset_owners ao
@@ -841,11 +840,8 @@ func (r *AssetRepository) createOrFetchUsers(ctx context.Context, tx *sqlx.Tx, u
 			fetchedUser user.User
 			err         error
 		)
-		if u.UUID != "" {
-			fetchedUser, err = r.userRepo.GetByUUIDWithTx(ctx, tx, u.UUID)
-		} else {
-			fetchedUser, err = r.userRepo.GetByEmailWithTx(ctx, tx, u.Email)
-		}
+		fetchedUser, err = r.userRepo.GetByEmailWithTx(ctx, tx, u.Email)
+
 		switch {
 		case errors.As(err, &user.NotFoundError{}):
 			u.Provider = r.defaultUserProvider
@@ -911,7 +907,6 @@ func (r *AssetRepository) getAssetSQL() sq.SelectBuilder {
 		a.updated_at as updated_at,
 		a.refreshed_at as refreshed_at,
 		u.id as "updated_by.id",
-		u.uuid as "updated_by.uuid",
 		u.email as "updated_by.email",
 		u.provider as "updated_by.provider",
 		u.created_at as "updated_by.created_at",
@@ -937,7 +932,6 @@ func (r *AssetRepository) getAssetVersionSQL() sq.SelectBuilder {
 		a.changelog as changelog,
 		a.owners as owners,
 		u.id as "updated_by.id",
-		u.uuid as "updated_by.uuid",
 		u.email as "updated_by.email",
 		u.provider as "updated_by.provider",
 		u.created_at as "updated_by.created_at",

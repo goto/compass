@@ -72,8 +72,8 @@ worker:
 
 client:
     host: localhost:8081
-    serverheaderkey_uuid: Compass-User-UUID // if ommited, will use value on service.identity.headerkey_uuid
-    serverheadervalue_uuid: gotocompany@email.com
+    serverheaderkey_email: Compass-User-Email // if ommited, will use value on service.identity.headerkey_email
+    serverheadervalue_email: gotocompany@email.com
 
 asset:
     additional_types:
