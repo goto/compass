@@ -73,8 +73,8 @@ var sampleTemplatePB = &compassv1beta1.TagTemplate{
 
 func TestGetAllTagTemplates(t *testing.T) {
 	var (
-		userID   = uuid.NewString()
-		userUUID = uuid.NewString()
+		userID    = uuid.NewString()
+		userEmail = uuid.NewString()
 	)
 	type testCase struct {
 		Description  string
@@ -140,7 +140,7 @@ func TestGetAllTagTemplates(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.Description, func(t *testing.T) {
-			ctx := user.NewContext(context.Background(), user.User{UUID: userUUID})
+			ctx := user.NewContext(context.Background(), user.User{Email: userEmail})
 
 			logger := log.NewNoop()
 			mockUserSvc := new(mocks.UserService)
@@ -153,7 +153,7 @@ func TestGetAllTagTemplates(t *testing.T) {
 			defer mockTagSvc.AssertExpectations(t)
 			defer mockTemplateSvc.AssertExpectations(t)
 
-			mockUserSvc.EXPECT().ValidateUser(ctx, userUUID, "").Return(userID, nil)
+			mockUserSvc.EXPECT().ValidateUser(ctx, userEmail).Return(userID, nil)
 
 			handler := NewAPIServer(APIServerDeps{
 				TagSvc:         mockTagSvc,
@@ -181,7 +181,7 @@ func TestGetAllTagTemplates(t *testing.T) {
 func TestCreateTagTemplate(t *testing.T) {
 	var (
 		userID       = uuid.NewString()
-		userUUID     = uuid.NewString()
+		userEmail    = uuid.NewString()
 		validRequest = &compassv1beta1.CreateTagTemplateRequest{
 			Urn:         sampleTemplatePB.GetUrn(),
 			DisplayName: sampleTemplatePB.GetDisplayName(),
@@ -275,7 +275,7 @@ func TestCreateTagTemplate(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.Description, func(t *testing.T) {
-			ctx := user.NewContext(context.Background(), user.User{UUID: userUUID})
+			ctx := user.NewContext(context.Background(), user.User{Email: userEmail})
 
 			logger := log.NewNoop()
 			mockUserSvc := new(mocks.UserService)
@@ -288,7 +288,7 @@ func TestCreateTagTemplate(t *testing.T) {
 			defer mockTagSvc.AssertExpectations(t)
 			defer mockTemplateSvc.AssertExpectations(t)
 
-			mockUserSvc.EXPECT().ValidateUser(ctx, userUUID, "").Return(userID, nil)
+			mockUserSvc.EXPECT().ValidateUser(ctx, userEmail).Return(userID, nil)
 
 			handler := NewAPIServer(APIServerDeps{
 				TagSvc:         mockTagSvc,
@@ -316,7 +316,7 @@ func TestCreateTagTemplate(t *testing.T) {
 func TestGetTagTemplate(t *testing.T) {
 	var (
 		userID       = uuid.NewString()
-		userUUID     = uuid.NewString()
+		userEmail    = uuid.NewString()
 		validRequest = &compassv1beta1.GetTagTemplateRequest{
 			TemplateUrn: sampleTemplatePB.GetUrn(),
 		}
@@ -367,7 +367,7 @@ func TestGetTagTemplate(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.Description, func(t *testing.T) {
-			ctx := user.NewContext(context.Background(), user.User{UUID: userUUID})
+			ctx := user.NewContext(context.Background(), user.User{Email: userEmail})
 
 			logger := log.NewNoop()
 			mockUserSvc := new(mocks.UserService)
@@ -380,7 +380,7 @@ func TestGetTagTemplate(t *testing.T) {
 			defer mockTagSvc.AssertExpectations(t)
 			defer mockTemplateSvc.AssertExpectations(t)
 
-			mockUserSvc.EXPECT().ValidateUser(ctx, userUUID, "").Return(userID, nil)
+			mockUserSvc.EXPECT().ValidateUser(ctx, userEmail).Return(userID, nil)
 
 			handler := NewAPIServer(APIServerDeps{
 				TagSvc:         mockTagSvc,
@@ -408,7 +408,7 @@ func TestGetTagTemplate(t *testing.T) {
 func TestUpdateTagTemplate(t *testing.T) {
 	var (
 		userID       = uuid.NewString()
-		userUUID     = uuid.NewString()
+		userEmail    = "test@test.com"
 		validRequest = &compassv1beta1.UpdateTagTemplateRequest{
 			TemplateUrn: sampleTemplatePB.GetUrn(),
 			DisplayName: sampleTemplatePB.GetDisplayName(),
@@ -504,7 +504,7 @@ func TestUpdateTagTemplate(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.Description, func(t *testing.T) {
-			ctx := user.NewContext(context.Background(), user.User{UUID: userUUID})
+			ctx := user.NewContext(context.Background(), user.User{Email: userEmail})
 
 			logger := log.NewNoop()
 			mockUserSvc := new(mocks.UserService)
@@ -517,7 +517,7 @@ func TestUpdateTagTemplate(t *testing.T) {
 			defer mockTagSvc.AssertExpectations(t)
 			defer mockTemplateSvc.AssertExpectations(t)
 
-			mockUserSvc.EXPECT().ValidateUser(ctx, userUUID, "").Return(userID, nil)
+			mockUserSvc.EXPECT().ValidateUser(ctx, userEmail).Return(userID, nil)
 
 			handler := NewAPIServer(APIServerDeps{
 				TagSvc:         mockTagSvc,
@@ -545,7 +545,7 @@ func TestUpdateTagTemplate(t *testing.T) {
 func TestDeleteTagTemplate(t *testing.T) {
 	var (
 		userID       = uuid.NewString()
-		userUUID     = uuid.NewString()
+		userEmail    = uuid.NewString()
 		validRequest = &compassv1beta1.DeleteTagTemplateRequest{
 			TemplateUrn: sampleTemplatePB.GetUrn(),
 		}
@@ -585,7 +585,7 @@ func TestDeleteTagTemplate(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.Description, func(t *testing.T) {
-			ctx := user.NewContext(context.Background(), user.User{UUID: userUUID})
+			ctx := user.NewContext(context.Background(), user.User{Email: userEmail})
 
 			logger := log.NewNoop()
 			mockUserSvc := new(mocks.UserService)
@@ -598,7 +598,7 @@ func TestDeleteTagTemplate(t *testing.T) {
 			defer mockTagSvc.AssertExpectations(t)
 			defer mockTemplateSvc.AssertExpectations(t)
 
-			mockUserSvc.EXPECT().ValidateUser(ctx, userUUID, "").Return(userID, nil)
+			mockUserSvc.EXPECT().ValidateUser(ctx, userEmail).Return(userID, nil)
 
 			handler := NewAPIServer(APIServerDeps{
 				TagSvc:         mockTagSvc,

@@ -17,13 +17,13 @@ import (
 
 func TestValidateUserInCtx(t *testing.T) {
 	var (
-		userUUID = uuid.NewString()
-		userID   = uuid.NewString()
+		userEmail = "test@test.com"
+		userID    = uuid.NewString()
 	)
 	type testCase struct {
 		Description  string
 		UserID       string
-		UserUUID     string
+		UserEmail    string
 		ExpectStatus codes.Code
 		Setup        func(context.Context, *mocks.UserService)
 		PostCheck    func(resp *compassv1beta1.GetUserStarredAssetsResponse) error
@@ -33,25 +33,25 @@ func TestValidateUserInCtx(t *testing.T) {
 		{
 			Description:  "should return invalid argument error if ValidateUser empty uuid is passed",
 			UserID:       "",
-			UserUUID:     "",
+			UserEmail:    "",
 			ExpectStatus: codes.InvalidArgument,
 			Setup: func(ctx context.Context, us *mocks.UserService) {
-				us.EXPECT().ValidateUser(ctx, "", "").Return("", user.ErrNoUserInformation)
+				us.EXPECT().ValidateUser(ctx, "").Return("", user.ErrNoUserInformation)
 			},
 		},
 		{
 			Description:  "should return internal error if ValidateUser returns some error",
 			UserID:       userID,
-			UserUUID:     userUUID,
+			UserEmail:    userEmail,
 			ExpectStatus: codes.Internal,
 			Setup: func(ctx context.Context, us *mocks.UserService) {
-				us.EXPECT().ValidateUser(ctx, userUUID, "").Return("", errors.New("internal error"))
+				us.EXPECT().ValidateUser(ctx, userEmail).Return("", errors.New("internal error"))
 			},
 		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.Description, func(t *testing.T) {
-			ctx := user.NewContext(context.Background(), user.User{UUID: tc.UserUUID})
+			ctx := user.NewContext(context.Background(), user.User{Email: tc.UserEmail})
 
 			logger := log.NewNoop()
 

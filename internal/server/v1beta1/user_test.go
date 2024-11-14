@@ -25,10 +25,10 @@ import (
 
 func TestGetUserStarredAssets(t *testing.T) {
 	var (
-		userUUID = uuid.NewString()
-		userID   = uuid.NewString()
-		offset   = 2
-		size     = 10
+		userEmail = "test@test.com"
+		userID    = uuid.NewString()
+		offset    = 2
+		size      = 10
 	)
 	type testCase struct {
 		Description  string
@@ -99,7 +99,7 @@ func TestGetUserStarredAssets(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.Description, func(t *testing.T) {
-			ctx := user.NewContext(context.Background(), user.User{UUID: userUUID})
+			ctx := user.NewContext(context.Background(), user.User{Email: userEmail})
 
 			logger := log.NewNoop()
 
@@ -111,7 +111,7 @@ func TestGetUserStarredAssets(t *testing.T) {
 			defer mockUserSvc.AssertExpectations(t)
 			defer mockStarSvc.AssertExpectations(t)
 
-			mockUserSvc.EXPECT().ValidateUser(ctx, userUUID, "").Return(userID, nil)
+			mockUserSvc.EXPECT().ValidateUser(ctx, userEmail).Return(userID, nil)
 
 			handler := NewAPIServer(APIServerDeps{StarSvc: mockStarSvc, UserSvc: mockUserSvc, Logger: logger})
 
@@ -137,10 +137,10 @@ func TestGetUserStarredAssets(t *testing.T) {
 
 func TestGetMyStarredAssets(t *testing.T) {
 	var (
-		userUUID = uuid.NewString()
-		userID   = uuid.NewString()
-		offset   = 2
-		size     = 10
+		userEmail = "test@test.com"
+		userID    = uuid.NewString()
+		offset    = 2
+		size      = 10
 	)
 	type testCase struct {
 		Description  string
@@ -211,7 +211,7 @@ func TestGetMyStarredAssets(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.Description, func(t *testing.T) {
-			ctx := user.NewContext(context.Background(), user.User{UUID: userUUID})
+			ctx := user.NewContext(context.Background(), user.User{Email: userEmail})
 
 			logger := log.NewNoop()
 
@@ -223,7 +223,7 @@ func TestGetMyStarredAssets(t *testing.T) {
 			defer mockUserSvc.AssertExpectations(t)
 			defer mockStarSvc.AssertExpectations(t)
 
-			mockUserSvc.EXPECT().ValidateUser(ctx, userUUID, "").Return(userID, nil)
+			mockUserSvc.EXPECT().ValidateUser(ctx, userEmail).Return(userID, nil)
 
 			handler := NewAPIServer(APIServerDeps{StarSvc: mockStarSvc, UserSvc: mockUserSvc, Logger: logger})
 
@@ -248,7 +248,7 @@ func TestGetMyStarredAssets(t *testing.T) {
 
 func TestGetMyStarredAsset(t *testing.T) {
 	var (
-		userUUID  = uuid.NewString()
+		userEmail = "test@test.com"
 		userID    = uuid.NewString()
 		assetID   = uuid.NewString()
 		assetType = "an-asset-type"
@@ -313,7 +313,7 @@ func TestGetMyStarredAsset(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.Description, func(t *testing.T) {
-			ctx := user.NewContext(context.Background(), user.User{UUID: userUUID})
+			ctx := user.NewContext(context.Background(), user.User{Email: userEmail})
 
 			logger := log.NewNoop()
 
@@ -325,7 +325,7 @@ func TestGetMyStarredAsset(t *testing.T) {
 			defer mockUserSvc.AssertExpectations(t)
 			defer mockStarSvc.AssertExpectations(t)
 
-			mockUserSvc.EXPECT().ValidateUser(ctx, userUUID, "").Return(userID, nil)
+			mockUserSvc.EXPECT().ValidateUser(ctx, userEmail).Return(userID, nil)
 
 			handler := NewAPIServer(APIServerDeps{StarSvc: mockStarSvc, UserSvc: mockUserSvc, Logger: logger})
 
@@ -349,9 +349,9 @@ func TestGetMyStarredAsset(t *testing.T) {
 
 func TestStarAsset(t *testing.T) {
 	var (
-		userID   = uuid.NewString()
-		assetID  = uuid.NewString()
-		userUUID = uuid.NewString()
+		userID    = uuid.NewString()
+		assetID   = uuid.NewString()
+		userEmail = "test@test.com"
 	)
 	type testCase struct {
 		Description  string
@@ -405,7 +405,7 @@ func TestStarAsset(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.Description, func(t *testing.T) {
-			ctx := user.NewContext(context.Background(), user.User{UUID: userUUID})
+			ctx := user.NewContext(context.Background(), user.User{Email: userEmail})
 
 			logger := log.NewNoop()
 
@@ -417,7 +417,7 @@ func TestStarAsset(t *testing.T) {
 			defer mockUserSvc.AssertExpectations(t)
 			defer mockStarSvc.AssertExpectations(t)
 
-			mockUserSvc.EXPECT().ValidateUser(ctx, userUUID, "").Return(userID, nil)
+			mockUserSvc.EXPECT().ValidateUser(ctx, userEmail).Return(userID, nil)
 
 			handler := NewAPIServer(APIServerDeps{StarSvc: mockStarSvc, UserSvc: mockUserSvc, Logger: logger})
 
@@ -435,9 +435,9 @@ func TestStarAsset(t *testing.T) {
 
 func TestUnstarAsset(t *testing.T) {
 	var (
-		userID   = uuid.NewString()
-		assetID  = uuid.NewString()
-		userUUID = uuid.NewString()
+		userID    = uuid.NewString()
+		assetID   = uuid.NewString()
+		userEmail = "test@test.com"
 	)
 	type testCase struct {
 		Description  string
@@ -484,7 +484,7 @@ func TestUnstarAsset(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.Description, func(t *testing.T) {
-			ctx := user.NewContext(context.Background(), user.User{UUID: userUUID})
+			ctx := user.NewContext(context.Background(), user.User{Email: userEmail})
 
 			logger := log.NewNoop()
 
@@ -496,7 +496,7 @@ func TestUnstarAsset(t *testing.T) {
 			defer mockUserSvc.AssertExpectations(t)
 			defer mockStarSvc.AssertExpectations(t)
 
-			mockUserSvc.EXPECT().ValidateUser(ctx, userUUID, "").Return(userID, nil)
+			mockUserSvc.EXPECT().ValidateUser(ctx, userEmail).Return(userID, nil)
 
 			handler := NewAPIServer(APIServerDeps{StarSvc: mockStarSvc, UserSvc: mockUserSvc, Logger: logger})
 
@@ -514,8 +514,8 @@ func TestUnstarAsset(t *testing.T) {
 
 func TestGetMyDiscussions(t *testing.T) {
 	var (
-		userID   = uuid.NewString()
-		userUUID = uuid.NewString()
+		userID    = uuid.NewString()
+		userEmail = "test@test.com"
 	)
 	type testCase struct {
 		Description  string
@@ -638,7 +638,7 @@ func TestGetMyDiscussions(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.Description, func(t *testing.T) {
-			ctx := user.NewContext(context.Background(), user.User{UUID: userUUID})
+			ctx := user.NewContext(context.Background(), user.User{Email: userEmail})
 
 			logger := log.NewNoop()
 
@@ -650,7 +650,7 @@ func TestGetMyDiscussions(t *testing.T) {
 			defer mockUserSvc.AssertExpectations(t)
 			defer mockDiscussionSvc.AssertExpectations(t)
 
-			mockUserSvc.EXPECT().ValidateUser(ctx, userUUID, "").Return(userID, nil)
+			mockUserSvc.EXPECT().ValidateUser(ctx, userEmail).Return(userID, nil)
 
 			handler := NewAPIServer(APIServerDeps{DiscussionSvc: mockDiscussionSvc, UserSvc: mockUserSvc, Logger: logger})
 
@@ -680,14 +680,14 @@ func TestUserToProto(t *testing.T) {
 
 	testCases := []testCase{
 		{
-			Title:       "should return nil if UUID is empty",
+			Title:       "should return nil if email is empty",
 			User:        user.User{},
 			ExpectProto: nil,
 		},
 		{
 			Title:       "should return fields without timestamp",
-			User:        user.User{UUID: "uuid1", Email: "email@email.com", Provider: "provider", CreatedAt: timeDummy, UpdatedAt: timeDummy},
-			ExpectProto: &compassv1beta1.User{Uuid: "uuid1", Email: "email@email.com"},
+			User:        user.User{Email: "email@email.com", Provider: "provider", CreatedAt: timeDummy, UpdatedAt: timeDummy},
+			ExpectProto: &compassv1beta1.User{Email: "email@email.com"},
 		},
 	}
 	for _, tc := range testCases {
@@ -710,19 +710,19 @@ func TestUserToFullProto(t *testing.T) {
 
 	testCases := []testCase{
 		{
-			Title:       "should return nil if UUID is empty",
+			Title:       "should return nil if email is empty",
 			User:        user.User{},
 			ExpectProto: nil,
 		},
 		{
 			Title:       "should return without timestamp pb if timestamp is zero",
-			User:        user.User{UUID: "uuid1", Provider: "provider"},
-			ExpectProto: &compassv1beta1.User{Uuid: "uuid1", Provider: "provider"},
+			User:        user.User{Email: "test@test.com", Provider: "provider"},
+			ExpectProto: &compassv1beta1.User{Email: "test@test.com", Provider: "provider"},
 		},
 		{
 			Title:       "should return with timestamp pb if timestamp is not zero",
-			User:        user.User{UUID: "uuid1", Provider: "provider", CreatedAt: timeDummy, UpdatedAt: timeDummy},
-			ExpectProto: &compassv1beta1.User{Uuid: "uuid1", Provider: "provider", CreatedAt: timestamppb.New(timeDummy), UpdatedAt: timestamppb.New(timeDummy)},
+			User:        user.User{Email: "test@test.com", Provider: "provider", CreatedAt: timeDummy, UpdatedAt: timeDummy},
+			ExpectProto: &compassv1beta1.User{Email: "test@test.com", Provider: "provider", CreatedAt: timestamppb.New(timeDummy), UpdatedAt: timestamppb.New(timeDummy)},
 		},
 	}
 	for _, tc := range testCases {
@@ -746,13 +746,13 @@ func TestUserFromProto(t *testing.T) {
 	testCases := []testCase{
 		{
 			Title:      "should return non empty time.Time if timestamp pb is not zero",
-			UserPB:     &compassv1beta1.User{Uuid: "uuid1", Provider: "provider", CreatedAt: timestamppb.New(timeDummy), UpdatedAt: timestamppb.New(timeDummy)},
-			ExpectUser: user.User{UUID: "uuid1", Provider: "provider", CreatedAt: timeDummy, UpdatedAt: timeDummy},
+			UserPB:     &compassv1beta1.User{Email: "test@test.com", Provider: "provider", CreatedAt: timestamppb.New(timeDummy), UpdatedAt: timestamppb.New(timeDummy)},
+			ExpectUser: user.User{Email: "test@test.com", Provider: "provider", CreatedAt: timeDummy, UpdatedAt: timeDummy},
 		},
 		{
 			Title:      "should return empty time.Time if timestamp pb is zero",
-			UserPB:     &compassv1beta1.User{Uuid: "uuid1", Provider: "provider"},
-			ExpectUser: user.User{UUID: "uuid1", Provider: "provider"},
+			UserPB:     &compassv1beta1.User{Email: "test@test.com", Provider: "provider"},
+			ExpectUser: user.User{Email: "test@test.com", Provider: "provider"},
 		},
 	}
 	for _, tc := range testCases {

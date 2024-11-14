@@ -19,8 +19,8 @@ import (
 
 func TestGetTypes(t *testing.T) {
 	var (
-		userID   = uuid.NewString()
-		userUUID = uuid.NewString()
+		userID    = uuid.NewString()
+		userEmail = "test@test.com"
 	)
 	type testCase struct {
 		Description  string
@@ -115,7 +115,7 @@ func TestGetTypes(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.Description, func(t *testing.T) {
-			ctx := user.NewContext(context.Background(), user.User{UUID: userUUID})
+			ctx := user.NewContext(context.Background(), user.User{Email: userEmail})
 
 			mockUserSvc := new(mocks.UserService)
 			mockSvc := new(mocks.AssetService)
@@ -126,7 +126,7 @@ func TestGetTypes(t *testing.T) {
 			defer mockUserSvc.AssertExpectations(t)
 			defer mockSvc.AssertExpectations(t)
 
-			mockUserSvc.EXPECT().ValidateUser(ctx, userUUID, "").Return(userID, nil)
+			mockUserSvc.EXPECT().ValidateUser(ctx, userEmail).Return(userID, nil)
 
 			handler := NewAPIServer(APIServerDeps{AssetSvc: mockSvc, UserSvc: mockUserSvc, Logger: logger})
 

@@ -25,8 +25,8 @@ import (
 
 func TestGetAllDiscussions(t *testing.T) {
 	var (
-		userID   = uuid.NewString()
-		userUUID = uuid.NewString()
+		userID    = uuid.NewString()
+		userEmail = "test@test.com"
 	)
 	type testCase struct {
 		Description  string
@@ -111,7 +111,7 @@ func TestGetAllDiscussions(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.Description, func(t *testing.T) {
-			ctx := user.NewContext(context.Background(), user.User{UUID: userUUID})
+			ctx := user.NewContext(context.Background(), user.User{Email: userEmail})
 
 			logger := log.NewNoop()
 			mockUserSvc := new(mocks.UserService)
@@ -122,7 +122,7 @@ func TestGetAllDiscussions(t *testing.T) {
 			defer mockUserSvc.AssertExpectations(t)
 			defer mockSvc.AssertExpectations(t)
 
-			mockUserSvc.EXPECT().ValidateUser(ctx, userUUID, "").Return(userID, nil)
+			mockUserSvc.EXPECT().ValidateUser(ctx, userEmail).Return(userID, nil)
 
 			handler := NewAPIServer(APIServerDeps{DiscussionSvc: mockSvc, UserSvc: mockUserSvc, Logger: logger})
 
@@ -144,8 +144,8 @@ func TestGetAllDiscussions(t *testing.T) {
 
 func TestCreateDiscussion(t *testing.T) {
 	var (
-		userID   = uuid.NewString()
-		userUUID = uuid.NewString()
+		userID    = uuid.NewString()
+		userEmail = "test@test.com"
 	)
 	validRequest := &compassv1beta1.CreateDiscussionRequest{
 		Title: "Lorem Ipsum",
@@ -240,7 +240,7 @@ func TestCreateDiscussion(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.Description, func(t *testing.T) {
-			ctx := user.NewContext(context.Background(), user.User{UUID: userUUID})
+			ctx := user.NewContext(context.Background(), user.User{Email: userEmail})
 
 			logger := log.NewNoop()
 			mockUserSvc := new(mocks.UserService)
@@ -251,7 +251,7 @@ func TestCreateDiscussion(t *testing.T) {
 			defer mockUserSvc.AssertExpectations(t)
 			defer mockSvc.AssertExpectations(t)
 
-			mockUserSvc.EXPECT().ValidateUser(ctx, userUUID, "").Return(userID, nil)
+			mockUserSvc.EXPECT().ValidateUser(ctx, userEmail).Return(userID, nil)
 
 			handler := NewAPIServer(APIServerDeps{DiscussionSvc: mockSvc, UserSvc: mockUserSvc, Logger: logger})
 
@@ -268,7 +268,7 @@ func TestCreateDiscussion(t *testing.T) {
 func TestGetDiscussion(t *testing.T) {
 	var (
 		userID       = uuid.NewString()
-		userUUID     = uuid.NewString()
+		userEmail    = "test@test.com"
 		discussionID = "123"
 	)
 
@@ -341,7 +341,7 @@ func TestGetDiscussion(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.Description, func(t *testing.T) {
-			ctx := user.NewContext(context.Background(), user.User{UUID: userUUID})
+			ctx := user.NewContext(context.Background(), user.User{Email: userEmail})
 
 			logger := log.NewNoop()
 			mockUserSvc := new(mocks.UserService)
@@ -352,7 +352,7 @@ func TestGetDiscussion(t *testing.T) {
 			defer mockUserSvc.AssertExpectations(t)
 			defer mockSvc.AssertExpectations(t)
 
-			mockUserSvc.EXPECT().ValidateUser(ctx, userUUID, "").Return(userID, nil)
+			mockUserSvc.EXPECT().ValidateUser(ctx, userEmail).Return(userID, nil)
 			handler := NewAPIServer(APIServerDeps{DiscussionSvc: mockSvc, UserSvc: mockUserSvc, Logger: logger})
 
 			got, err := handler.GetDiscussion(ctx, tc.Request)
@@ -374,7 +374,7 @@ func TestGetDiscussion(t *testing.T) {
 func TestPatchDiscussion(t *testing.T) {
 	var (
 		userID       = uuid.NewString()
-		userUUID     = uuid.NewString()
+		userEmail    = "test@test.com"
 		discussionID = "123"
 	)
 
@@ -479,7 +479,7 @@ func TestPatchDiscussion(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.Description, func(t *testing.T) {
-			ctx := user.NewContext(context.Background(), user.User{UUID: userUUID})
+			ctx := user.NewContext(context.Background(), user.User{Email: userEmail})
 
 			logger := log.NewNoop()
 			mockUserSvc := new(mocks.UserService)
@@ -490,7 +490,7 @@ func TestPatchDiscussion(t *testing.T) {
 			defer mockUserSvc.AssertExpectations(t)
 			defer mockSvc.AssertExpectations(t)
 
-			mockUserSvc.EXPECT().ValidateUser(ctx, userUUID, "").Return(userID, nil)
+			mockUserSvc.EXPECT().ValidateUser(ctx, userEmail).Return(userID, nil)
 
 			handler := NewAPIServer(APIServerDeps{DiscussionSvc: mockSvc, UserSvc: mockUserSvc, Logger: logger})
 

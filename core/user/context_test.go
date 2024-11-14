@@ -10,7 +10,7 @@ import (
 
 func TestContext(t *testing.T) {
 	t.Run("should return passed user if exist in context", func(t *testing.T) {
-		passedUser := user.User{UUID: "uuid", Email: "email"}
+		passedUser := user.User{Email: "test@test.com"}
 		userCtx := user.NewContext(context.Background(), passedUser)
 		actual := user.FromContext(userCtx)
 		if !cmp.Equal(passedUser, actual) {

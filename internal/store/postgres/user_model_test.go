@@ -15,8 +15,7 @@ func TestUserModel(t *testing.T) {
 		someUUID := uuid.NewString()
 		timestamp := time.Now().UTC()
 		um := UserModel{
-			ID:        sql.NullString{String: "12", Valid: true},
-			UUID:      sql.NullString{String: someUUID, Valid: true},
+			ID:        sql.NullString{String: someUUID, Valid: true},
 			Email:     sql.NullString{String: "user@gotocompany.com", Valid: true},
 			Provider:  sql.NullString{String: "compass", Valid: true},
 			CreatedAt: sql.NullTime{Time: timestamp, Valid: true},
@@ -26,7 +25,6 @@ func TestUserModel(t *testing.T) {
 		ud := um.toUser()
 
 		assert.Equal(t, um.ID.String, ud.ID)
-		assert.Equal(t, um.UUID.String, ud.UUID)
 		assert.Equal(t, um.Email.String, ud.Email)
 		assert.Equal(t, um.Provider.String, ud.Provider)
 		assert.True(t, um.CreatedAt.Time.Equal(ud.CreatedAt))
@@ -38,8 +36,7 @@ func TestUserModel(t *testing.T) {
 		timestamp := time.Now().UTC()
 
 		ud := &user.User{
-			ID:        "12",
-			UUID:      someUUID,
+			ID:        someUUID,
 			Email:     "user@gotocompany.com",
 			Provider:  "compass",
 			CreatedAt: timestamp,
@@ -49,7 +46,6 @@ func TestUserModel(t *testing.T) {
 		um := newUserModel(ud)
 
 		assert.Equal(t, um.ID.String, ud.ID)
-		assert.Equal(t, um.UUID.String, ud.UUID)
 		assert.Equal(t, um.Email.String, ud.Email)
 		assert.Equal(t, um.Provider.String, ud.Provider)
 		assert.True(t, um.CreatedAt.Time.Equal(ud.CreatedAt))

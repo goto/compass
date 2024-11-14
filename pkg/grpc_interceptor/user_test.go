@@ -30,7 +30,7 @@ func TestUserSuite(t *testing.T) {
 			TestService: &dummyService{TestServiceServer: &grpc_testing.TestPingService{T: t}},
 			ServerOpts: []grpc.ServerOption{
 				grpc_middleware.WithUnaryServerChain(
-					UserHeaderCtx(IdentityHeaderKeyUUID, IdentityHeaderKeyEmail)),
+					UserHeaderCtx(IdentityHeaderKeyEmail)),
 			},
 		},
 	}
@@ -41,22 +41,21 @@ func (s *UserTestSuite) TestUnary_IdentityHeaderNotPresent() {
 	_, err := s.Client.Ping(s.SimpleCtx(), &pb_testproto.PingRequest{Value: "testuser", SleepTimeMs: 9999})
 	code := status.Code(err)
 	require.Equal(s.T(), codes.InvalidArgument, code)
-	require.EqualError(s.T(), err, "rpc error: code = InvalidArgument desc = uuid not found")
+	require.EqualError(s.T(), err, "rpc error: code = InvalidArgument desc = email not found")
 }
 
 func (s *UserTestSuite) TestUnary_HeaderPresentAndEmpty() {
-	ctx := metadata.AppendToOutgoingContext(context.Background(), IdentityHeaderKeyUUID, "", IdentityHeaderKeyEmail, "")
+	ctx := metadata.AppendToOutgoingContext(context.Background(), IdentityHeaderKeyEmail, "")
 	_, err := s.Client.Ping(ctx, &pb_testproto.PingRequest{Value: "testuser", SleepTimeMs: 9999})
 	code := status.Code(err)
 	require.Equal(s.T(), codes.InvalidArgument, code)
-	require.EqualError(s.T(), err, "rpc error: code = InvalidArgument desc = uuid not found")
+	require.EqualError(s.T(), err, "rpc error: code = InvalidArgument desc = email not found")
 }
 
 func (s *UserTestSuite) TestUnary_HeaderPresentAndPassed() {
 	userEmail := "user-email"
-	userUUID := "user-uuid"
 
-	ctx := metadata.AppendToOutgoingContext(s.SimpleCtx(), IdentityHeaderKeyUUID, userUUID, IdentityHeaderKeyEmail, userEmail)
+	ctx := metadata.AppendToOutgoingContext(s.SimpleCtx(), IdentityHeaderKeyEmail, userEmail)
 	_, err := s.Client.Ping(ctx, &pb_testproto.PingRequest{Value: "testuser", SleepTimeMs: 9999})
 	code := status.Code(err)
 	require.Equal(s.T(), codes.OK, code)

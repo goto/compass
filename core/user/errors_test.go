@@ -16,18 +16,18 @@ func TestErrors(t *testing.T) {
 	testCases := []testCase{
 		{
 			Description:    "not found error return correct error string",
-			Err:            user.NotFoundError{UUID: "uuid", Email: "email"},
-			ExpectedString: "could not find user with uuid \"uuid\" with email \"email\"",
+			Err:            user.NotFoundError{Email: "test@test.com"},
+			ExpectedString: "could not find user with email \"test@test.com\"",
 		},
 		{
 			Description:    "duplicate error return correct error string",
-			Err:            user.DuplicateRecordError{UUID: "uuid", Email: "email"},
-			ExpectedString: "duplicate user with uuid \"uuid\" with email \"email\"",
+			Err:            user.DuplicateRecordError{Email: "test@test.com"},
+			ExpectedString: "duplicate user with email \"test@test.com\"",
 		},
 		{
 			Description:    "invalid error return correct error string",
-			Err:            user.InvalidError{UUID: "uuid"},
-			ExpectedString: "empty field with uuid \"uuid\"",
+			Err:            user.InvalidError{Email: "test@test.com"},
+			ExpectedString: "empty field with email \"test@test.com\"",
 		},
 	}
 

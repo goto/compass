@@ -6,7 +6,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/goto/compass/core/asset"
 	"github.com/goto/compass/core/user"
 	"github.com/goto/compass/internal/store/postgres"
@@ -93,7 +92,6 @@ func getAsset(ownerEmail, assetURN, assetType string) *asset.Asset {
 func getUser(email string) *user.User {
 	timestamp := time.Now().UTC()
 	return &user.User{
-		UUID:      uuid.NewString(),
 		Email:     email,
 		Provider:  defaultProviderName,
 		CreatedAt: timestamp,
@@ -105,7 +103,7 @@ func createUsers(userRepo user.Repository, num int) ([]user.User, error) {
 	var users []user.User
 	for i := 0; i < num; i++ {
 		email := fmt.Sprintf("user-test-%d@gotocompany.com", i+1)
-		user1 := user.User{UUID: uuid.NewString(), Email: email, Provider: defaultProviderName}
+		user1 := user.User{Email: email, Provider: defaultProviderName}
 		var err error
 		user1.ID, err = userRepo.Create(context.Background(), &user1)
 		if err != nil {

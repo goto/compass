@@ -408,7 +408,7 @@ func TestService_DeleteAsset(t *testing.T) {
 			Err: errors.New("unknown error"),
 		},
 		{
-			Description: `should call DeleteByURN on repositories by fetching URN when given a UUID`,
+			Description: `should call DeleteByURN on repositories by fetching URN when given an ID`,
 			ID:          assetID,
 			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository, lr *mocks.LineageRepository) {
 				ar.EXPECT().GetByID(ctx, assetID).Return(asset.Asset{ID: assetID, URN: urn}, nil)
@@ -419,7 +419,7 @@ func TestService_DeleteAsset(t *testing.T) {
 			Err: nil,
 		},
 		{
-			Description: `should call DeleteByURN on repositories when not given a UUID`,
+			Description: `should call DeleteByURN on repositories when not given an ID`,
 			ID:          urn,
 			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository, lr *mocks.LineageRepository) {
 				ar.EXPECT().DeleteByURN(ctx, urn).Return(nil)

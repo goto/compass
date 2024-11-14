@@ -20,13 +20,13 @@ func TestValidate(t *testing.T) {
 			ExpectError: ErrNoUserInformation,
 		},
 		{
-			Title:       "should return error invalid if uuid is empty",
+			Title:       "should return error invalid if email is empty",
 			User:        &User{Provider: "provider"},
 			ExpectError: InvalidError{},
 		},
 		{
 			Title:       "should return nil if user is valid",
-			User:        &User{UUID: "some-uuid", Provider: "provider"},
+			User:        &User{Email: "test@test.com", Provider: "provider"},
 			ExpectError: nil,
 		},
 	}

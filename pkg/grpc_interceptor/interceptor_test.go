@@ -16,8 +16,8 @@ type dummyService struct {
 func (s *dummyService) Ping(ctx context.Context, ping *pb_testproto.PingRequest) (*pb_testproto.PingResponse, error) {
 	if ping.Value == "testuser" {
 		usr := user.FromContext(ctx)
-		if usr.UUID == "" {
-			return nil, status.Error(codes.InvalidArgument, "uuid not found")
+		if usr.Email == "" {
+			return nil, status.Error(codes.InvalidArgument, "email not found")
 		}
 	}
 	return s.TestServiceServer.Ping(ctx, ping)

@@ -129,7 +129,7 @@ func (c *Client) makeRequest(method, url string, payload, data interface{}) (err
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set(IDENTITY_HEADER_KEY_UUID, "compassendtoendtest@gotocompany.com")
+	req.Header.Set(IDENTITY_HEADER_KEY_UUID, "66c4a009-1ea3-4a91-bd95-79c8d4f5027e")
 	req.Header.Set(IDENTITY_HEADER_KEY_EMAIL, "compassendtoendtest@gotocompany.com")
 
 	for key, value := range c.headers {

@@ -22,8 +22,8 @@ import (
 
 func TestSearch(t *testing.T) {
 	var (
-		userID   = uuid.NewString()
-		userUUID = uuid.NewString()
+		userID    = uuid.NewString()
+		userEmail = "test@test.com"
 	)
 	type testCase struct {
 		Description  string
@@ -210,7 +210,7 @@ func TestSearch(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.Description, func(t *testing.T) {
-			ctx := user.NewContext(context.Background(), user.User{UUID: userUUID})
+			ctx := user.NewContext(context.Background(), user.User{Email: userEmail})
 
 			logger := log.NewNoop()
 			mockUserSvc := mocks.NewUserService(t)
@@ -219,7 +219,7 @@ func TestSearch(t *testing.T) {
 				tc.Setup(ctx, mockSvc)
 			}
 
-			mockUserSvc.EXPECT().ValidateUser(ctx, userUUID, "").Return(userID, nil)
+			mockUserSvc.EXPECT().ValidateUser(ctx, userEmail).Return(userID, nil)
 
 			handler := NewAPIServer(APIServerDeps{AssetSvc: mockSvc, UserSvc: mockUserSvc, Logger: logger})
 
@@ -241,8 +241,8 @@ func TestSearch(t *testing.T) {
 
 func TestSuggest(t *testing.T) {
 	var (
-		userID   = uuid.NewString()
-		userUUID = uuid.NewString()
+		userID    = uuid.NewString()
+		userEmail = "test@test.com"
 	)
 	type testCase struct {
 		Description  string
@@ -307,7 +307,7 @@ func TestSuggest(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.Description, func(t *testing.T) {
-			ctx := user.NewContext(context.Background(), user.User{UUID: userUUID})
+			ctx := user.NewContext(context.Background(), user.User{Email: userEmail})
 
 			logger := log.NewNoop()
 			mockUserSvc := mocks.NewUserService(t)
@@ -316,7 +316,7 @@ func TestSuggest(t *testing.T) {
 				tc.Setup(ctx, mockSvc)
 			}
 
-			mockUserSvc.EXPECT().ValidateUser(ctx, userUUID, "").Return(userID, nil)
+			mockUserSvc.EXPECT().ValidateUser(ctx, userEmail).Return(userID, nil)
 
 			handler := NewAPIServer(APIServerDeps{AssetSvc: mockSvc, UserSvc: mockUserSvc, Logger: logger})
 
@@ -338,8 +338,8 @@ func TestSuggest(t *testing.T) {
 
 func TestGroupAssets(t *testing.T) {
 	var (
-		userID   = uuid.NewString()
-		userUUID = uuid.NewString()
+		userID    = uuid.NewString()
+		userEmail = "test@test.com"
 	)
 	type testCase struct {
 		Description  string
@@ -479,7 +479,7 @@ func TestGroupAssets(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.Description, func(t *testing.T) {
-			ctx := user.NewContext(context.Background(), user.User{UUID: userUUID})
+			ctx := user.NewContext(context.Background(), user.User{Email: userEmail})
 
 			logger := log.NewNoop()
 			mockUserSvc := mocks.NewUserService(t)
@@ -488,7 +488,7 @@ func TestGroupAssets(t *testing.T) {
 				tc.Setup(ctx, mockSvc)
 			}
 
-			mockUserSvc.EXPECT().ValidateUser(ctx, userUUID, "").Return(userID, nil)
+			mockUserSvc.EXPECT().ValidateUser(ctx, userEmail).Return(userID, nil)
 
 			handler := NewAPIServer(APIServerDeps{AssetSvc: mockSvc, UserSvc: mockUserSvc, Logger: logger})
 
