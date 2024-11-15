@@ -44,7 +44,6 @@ service:
     port: 8080
     request_timeout: 10s
     identity:
-        headerkey_uuid: Compass-User-UUID
         headerkey_email: Compass-User-Email
         provider_default_name: shield
     grpc:
