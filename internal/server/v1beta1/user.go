@@ -252,6 +252,7 @@ func userToProto(u user.User) *compassv1beta1.User {
 		return nil
 	}
 	return &compassv1beta1.User{
+		Id:    u.ID,
 		Email: u.Email,
 	}
 }

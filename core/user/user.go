@@ -8,7 +8,7 @@ import (
 
 // User is a basic entity of a user
 type User struct {
-	ID        string    `json:"-" diff:"-" db:"id"`
+	ID        string    `json:"id" diff:"-" db:"id"`
 	Email     string    `json:"email" diff:"email" db:"email"`
 	Provider  string    `json:"provider" diff:"-" db:"provider"`
 	CreatedAt time.Time `json:"-" diff:"-" db:"created_at"`
