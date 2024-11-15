@@ -686,8 +686,8 @@ func TestUserToProto(t *testing.T) {
 		},
 		{
 			Title:       "should return fields without timestamp",
-			User:        user.User{Email: "email@email.com", Provider: "provider", CreatedAt: timeDummy, UpdatedAt: timeDummy},
-			ExpectProto: &compassv1beta1.User{Email: "email@email.com"},
+			User:        user.User{ID: "86a7987c-2f4d-4a0b-a8da-08b17e81a047", Email: "email@email.com", Provider: "provider", CreatedAt: timeDummy, UpdatedAt: timeDummy},
+			ExpectProto: &compassv1beta1.User{Id: "86a7987c-2f4d-4a0b-a8da-08b17e81a047", Email: "email@email.com"},
 		},
 	}
 	for _, tc := range testCases {
