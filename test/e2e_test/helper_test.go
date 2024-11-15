@@ -15,7 +15,6 @@ import (
 
 var (
 	SERVER_HOST               = "http://localhost:8080"
-	IDENTITY_HEADER_KEY_UUID  = "Compass-User-UUID"
 	IDENTITY_HEADER_KEY_EMAIL = "Compass-User-Email"
 )
 

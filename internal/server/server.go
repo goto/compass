@@ -47,8 +47,6 @@ func (cfg Config) grpcAddr() string { return fmt.Sprintf("%s:%d", cfg.Host, cfg.
 
 type IdentityConfig struct {
 	// User Identity
-	HeaderKeyUUID       string `yaml:"headerkey_uuid" mapstructure:"headerkey_uuid" default:"Compass-User-UUID"`
-	HeaderValueUUID     string `yaml:"headervalue_uuid" mapstructure:"headervalue_uuid" default:"gotocompany@email.com"`
 	HeaderKeyEmail      string `yaml:"headerkey_email" mapstructure:"headerkey_email" default:"Compass-User-Email"`
 	HeaderValueEmail    string `yaml:"headervalue_email" mapstructure:"headervalue_email" default:"gotocompany@email.com"`
 	ProviderDefaultName string `yaml:"provider_default_name" mapstructure:"provider_default_name" default:""`
@@ -177,8 +175,6 @@ func makeHeaderMatcher(c Config) func(key string) (string, bool) {
 	return func(key string) (string, bool) {
 		switch strings.ToLower(key) {
 		case strings.ToLower(c.Identity.HeaderKeyEmail):
-			return key, true
-		case strings.ToLower(c.Identity.HeaderKeyUUID):
 			return key, true
 		default:
 			return runtime.DefaultHeaderMatcher(key)
