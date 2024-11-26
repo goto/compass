@@ -15,7 +15,6 @@ import (
 
 var (
 	SERVER_HOST               = "http://localhost:8080"
-	IDENTITY_HEADER_KEY_UUID  = "Compass-User-UUID"
 	IDENTITY_HEADER_KEY_EMAIL = "Compass-User-Email"
 )
 
@@ -129,7 +128,6 @@ func (c *Client) makeRequest(method, url string, payload, data interface{}) (err
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set(IDENTITY_HEADER_KEY_UUID, "compassendtoendtest@gotocompany.com")
 	req.Header.Set(IDENTITY_HEADER_KEY_EMAIL, "compassendtoendtest@gotocompany.com")
 
 	for key, value := range c.headers {

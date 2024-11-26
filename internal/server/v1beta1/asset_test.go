@@ -30,8 +30,8 @@ import (
 
 func TestGetAllAssets(t *testing.T) {
 	var (
-		userID   = uuid.NewString()
-		userUUID = uuid.NewString()
+		userID    = uuid.NewString()
+		userEmail = uuid.NewString()
 	)
 	type testCase struct {
 		Description  string
@@ -47,7 +47,7 @@ func TestGetAllAssets(t *testing.T) {
 			ExpectStatus: codes.Internal,
 			Request:      &compassv1beta1.GetAllAssetsRequest{},
 			Setup: func(ctx context.Context, as *mocks.AssetService, us *mocks.UserService) {
-				us.EXPECT().ValidateUser(ctx, mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return("", errors.New("some-error"))
+				us.EXPECT().ValidateUser(ctx, mock.AnythingOfType("string")).Return("", errors.New("some-error"))
 			},
 		},
 		{
@@ -187,7 +187,7 @@ func TestGetAllAssets(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.Description, func(t *testing.T) {
-			ctx := user.NewContext(context.Background(), user.User{UUID: userUUID})
+			ctx := user.NewContext(context.Background(), user.User{Email: userEmail})
 
 			logger := log.NewNoop()
 			mockUserSvc := new(mocks.UserService)
@@ -198,7 +198,7 @@ func TestGetAllAssets(t *testing.T) {
 			defer mockUserSvc.AssertExpectations(t)
 			defer mockAssetSvc.AssertExpectations(t)
 
-			mockUserSvc.EXPECT().ValidateUser(ctx, userUUID, "").Return(userID, nil)
+			mockUserSvc.EXPECT().ValidateUser(ctx, userEmail).Return(userID, nil)
 
 			handler := NewAPIServer(APIServerDeps{AssetSvc: mockAssetSvc, UserSvc: mockUserSvc, Logger: logger})
 
@@ -220,11 +220,11 @@ func TestGetAllAssets(t *testing.T) {
 
 func TestGetAssetByID(t *testing.T) {
 	var (
-		userID   = uuid.NewString()
-		userUUID = uuid.NewString()
-		assetID  = uuid.NewString()
-		now      = time.Now()
-		ast      = asset.Asset{
+		userID    = uuid.NewString()
+		userEmail = "test@test.com"
+		assetID   = uuid.NewString()
+		now       = time.Now()
+		ast       = asset.Asset{
 			ID:     assetID,
 			Owners: []user.User{{Email: "dummy@trash.com"}},
 			Probes: []asset.Probe{
@@ -263,7 +263,7 @@ func TestGetAssetByID(t *testing.T) {
 			Description:  `should return error if user validation in ctx fails`,
 			ExpectStatus: codes.Internal,
 			Setup: func(ctx context.Context, as *mocks.AssetService, us *mocks.UserService) {
-				us.EXPECT().ValidateUser(ctx, mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return("", errors.New("some-error"))
+				us.EXPECT().ValidateUser(ctx, mock.AnythingOfType("string")).Return("", errors.New("some-error"))
 			},
 		},
 		{
@@ -328,7 +328,7 @@ func TestGetAssetByID(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.Description, func(t *testing.T) {
-			ctx := user.NewContext(context.Background(), user.User{UUID: userUUID})
+			ctx := user.NewContext(context.Background(), user.User{Email: userEmail})
 
 			logger := log.NewNoop()
 			mockUserSvc := mocks.NewUserService(t)
@@ -337,7 +337,7 @@ func TestGetAssetByID(t *testing.T) {
 				tc.Setup(ctx, mockAssetSvc, mockUserSvc)
 			}
 
-			mockUserSvc.EXPECT().ValidateUser(ctx, userUUID, "").Return(userID, nil)
+			mockUserSvc.EXPECT().ValidateUser(ctx, userEmail).Return(userID, nil)
 
 			handler := NewAPIServer(APIServerDeps{AssetSvc: mockAssetSvc, UserSvc: mockUserSvc, Logger: logger})
 
@@ -360,7 +360,7 @@ func TestGetAssetByID(t *testing.T) {
 func TestUpsertAsset(t *testing.T) {
 	var (
 		userID       = uuid.NewString()
-		userUUID     = uuid.NewString()
+		userEmail    = uuid.NewString()
 		assetID      = uuid.NewString()
 		validPayload = &compassv1beta1.UpsertAssetRequest{
 			Asset: &compassv1beta1.UpsertAssetRequest_Asset{
@@ -371,10 +371,9 @@ func TestUpsertAsset(t *testing.T) {
 				Data:    &structpb.Struct{},
 				Url:     "https://sample-url.com",
 				Owners: []*compassv1beta1.User{
-					{Id: "id", Uuid: "1aecb8b3-23a9-4456-8ebd-3aafc746fff8", Email: "email@email.com", Provider: "provider"},
+					{Id: "id", Email: "email@email.com", Provider: "provider"},
 					// the following users should get de-duplicated.
 					{Id: "id"},
-					{Uuid: "1aecb8b3-23a9-4456-8ebd-3aafc746fff8"},
 					{Email: "email@email.com"},
 				},
 			},
@@ -413,7 +412,7 @@ func TestUpsertAsset(t *testing.T) {
 			ExpectStatus: codes.Internal,
 			Request:      &compassv1beta1.UpsertAssetRequest{},
 			Setup: func(ctx context.Context, _ *mocks.AssetService, us *mocks.UserService) {
-				us.EXPECT().ValidateUser(ctx, mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return("", errors.New("some-error"))
+				us.EXPECT().ValidateUser(ctx, mock.AnythingOfType("string")).Return("", errors.New("some-error"))
 			},
 		},
 		{
@@ -503,7 +502,7 @@ func TestUpsertAsset(t *testing.T) {
 					UpdatedBy: user.User{ID: userID},
 					Data:      map[string]interface{}{},
 					URL:       "https://sample-url.com",
-					Owners:    []user.User{{ID: "id", UUID: "1aecb8b3-23a9-4456-8ebd-3aafc746fff8", Email: "email@email.com", Provider: "provider"}},
+					Owners:    []user.User{{ID: "id", Email: "email@email.com", Provider: "provider"}},
 				}
 				upstreams := []string{"upstream-1"}
 				downstreams := []string{"downstream-1", "downstream-2"}
@@ -530,7 +529,7 @@ func TestUpsertAsset(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.Description, func(t *testing.T) {
-			ctx := user.NewContext(context.Background(), user.User{UUID: userUUID})
+			ctx := user.NewContext(context.Background(), user.User{Email: userEmail})
 
 			logger := log.NewNoop()
 			mockUserSvc := new(mocks.UserService)
@@ -541,7 +540,7 @@ func TestUpsertAsset(t *testing.T) {
 			defer mockUserSvc.AssertExpectations(t)
 			defer mockAssetSvc.AssertExpectations(t)
 
-			mockUserSvc.EXPECT().ValidateUser(ctx, userUUID, "").Return(userID, nil)
+			mockUserSvc.EXPECT().ValidateUser(ctx, userEmail).Return(userID, nil)
 
 			handler := NewAPIServer(APIServerDeps{AssetSvc: mockAssetSvc, UserSvc: mockUserSvc, Logger: logger})
 
@@ -564,7 +563,7 @@ func TestUpsertAsset(t *testing.T) {
 func TestUpsertPatchAsset(t *testing.T) {
 	var (
 		userID       = uuid.NewString()
-		userUUID     = uuid.NewString()
+		userEmail    = uuid.NewString()
 		assetID      = uuid.NewString()
 		validPayload = &compassv1beta1.UpsertPatchAssetRequest{
 			Asset: &compassv1beta1.UpsertPatchAssetRequest_Asset{
@@ -575,10 +574,9 @@ func TestUpsertPatchAsset(t *testing.T) {
 				Data:    &structpb.Struct{},
 				Url:     "https://sample-url.com",
 				Owners: []*compassv1beta1.User{
-					{Id: "id", Uuid: "1aecb8b3-23a9-4456-8ebd-3aafc746fff8", Email: "email@email.com", Provider: "provider"},
+					{Id: "id", Email: "email@email.com", Provider: "provider"},
 					// the following users should get de-duplicated.
 					{Id: "id"},
-					{Uuid: "1aecb8b3-23a9-4456-8ebd-3aafc746fff8"},
 					{Email: "email@email.com"},
 				},
 			},
@@ -620,7 +618,7 @@ func TestUpsertPatchAsset(t *testing.T) {
 			UpdatedBy: user.User{ID: userID},
 			Data:      map[string]interface{}{},
 			URL:       "https://sample-url-old.com",
-			Owners:    []user.User{{ID: "id", UUID: "1aecb8b3-23a9-4456-8ebd-3aafc746fff8", Email: "email@email.com", Provider: "provider"}},
+			Owners:    []user.User{{ID: "id", Email: "email@email.com", Provider: "provider"}},
 		}
 		currentAssetNew = asset.Asset{
 			URN:       "test dagger",
@@ -630,7 +628,7 @@ func TestUpsertPatchAsset(t *testing.T) {
 			UpdatedBy: user.User{ID: userID},
 			Data:      map[string]interface{}{},
 			URL:       "https://sample-url.com",
-			Owners:    []user.User{{ID: "id", UUID: "1aecb8b3-23a9-4456-8ebd-3aafc746fff8", Email: "email@email.com", Provider: "provider"}},
+			Owners:    []user.User{{ID: "id", Email: "email@email.com", Provider: "provider"}},
 		}
 	)
 	type testCase struct {
@@ -647,7 +645,7 @@ func TestUpsertPatchAsset(t *testing.T) {
 			ExpectStatus: codes.Internal,
 			Request:      &compassv1beta1.UpsertPatchAssetRequest{},
 			Setup: func(ctx context.Context, _ *mocks.AssetService, us *mocks.UserService) {
-				us.EXPECT().ValidateUser(ctx, mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return("", errors.New("some-error"))
+				us.EXPECT().ValidateUser(ctx, mock.AnythingOfType("string")).Return("", errors.New("some-error"))
 			},
 		},
 		{
@@ -760,7 +758,7 @@ func TestUpsertPatchAsset(t *testing.T) {
 					UpdatedBy: user.User{ID: userID},
 					Data:      map[string]interface{}{},
 					URL:       "https://sample-url.com",
-					Owners:    []user.User{{ID: "id", UUID: "1aecb8b3-23a9-4456-8ebd-3aafc746fff8", Email: "email@email.com", Provider: "provider"}},
+					Owners:    []user.User{{ID: "id", Email: "email@email.com", Provider: "provider"}},
 				}
 				upstreams := []string{"upstream-1"}
 				downstreams := []string{"downstream-1", "downstream-2"}
@@ -796,7 +794,7 @@ func TestUpsertPatchAsset(t *testing.T) {
 					UpdatedBy: user.User{ID: userID},
 					Data:      map[string]interface{}{},
 					URL:       "https://sample-url-old.com",
-					Owners:    []user.User{{ID: "id", UUID: "1aecb8b3-23a9-4456-8ebd-3aafc746fff8", Email: "email@email.com", Provider: "provider"}},
+					Owners:    []user.User{{ID: "id", Email: "email@email.com", Provider: "provider"}},
 				}
 
 				assetWithID := patchedAsset
@@ -816,7 +814,7 @@ func TestUpsertPatchAsset(t *testing.T) {
 					Name:    wrapperspb.String("new-name"),
 					Service: "kafka",
 					Data:    &structpb.Struct{},
-					Owners:  []*compassv1beta1.User{{Id: "id", Uuid: "1aecb8b3-23a9-4456-8ebd-3aafc746fff8", Email: "email@email.com", Provider: "provider"}},
+					Owners:  []*compassv1beta1.User{{Id: "id", Email: "email@email.com", Provider: "provider"}},
 				},
 			},
 			ExpectStatus: codes.OK,
@@ -841,7 +839,7 @@ func TestUpsertPatchAsset(t *testing.T) {
 					UpdatedBy: user.User{ID: userID},
 					Data:      map[string]interface{}{},
 					URL:       "https://sample-url-old.com",
-					Owners:    []user.User{{ID: "id", UUID: "1aecb8b3-23a9-4456-8ebd-3aafc746fff8", Email: "email@email.com", Provider: "provider"}},
+					Owners:    []user.User{{ID: "id", Email: "email@email.com", Provider: "provider"}},
 				}
 
 				assetWithID := patchedAsset
@@ -861,7 +859,7 @@ func TestUpsertPatchAsset(t *testing.T) {
 					Name:    wrapperspb.String("new-name"),
 					Service: "kafka",
 					Data:    &structpb.Struct{},
-					Owners:  []*compassv1beta1.User{{Id: "id", Uuid: "1aecb8b3-23a9-4456-8ebd-3aafc746fff8", Email: "email@email.com", Provider: "provider"}},
+					Owners:  []*compassv1beta1.User{{Id: "id", Email: "email@email.com", Provider: "provider"}},
 				},
 				OverwriteLineage: true,
 			},
@@ -879,7 +877,7 @@ func TestUpsertPatchAsset(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.Description, func(t *testing.T) {
-			ctx := user.NewContext(context.Background(), user.User{UUID: userUUID})
+			ctx := user.NewContext(context.Background(), user.User{Email: userEmail})
 
 			logger := log.NewNoop()
 			mockUserSvc := new(mocks.UserService)
@@ -890,7 +888,7 @@ func TestUpsertPatchAsset(t *testing.T) {
 			defer mockUserSvc.AssertExpectations(t)
 			defer mockAssetSvc.AssertExpectations(t)
 
-			mockUserSvc.EXPECT().ValidateUser(ctx, userUUID, "").Return(userID, nil)
+			mockUserSvc.EXPECT().ValidateUser(ctx, userEmail).Return(userID, nil)
 
 			handler := NewAPIServer(APIServerDeps{AssetSvc: mockAssetSvc, UserSvc: mockUserSvc, Logger: logger})
 
@@ -912,8 +910,8 @@ func TestUpsertPatchAsset(t *testing.T) {
 
 func TestDeleteAsset(t *testing.T) {
 	var (
-		userID   = uuid.NewString()
-		userUUID = uuid.NewString()
+		userID    = uuid.NewString()
+		userEmail = uuid.NewString()
 	)
 	type TestCase struct {
 		Description  string
@@ -958,7 +956,7 @@ func TestDeleteAsset(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.Description, func(t *testing.T) {
-			ctx := user.NewContext(context.Background(), user.User{UUID: userUUID})
+			ctx := user.NewContext(context.Background(), user.User{Email: userEmail})
 
 			logger := log.NewNoop()
 			mockUserSvc := new(mocks.UserService)
@@ -969,7 +967,7 @@ func TestDeleteAsset(t *testing.T) {
 			defer mockUserSvc.AssertExpectations(t)
 			defer mockAssetSvc.AssertExpectations(t)
 
-			mockUserSvc.EXPECT().ValidateUser(ctx, userUUID, "").Return(userID, nil)
+			mockUserSvc.EXPECT().ValidateUser(ctx, userEmail).Return(userID, nil)
 
 			handler := NewAPIServer(APIServerDeps{AssetSvc: mockAssetSvc, UserSvc: mockUserSvc, Logger: logger})
 
@@ -986,7 +984,7 @@ func TestDeleteAsset(t *testing.T) {
 func TestDeleteAssets(t *testing.T) {
 	var (
 		userID       = uuid.NewString()
-		userUUID     = uuid.NewString()
+		userEmail    = uuid.NewString()
 		dummyQuery   = "testing < now()"
 		dummyRequest = asset.DeleteAssetsRequest{
 			QueryExpr: dummyQuery,
@@ -1026,7 +1024,7 @@ func TestDeleteAssets(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.Description, func(t *testing.T) {
-			ctx := user.NewContext(context.Background(), user.User{UUID: userUUID})
+			ctx := user.NewContext(context.Background(), user.User{Email: userEmail})
 
 			logger := log.NewNoop()
 			mockUserSvc := new(mocks.UserService)
@@ -1037,7 +1035,7 @@ func TestDeleteAssets(t *testing.T) {
 			defer mockUserSvc.AssertExpectations(t)
 			defer mockAssetSvc.AssertExpectations(t)
 
-			mockUserSvc.EXPECT().ValidateUser(ctx, userUUID, "").Return(userID, nil)
+			mockUserSvc.EXPECT().ValidateUser(ctx, userEmail).Return(userID, nil)
 
 			handler := NewAPIServer(APIServerDeps{AssetSvc: mockAssetSvc, UserSvc: mockUserSvc, Logger: logger})
 
@@ -1058,7 +1056,7 @@ func TestGetAssetStargazers(t *testing.T) {
 		size           = 20
 		defaultStarCfg = star.Filter{Offset: offset, Size: size}
 		userID         = uuid.NewString()
-		userUUID       = uuid.NewString()
+		userEmail      = uuid.NewString()
 	)
 
 	type TestCase struct {
@@ -1075,7 +1073,7 @@ func TestGetAssetStargazers(t *testing.T) {
 			ExpectStatus: codes.Internal,
 			Request:      &compassv1beta1.GetAssetStargazersRequest{},
 			Setup: func(ctx context.Context, as *mocks.StarService, us *mocks.UserService) {
-				us.EXPECT().ValidateUser(ctx, mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return("", errors.New("some-error"))
+				us.EXPECT().ValidateUser(ctx, mock.AnythingOfType("string")).Return("", errors.New("some-error"))
 			},
 		},
 		{
@@ -1129,7 +1127,7 @@ func TestGetAssetStargazers(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.Description, func(t *testing.T) {
-			ctx := user.NewContext(context.Background(), user.User{UUID: userUUID})
+			ctx := user.NewContext(context.Background(), user.User{Email: userEmail})
 
 			logger := log.NewNoop()
 			mockUserSvc := new(mocks.UserService)
@@ -1139,7 +1137,7 @@ func TestGetAssetStargazers(t *testing.T) {
 			}
 			defer mockStarSvc.AssertExpectations(t)
 
-			mockUserSvc.EXPECT().ValidateUser(ctx, userUUID, "").Return(userID, nil)
+			mockUserSvc.EXPECT().ValidateUser(ctx, userEmail).Return(userID, nil)
 
 			handler := NewAPIServer(APIServerDeps{StarSvc: mockStarSvc, UserSvc: mockUserSvc, Logger: logger})
 
@@ -1161,8 +1159,8 @@ func TestGetAssetStargazers(t *testing.T) {
 
 func TestGetAssetVersionHistory(t *testing.T) {
 	var (
-		userID   = uuid.NewString()
-		userUUID = uuid.NewString()
+		userID    = uuid.NewString()
+		userEmail = uuid.NewString()
 	)
 
 	type TestCase struct {
@@ -1179,7 +1177,7 @@ func TestGetAssetVersionHistory(t *testing.T) {
 			ExpectStatus: codes.Internal,
 			Request:      &compassv1beta1.GetAssetVersionHistoryRequest{},
 			Setup: func(ctx context.Context, _ *mocks.AssetService, us *mocks.UserService) {
-				us.EXPECT().ValidateUser(ctx, mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return("", errors.New("some-error"))
+				us.EXPECT().ValidateUser(ctx, mock.AnythingOfType("string")).Return("", errors.New("some-error"))
 			},
 		},
 		{
@@ -1259,7 +1257,7 @@ func TestGetAssetVersionHistory(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.Description, func(t *testing.T) {
-			ctx := user.NewContext(context.Background(), user.User{UUID: userUUID})
+			ctx := user.NewContext(context.Background(), user.User{Email: userEmail})
 
 			logger := log.NewNoop()
 			mockUserSvc := new(mocks.UserService)
@@ -1270,7 +1268,7 @@ func TestGetAssetVersionHistory(t *testing.T) {
 			defer mockUserSvc.AssertExpectations(t)
 			defer mockAssetSvc.AssertExpectations(t)
 
-			mockUserSvc.EXPECT().ValidateUser(ctx, userUUID, "").Return(userID, nil)
+			mockUserSvc.EXPECT().ValidateUser(ctx, userEmail).Return(userID, nil)
 
 			handler := NewAPIServer(APIServerDeps{AssetSvc: mockAssetSvc, UserSvc: mockUserSvc, Logger: logger})
 
@@ -1292,10 +1290,10 @@ func TestGetAssetVersionHistory(t *testing.T) {
 
 func TestGetAssetByVersion(t *testing.T) {
 	var (
-		userID   = uuid.NewString()
-		userUUID = uuid.NewString()
-		version  = "0.2"
-		ast      = asset.Asset{
+		userID    = uuid.NewString()
+		userEmail = uuid.NewString()
+		version   = "0.2"
+		ast       = asset.Asset{
 			ID:      assetID,
 			Version: version,
 			Owners:  []user.User{{Email: "dummy@trash.com"}},
@@ -1316,7 +1314,7 @@ func TestGetAssetByVersion(t *testing.T) {
 			ExpectStatus: codes.Internal,
 			Request:      &compassv1beta1.GetAssetByVersionRequest{},
 			Setup: func(ctx context.Context, _ *mocks.AssetService, us *mocks.UserService) {
-				us.EXPECT().ValidateUser(ctx, mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return("", errors.New("some-error"))
+				us.EXPECT().ValidateUser(ctx, mock.AnythingOfType("string")).Return("", errors.New("some-error"))
 			},
 		},
 		{
@@ -1379,7 +1377,7 @@ func TestGetAssetByVersion(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.Description, func(t *testing.T) {
-			ctx := user.NewContext(context.Background(), user.User{UUID: userUUID})
+			ctx := user.NewContext(context.Background(), user.User{Email: userEmail})
 
 			logger := log.NewNoop()
 			mockUserSvc := new(mocks.UserService)
@@ -1390,7 +1388,7 @@ func TestGetAssetByVersion(t *testing.T) {
 			defer mockUserSvc.AssertExpectations(t)
 			defer mockAssetSvc.AssertExpectations(t)
 
-			mockUserSvc.EXPECT().ValidateUser(ctx, userUUID, "").Return(userID, nil)
+			mockUserSvc.EXPECT().ValidateUser(ctx, userEmail).Return(userID, nil)
 
 			handler := NewAPIServer(APIServerDeps{AssetSvc: mockAssetSvc, UserSvc: mockUserSvc, Logger: logger})
 
@@ -1412,11 +1410,11 @@ func TestGetAssetByVersion(t *testing.T) {
 
 func TestCreateAssetProbe(t *testing.T) {
 	var (
-		userID   = uuid.NewString()
-		userUUID = uuid.NewString()
-		assetURN = "test-urn"
-		now      = time.Now().UTC()
-		probeID  = uuid.NewString()
+		userID    = uuid.NewString()
+		userEmail = uuid.NewString()
+		assetURN  = "test-urn"
+		now       = time.Now().UTC()
+		probeID   = uuid.NewString()
 	)
 
 	type testCase struct {
@@ -1554,7 +1552,7 @@ func TestCreateAssetProbe(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.Description, func(t *testing.T) {
-			ctx := user.NewContext(context.Background(), user.User{UUID: userUUID})
+			ctx := user.NewContext(context.Background(), user.User{Email: userEmail})
 
 			logger := log.NewNoop()
 			mockUserSvc := mocks.NewUserService(t)
@@ -1563,7 +1561,7 @@ func TestCreateAssetProbe(t *testing.T) {
 				tc.Setup(ctx, mockAssetSvc)
 			}
 
-			mockUserSvc.EXPECT().ValidateUser(ctx, userUUID, "").Return(userID, nil)
+			mockUserSvc.EXPECT().ValidateUser(ctx, userEmail).Return(userID, nil)
 
 			handler := NewAPIServer(APIServerDeps{AssetSvc: mockAssetSvc, UserSvc: mockUserSvc, Logger: logger})
 

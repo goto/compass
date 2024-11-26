@@ -12,65 +12,35 @@ import (
 )
 
 func TestValidateUser(t *testing.T) {
+	userID := "user-id"
 	type testCase struct {
 		Description string
-		UUID        string
 		Email       string
-		Setup       func(ctx context.Context, inputUUID, inputEmail string, userRepo *mocks.UserRepository)
+		Setup       func(ctx context.Context, inputEmail string, userRepo *mocks.UserRepository)
 		ExpectErr   error
 	}
 
 	testCases := []testCase{
 		{
-			Description: "should return no user error when uuid is empty and email is optional",
-			UUID:        "",
+			Description: "should return no user error when email is empty",
 			ExpectErr:   user.ErrNoUserInformation,
 		},
 		{
-			Description: "should return user UUID when successfully found user UUID from DB",
-			UUID:        "a-uuid",
-			Setup: func(ctx context.Context, inputUUID, inputEmail string, userRepo *mocks.UserRepository) {
-				userRepo.EXPECT().GetByUUID(ctx, inputUUID).Return(user.User{ID: "user-id", UUID: inputUUID}, nil)
+			Description: "should return user ID when successfully found user Email from DB, or not found but can create the new one",
+			Email:       "test@test.com",
+			Setup: func(ctx context.Context, inputEmail string, userRepo *mocks.UserRepository) {
+				userRepo.EXPECT().GetOrInsertByEmail(ctx, &user.User{Email: inputEmail}).Return(userID, nil)
 			},
 			ExpectErr: nil,
 		},
 		{
-			Description: "should return user error if GetByUUID return nil error and empty ID",
-			UUID:        "a-uuid",
-			Setup: func(ctx context.Context, inputUUID, inputEmail string, userRepo *mocks.UserRepository) {
-				userRepo.EXPECT().GetByUUID(ctx, inputUUID).Return(user.User{}, nil)
+			Description: "should return user error if InsertByEmail return empty ID and error",
+			Email:       "test@test.com",
+			Setup: func(ctx context.Context, inputEmail string, userRepo *mocks.UserRepository) {
+				mockErr := errors.New("error get or insert user")
+				userRepo.EXPECT().GetOrInsertByEmail(ctx, &user.User{Email: inputEmail}).Return("", mockErr)
 			},
-			ExpectErr: errors.New("fetched user uuid from DB is empty"),
-		},
-		{
-			Description: "should return user UUID when not found user UUID from DB but can create the new one without email",
-			UUID:        "an-email-success-create",
-			Setup: func(ctx context.Context, inputUUID, inputEmail string, userRepo *mocks.UserRepository) {
-				userRepo.EXPECT().GetByUUID(ctx, inputUUID).Return(user.User{}, user.NotFoundError{UUID: inputUUID})
-				userRepo.EXPECT().UpsertByEmail(ctx, &user.User{UUID: inputUUID}).Return("some-id", nil)
-			},
-			ExpectErr: nil,
-		},
-		{
-			Description: "should return user UUID when not found user UUID from DB but can create the new one wit email",
-			UUID:        "an-uuid-error",
-			Email:       "an-email-success-create",
-			Setup: func(ctx context.Context, inputUUID, inputEmail string, userRepo *mocks.UserRepository) {
-				userRepo.EXPECT().GetByUUID(ctx, inputUUID).Return(user.User{}, user.NotFoundError{UUID: inputUUID})
-				userRepo.EXPECT().UpsertByEmail(ctx, &user.User{UUID: inputUUID, Email: inputEmail}).Return("some-id", nil)
-			},
-			ExpectErr: nil,
-		},
-		{
-			Description: "should return error when not found user ID from DB but can't create the new one",
-			UUID:        "an-uuid-error",
-			Email:       "an-email",
-			Setup: func(ctx context.Context, inputUUID, inputEmail string, userRepo *mocks.UserRepository) {
-				mockErr := errors.New("error upserting user")
-				userRepo.EXPECT().GetByUUID(ctx, inputUUID).Return(user.User{}, mockErr)
-				userRepo.EXPECT().UpsertByEmail(ctx, &user.User{UUID: inputUUID, Email: inputEmail}).Return("", mockErr)
-			},
-			ExpectErr: errors.New("error upserting user"),
+			ExpectErr: errors.New("error get or insert user"),
 		},
 	}
 
@@ -81,12 +51,12 @@ func TestValidateUser(t *testing.T) {
 			mockUserRepo := new(mocks.UserRepository)
 
 			if tc.Setup != nil {
-				tc.Setup(ctx, tc.UUID, tc.Email, mockUserRepo)
+				tc.Setup(ctx, tc.Email, mockUserRepo)
 			}
 
 			userSvc := user.NewService(logger, mockUserRepo)
 
-			_, err := userSvc.ValidateUser(ctx, tc.UUID, tc.Email)
+			_, err := userSvc.ValidateUser(ctx, tc.Email)
 
 			assert.Equal(t, tc.ExpectErr, err)
 		})

@@ -51,7 +51,6 @@ service:
     host: localhost                             #required
     port: 8080                                  #required    
     identity:                                   
-        headerkey_uuid: Compass-User-UUID       #required
         headerkey_email: Compass-User-Email     #optional
         provider_default_name: shield           #optional
     grpc:
@@ -76,7 +75,6 @@ DB_PASSWORD=compass_password
 DB_SSLMODE=disable
 SERVICE_HOST=localhost
 SERVICE_PORT=8080
-SERVICE_IDENTITY_HEADERKEY_UUID=Compass-User-UUID
 SERVICE_IDENTITY_HEADERKEY_EMAIL=Compass-User-Email
 SERVICE_IDENTITY_PROVIDER_DEFAULT_NAME=shield
 SERVICE_GRPC_PORT=8081
@@ -262,8 +260,8 @@ Add client configurations in the same `~/compass.yaml` file in root of current d
 ```yml
 client:
     host: localhost:8081
-    serverheaderkey_uuid: Compass-User-UUID
-    serverheadervalue_uuid: john.doe@example.com
+    serverheaderkey_email: Compass-User-Email
+    serverheadervalue_email: john.doe@example.com
 ```
 
 #### Required Header/Metadata in API

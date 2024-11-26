@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/google/uuid"
 	"github.com/goto/compass/core/user"
 	"github.com/goto/compass/internal/store/postgres"
 	"github.com/goto/compass/internal/testutils"
@@ -77,30 +76,15 @@ func (r *UserRepositoryTestSuite) TestCreate() {
 }
 
 func (r *UserRepositoryTestSuite) TestCreateWithTx() {
-	validUserWithoutUUID := &user.User{
+	validUser := &user.User{
 		Email:    "userWithTx@gotocompany.com",
 		Provider: "compass",
 	}
-	validUserWithoutEmail := &user.User{
-		UUID:     "a-uuid",
-		Provider: "compass",
-	}
-	r.Run("return no error if succesfully create user without uuid", func() {
+	r.Run("return no error if successfully create user with email", func() {
 		var id string
 		err := r.client.RunWithinTx(r.ctx, func(tx *sqlx.Tx) error {
 			var err error
-			id, err = r.repository.CreateWithTx(r.ctx, tx, validUserWithoutUUID)
-			return err
-		})
-		r.NotEmpty(id)
-		r.NoError(err)
-	})
-
-	r.Run("return no error if succesfully create user without email", func() {
-		var id string
-		err := r.client.RunWithinTx(r.ctx, func(tx *sqlx.Tx) error {
-			var err error
-			id, err = r.repository.CreateWithTx(r.ctx, tx, validUserWithoutEmail)
+			id, err = r.repository.CreateWithTx(r.ctx, tx, validUser)
 			return err
 		})
 		r.NotEmpty(id)
@@ -122,13 +106,13 @@ func (r *UserRepositoryTestSuite) TestCreateWithTx() {
 		err := testutils.RunMigrationsWithClient(r.T(), r.client)
 		r.NoError(err)
 
-		id, err := r.repository.Create(r.ctx, validUserWithoutUUID)
+		id, err := r.repository.Create(r.ctx, validUser)
 		r.NoError(err)
 		r.NotEmpty(id)
 
 		err = r.client.RunWithinTx(r.ctx, func(tx *sqlx.Tx) error {
 			var err error
-			id, err = r.repository.CreateWithTx(r.ctx, tx, validUserWithoutUUID)
+			id, err = r.repository.CreateWithTx(r.ctx, tx, validUser)
 			return err
 		})
 		r.ErrorAs(err, new(user.DuplicateRecordError))
@@ -179,125 +163,65 @@ func (r *UserRepositoryTestSuite) TestGetBy() {
 		})
 		r.NoError(err)
 	})
+}
 
-	r.Run("by uuid", func() {
-		r.Run("return empty string and ErrNotFound if uuid not found in DB", func() {
-			usr, err := r.repository.GetByUUID(r.ctx, "random")
-			r.ErrorAs(err, new(user.NotFoundError))
-			r.Empty(usr)
-		})
-
-		r.Run("return non empty user if email found in DB", func() {
-			err := testutils.RunMigrationsWithClient(r.T(), r.client)
-			r.NoError(err)
-
-			user := getUser("use-getbyuuid@gotocompany.com")
-			id, err := r.repository.Create(r.ctx, user)
-			r.NoError(err)
-			r.NotEmpty(id)
-
-			usr, err := r.repository.GetByUUID(r.ctx, user.UUID)
-			r.NoError(err)
-			r.NotEmpty(usr)
-		})
+func (r *UserRepositoryTestSuite) TestGetOrInsertByEmail() {
+	r.Run("return ErrNoUserInformation if user is nil", func() {
+		id, err := r.repository.GetOrInsertByEmail(r.ctx, nil)
+		r.ErrorIs(err, user.ErrNoUserInformation)
+		r.Empty(id)
 	})
 
-	r.Run("by UUID with tx, return the user created in the tx", func() {
-		err := testutils.RunMigrationsWithClient(r.T(), r.client)
+	r.Run("return user ID if record already exist", func() {
+		usr := &user.User{Email: "dummy@gotocompany.com"}
+
+		err := r.insertEmail(usr.Email)
 		r.NoError(err)
 
-		u := getUser("use-getbyuuid@gotocompany.com")
-		err = r.client.RunWithinTx(r.ctx, func(tx *sqlx.Tx) error {
-			id, err := r.repository.CreateWithTx(r.ctx, tx, u)
-			r.NoError(err)
-
-			_, err = r.repository.GetByUUID(r.ctx, u.UUID)
-			r.ErrorAs(err, new(user.NotFoundError))
-
-			u, err := r.repository.GetByUUIDWithTx(r.ctx, tx, u.UUID)
-			r.NoError(err)
-			r.Equal(id, u.ID)
-
-			return nil
-		})
+		id, err := r.repository.GetOrInsertByEmail(r.ctx, usr)
 		r.NoError(err)
+		r.NotEmpty(id)
+	})
+
+	r.Run("new row is inserted with email if user not exist", func() {
+		usr := &user.User{Email: "user-upsert-1@gotocompany.com"}
+		id, err := r.repository.GetOrInsertByEmail(r.ctx, usr)
+		r.NoError(err)
+		r.NotEmpty(id)
+
+		gotUser, err := r.repository.GetByEmail(r.ctx, usr.Email)
+		r.NoError(err)
+		r.Equal(gotUser.Email, usr.Email)
 	})
 }
 
-func (r *UserRepositoryTestSuite) TestUpsertByEmail() {
+func (r *UserRepositoryTestSuite) TestInsertByEmail() {
 	r.Run("return ErrNoUserInformation if user is nil", func() {
-		id, err := r.repository.UpsertByEmail(r.ctx, nil)
+		id, err := r.repository.InsertByEmail(r.ctx, nil)
 		r.ErrorIs(err, user.ErrNoUserInformation)
 		r.Empty(id)
 	})
 
 	r.Run("return ErrDuplicateRecord if record already exist", func() {
-		usr := &user.User{UUID: uuid.NewString(), Email: "dummy@gotocompany.com"}
+		usr := &user.User{Email: "dummy-insert@gotocompany.com"}
 
 		err := r.insertEmail(usr.Email)
 		r.NoError(err)
 
-		usr.UUID = uuid.NewString()
-		id, err := r.repository.UpsertByEmail(r.ctx, usr)
-		r.NoError(err)
-		r.NotEmpty(id)
-
-		id, err = r.repository.UpsertByEmail(r.ctx, usr)
-		r.ErrorIs(err, user.DuplicateRecordError{UUID: usr.UUID, Email: usr.Email})
+		id, err := r.repository.InsertByEmail(r.ctx, usr)
+		r.ErrorIs(err, user.DuplicateRecordError{Email: usr.Email})
 		r.Empty(id)
 	})
 
-	r.Run("new row is inserted with uuid and email if user not exist", func() {
-		usr := &user.User{UUID: uuid.NewString(), Email: "user-upsert-1@gotocompany.com"}
-		id, err := r.repository.UpsertByEmail(r.ctx, usr)
+	r.Run("new row is inserted with email if user not exist", func() {
+		usr := &user.User{Email: "user-insert-1@gotocompany.com"}
+		id, err := r.repository.InsertByEmail(r.ctx, usr)
 		r.NoError(err)
 		r.NotEmpty(id)
 
-		gotUser, err := r.repository.GetByUUID(r.ctx, usr.UUID)
+		gotUser, err := r.repository.GetByEmail(r.ctx, usr.Email)
 		r.NoError(err)
-		r.Equal(gotUser.UUID, usr.UUID)
 		r.Equal(gotUser.Email, usr.Email)
-	})
-
-	r.Run("new row is inserted with uuid only if user not exist", func() {
-		usr := &user.User{UUID: uuid.NewString()}
-		id, err := r.repository.UpsertByEmail(r.ctx, usr)
-		r.NoError(err)
-		r.NotEmpty(id)
-
-		gotUser, err := r.repository.GetByUUID(r.ctx, usr.UUID)
-		r.NoError(err)
-		r.Equal(gotUser.UUID, usr.UUID)
-		r.Equal(gotUser.Email, usr.Email)
-	})
-
-	r.Run("upserting existing row with empty uuid is upserted with uuid and email", func() {
-		usr := &user.User{Email: "user-upsert-2@gotocompany.com"}
-
-		err := r.insertEmail(usr.Email)
-		r.NoError(err)
-
-		usr.UUID = uuid.NewString()
-		id, err := r.repository.UpsertByEmail(r.ctx, usr)
-		r.NoError(err)
-		r.NotEmpty(id)
-
-		gotUser, err := r.repository.GetByUUID(r.ctx, usr.UUID)
-		r.NoError(err)
-		r.Equal(gotUser.UUID, usr.UUID)
-		r.Equal(gotUser.Email, usr.Email)
-	})
-
-	r.Run("upserting existing row with non empty uuid would return error", func() {
-		usr := &user.User{UUID: uuid.NewString(), Email: "user-upsert-3@gotocompany.com"}
-
-		id, err := r.repository.Create(r.ctx, usr)
-		r.NoError(err)
-		r.NotEmpty(id)
-
-		id, err = r.repository.UpsertByEmail(r.ctx, usr)
-		r.Error(err)
-		r.Empty(id)
 	})
 }
 

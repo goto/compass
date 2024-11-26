@@ -21,12 +21,12 @@ import (
 func TestGetLineageGraph(t *testing.T) {
 	// TODO[2022-10-13|@sudo-suhas]: Add comprehensive tests
 	var (
-		userID   = uuid.NewString()
-		userUUID = uuid.NewString()
+		userID    = uuid.NewString()
+		userEmail = "test@test.com"
 	)
 	t.Run("get Lineage", func(t *testing.T) {
 		t.Run("should return a graph containing the requested resource, along with it's related resources", func(t *testing.T) {
-			ctx := user.NewContext(context.Background(), user.User{UUID: userUUID})
+			ctx := user.NewContext(context.Background(), user.User{Email: userEmail})
 			logger := log.NewNoop()
 			nodeURN := "job-1"
 			level := 8
@@ -59,7 +59,7 @@ func TestGetLineageGraph(t *testing.T) {
 			defer mockSvc.AssertExpectations(t)
 
 			mockSvc.EXPECT().GetLineage(ctx, nodeURN, asset.LineageQuery{Level: level, Direction: direction, WithAttributes: true}).Return(lineage, nil)
-			mockUserSvc.EXPECT().ValidateUser(ctx, userUUID, "").Return(userID, nil)
+			mockUserSvc.EXPECT().ValidateUser(ctx, userEmail).Return(userID, nil)
 
 			handler := NewAPIServer(APIServerDeps{AssetSvc: mockSvc, UserSvc: mockUserSvc, Logger: logger})
 

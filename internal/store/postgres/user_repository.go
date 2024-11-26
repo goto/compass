@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-
 	sq "github.com/Masterminds/squirrel"
 	"github.com/goto/compass/core/user"
 	"github.com/jmoiron/sqlx"
@@ -16,9 +15,8 @@ type UserRepository struct {
 	client *Client
 }
 
-// UpsertByEmail updates a row if email match and uuid is empty
-// if email not found, insert a new row
-func (r *UserRepository) UpsertByEmail(ctx context.Context, ud *user.User) (string, error) {
+// InsertByEmail insert a new row if email not found
+func (r *UserRepository) InsertByEmail(ctx context.Context, ud *user.User) (string, error) {
 	var userID string
 
 	if err := ud.Validate(); err != nil {
@@ -28,25 +26,23 @@ func (r *UserRepository) UpsertByEmail(ctx context.Context, ud *user.User) (stri
 	um := newUserModel(ud)
 
 	if err := r.client.db.QueryRowxContext(ctx, `
-				INSERT INTO users (uuid, email, provider) VALUES ($1, $2, $3) ON CONFLICT (email)
-				DO UPDATE SET uuid = $1, email = $2 WHERE users.uuid IS NULL
+				INSERT INTO users (email, provider) VALUES ($1, $2)
 				RETURNING id
-		`, um.UUID, um.Email, um.Provider).Scan(&userID); err != nil {
+		`, um.Email, um.Provider).Scan(&userID); err != nil {
 		err := checkPostgresError(err)
-		if errors.Is(err, sql.ErrNoRows) {
-			return "", user.DuplicateRecordError{UUID: ud.UUID, Email: ud.Email}
+		if errors.Is(err, errDuplicateKey) {
+			return "", user.DuplicateRecordError{Email: ud.Email}
 		}
 		return "", err
 	}
 	if userID == "" {
-		return "", fmt.Errorf("error User UUID is empty from DB")
+		return "", fmt.Errorf("error User ID is empty from DB")
 	}
 	return userID, nil
 }
 
 // Create insert a user to the database
-// a new data is still inserted if either uuid or email is empty
-// but returns error if both uuid and email are empty
+// returns error if email is empty
 func (r *UserRepository) Create(ctx context.Context, ud *user.User) (string, error) {
 	return r.create(ctx, r.client.db, ud)
 }
@@ -63,7 +59,7 @@ func (r *UserRepository) create(ctx context.Context, querier sqlx.QueryerContext
 		return "", user.ErrNoUserInformation
 	}
 
-	if ud.UUID == "" && ud.Email == "" {
+	if ud.Email == "" {
 		return "", user.ErrNoUserInformation
 	}
 
@@ -72,24 +68,24 @@ func (r *UserRepository) create(ctx context.Context, querier sqlx.QueryerContext
 	if err := querier.QueryRowxContext(ctx, `
 					INSERT INTO
 					users
-						(uuid, email, provider)
+						(email, provider)
 					VALUES
-						($1, $2, $3)
+						($1, $2)
 					RETURNING id
-					`, um.UUID, um.Email, um.Provider).Scan(&userID); err != nil {
+					`, um.Email, um.Provider).Scan(&userID); err != nil {
 		err := checkPostgresError(err)
 		if errors.Is(err, errDuplicateKey) {
-			return "", user.DuplicateRecordError{UUID: ud.UUID, Email: ud.Email}
+			return "", user.DuplicateRecordError{Email: ud.Email}
 		}
 		return "", err
 	}
 	if userID == "" {
-		return "", fmt.Errorf("error User UUID is empty from DB")
+		return "", fmt.Errorf("error User ID is empty from DB")
 	}
 	return userID, nil
 }
 
-// GetUUID retrieves user UUID given the email
+// GetByEmail retrieves user by given the email
 func (r *UserRepository) GetByEmail(ctx context.Context, email string) (user.User, error) {
 	return r.GetByEmailWithTx(ctx, r.client.db, email)
 }
@@ -105,24 +101,29 @@ func (r *UserRepository) GetByEmailWithTx(ctx context.Context, querier sqlx.Quer
 	return u, nil
 }
 
-// GetbyUUID retrieves user given the uuid
-func (r *UserRepository) GetByUUID(ctx context.Context, uuid string) (user.User, error) {
-	return r.GetByUUIDWithTx(ctx, r.client.db, uuid)
-}
+func (r *UserRepository) GetOrInsertByEmail(ctx context.Context, ud *user.User) (string, error) {
+	var userID string
+	if err := ud.Validate(); err != nil {
+		return "", err
+	}
+	um := newUserModel(ud)
 
-func (r *UserRepository) GetByUUIDWithTx(ctx context.Context, querier sqlx.QueryerContext, uuid string) (user.User, error) {
-	u, err := getUserByPredicate(ctx, querier, sq.Eq{"uuid": uuid})
-	if err != nil && errors.Is(err, sql.ErrNoRows) {
-		return user.User{}, user.NotFoundError{UUID: uuid}
-	}
-	if err != nil {
-		return user.User{}, err
-	}
-	return u, nil
+	email := um.Email.String
+	err := r.client.RunWithinTx(ctx, func(*sqlx.Tx) error {
+		usr, err := r.GetByEmail(ctx, email)
+		if err == nil {
+			userID = usr.ID
+			return nil
+		}
+
+		userID, err = r.InsertByEmail(ctx, &user.User{Email: email})
+		return err
+	})
+	return userID, err
 }
 
 func getUserByPredicate(ctx context.Context, querier sqlx.QueryerContext, pred sq.Eq) (user.User, error) {
-	qry, args, err := sq.Select("id", "uuid", "email", "provider", "created_at", "updated_at").
+	qry, args, err := sq.Select("id", "email", "provider", "created_at", "updated_at").
 		From("users").
 		Where(pred).
 		PlaceholderFormat(sq.Dollar).

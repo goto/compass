@@ -2,8 +2,6 @@ package user
 
 import (
 	"context"
-	"errors"
-
 	"github.com/goto/salt/log"
 )
 
@@ -13,32 +11,20 @@ type Service struct {
 	logger     log.Logger
 }
 
-// ValidateUser checks if user uuid is already in DB
+// ValidateUser checks if user email is already in DB
 // if exist in DB, return user ID, if not exist in DB, create a new one
-func (s *Service) ValidateUser(ctx context.Context, uuid, email string) (string, error) {
-	if uuid == "" {
+func (s *Service) ValidateUser(ctx context.Context, email string) (string, error) {
+	if email == "" {
 		return "", ErrNoUserInformation
 	}
 
-	usr, err := s.repository.GetByUUID(ctx, uuid)
-	if err == nil {
-		if usr.ID != "" {
-			return usr.ID, nil
-		}
-		err := errors.New("fetched user uuid from DB is empty")
-		s.logger.Error(err.Error())
+	userID, err := s.repository.GetOrInsertByEmail(ctx, &User{Email: email})
+	if err != nil {
+		s.logger.Error("error when GetOrInsertByEmail in ValidateUser service", "err", err.Error())
 		return "", err
 	}
 
-	uid, err := s.repository.UpsertByEmail(ctx, &User{
-		UUID:  uuid,
-		Email: email,
-	})
-	if err != nil {
-		s.logger.Error("error when UpsertByEmail in ValidateUser service", "err", err.Error())
-		return "", err
-	}
-	return uid, nil
+	return userID, nil
 }
 
 // NewService initializes user service

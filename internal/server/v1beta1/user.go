@@ -18,7 +18,7 @@ import (
 )
 
 type UserService interface {
-	ValidateUser(ctx context.Context, uuid, email string) (string, error)
+	ValidateUser(ctx context.Context, email string) (string, error)
 }
 
 func (server *APIServer) GetUserStarredAssets(ctx context.Context, req *compassv1beta1.GetUserStarredAssetsRequest) (*compassv1beta1.GetUserStarredAssetsResponse, error) {
@@ -252,7 +252,7 @@ func userToProto(u user.User) *compassv1beta1.User {
 		return nil
 	}
 	return &compassv1beta1.User{
-		Uuid:  u.UUID,
+		Id:    u.ID,
 		Email: u.Email,
 	}
 }
@@ -274,7 +274,6 @@ func userToFullProto(u user.User) *compassv1beta1.User {
 
 	return &compassv1beta1.User{
 		Id:        u.ID,
-		Uuid:      u.UUID,
 		Email:     u.Email,
 		Provider:  u.Provider,
 		CreatedAt: createdAtPB,
@@ -296,7 +295,6 @@ func userFromProto(proto *compassv1beta1.User) user.User {
 
 	return user.User{
 		ID:        proto.GetId(),
-		UUID:      proto.GetUuid(),
 		Email:     proto.GetEmail(),
 		Provider:  proto.GetProvider(),
 		CreatedAt: createdAt,

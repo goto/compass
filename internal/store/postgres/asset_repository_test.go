@@ -62,22 +62,22 @@ func (r *AssetRepositoryTestSuite) createUsers(userRepo user.Repository) []user.
 	var err error
 	users := []user.User{}
 
-	user1 := user.User{UUID: uuid.NewString(), Email: "user-test-1@gotocompany.com", Provider: defaultProviderName}
+	user1 := user.User{Email: "user-test-1@gotocompany.com", Provider: defaultProviderName}
 	user1.ID, err = userRepo.Create(r.ctx, &user1)
 	r.Require().NoError(err)
 	users = append(users, user1)
 
-	user2 := user.User{UUID: uuid.NewString(), Email: "user-test-2@gotocompany.com", Provider: defaultProviderName}
+	user2 := user.User{Email: "user-test-2@gotocompany.com", Provider: defaultProviderName}
 	user2.ID, err = userRepo.Create(r.ctx, &user2)
 	r.Require().NoError(err)
 	users = append(users, user2)
 
-	user3 := user.User{UUID: uuid.NewString(), Email: "user-test-3@gotocompany.com", Provider: defaultProviderName}
+	user3 := user.User{Email: "user-test-3@gotocompany.com", Provider: defaultProviderName}
 	user3.ID, err = userRepo.Create(r.ctx, &user3)
 	r.Require().NoError(err)
 	users = append(users, user3)
 
-	user4 := user.User{UUID: uuid.NewString(), Email: "user-test-4@gotocompany.com", Provider: defaultProviderName}
+	user4 := user.User{Email: "user-test-4@gotocompany.com", Provider: defaultProviderName}
 	user4.ID, err = userRepo.Create(r.ctx, &user4)
 	r.Require().NoError(err)
 	users = append(users, user4)
@@ -1030,8 +1030,7 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 				Owners: []user.User{
 					r.users[1],
 					{Email: r.users[2].Email},
-					{UUID: r.users[2].UUID}, // should get deduplicated by ID on fetch by UUID
-					{ID: r.users[1].ID},     // should get deduplicated by ID
+					{ID: r.users[1].ID}, // should get deduplicated by ID
 				},
 				UpdatedBy: r.users[0],
 			}
@@ -1056,7 +1055,7 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 				Service: "bigquery",
 				Owners: []user.User{
 					{Email: "newuser@example.com"},
-					{UUID: "795151e5-4c9f-4951-a8e1-6966b5aa2bb6"},
+					{Email: "newuser2@example.com"},
 					{Email: "newuser@example.com"}, // should get deduplicated by ID on fetch user by email
 				},
 				UpdatedBy: r.users[0],
@@ -1071,7 +1070,6 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 
 			r.Len(actual.Owners, 2)
 			r.Equal(ast.Owners[0].Email, actual.Owners[0].Email)
-			r.Equal(ast.Owners[1].UUID, actual.Owners[1].UUID)
 		})
 	})
 

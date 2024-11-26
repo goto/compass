@@ -9,31 +9,22 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
-// UserHeaderCtx middleware will propagate a valid user ID as string
-// within request context
+// UserHeaderCtx middleware will propagate a valid user ID as string within request context
 // use `user.FromContext` function to get the user ID string
-func UserHeaderCtx(IdentityHeaderKeyUUID, IdentityHeaderKeyEmail string) grpc.UnaryServerInterceptor {
+func UserHeaderCtx(identityHeaderKeyEmail string) grpc.UnaryServerInterceptor {
 	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp interface{}, err error) {
-		var (
-			userUUID  = ""
-			userEmail = ""
-		)
+		userEmail := ""
 		md, ok := metadata.FromIncomingContext(ctx)
 		if !ok {
 			return "", fmt.Errorf("metadata in grpc doesn't exist")
 		}
 
-		metadataValues := md.Get(IdentityHeaderKeyUUID)
-		if len(metadataValues) > 0 {
-			userUUID = metadataValues[0]
-		}
-
-		metadataValues = md.Get(IdentityHeaderKeyEmail)
+		metadataValues := md.Get(identityHeaderKeyEmail)
 		if len(metadataValues) > 0 {
 			userEmail = metadataValues[0]
 		}
 
-		newCtx := user.NewContext(ctx, user.User{UUID: userUUID, Email: userEmail})
+		newCtx := user.NewContext(ctx, user.User{Email: userEmail})
 		return handler(newCtx, req)
 	}
 }

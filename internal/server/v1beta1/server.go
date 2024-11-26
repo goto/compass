@@ -63,12 +63,12 @@ func NewAPIServer(d APIServerDeps) *APIServer {
 
 func (server *APIServer) ValidateUserInCtx(ctx context.Context) (string, error) {
 	usr := user.FromContext(ctx)
-	userID, err := server.userService.ValidateUser(ctx, usr.UUID, usr.Email)
+	userID, err := server.userService.ValidateUser(ctx, usr.Email)
 	if err != nil {
 		if errors.Is(err, user.ErrNoUserInformation) {
 			return "", status.Errorf(codes.InvalidArgument, err.Error())
 		}
-		if errors.As(err, &user.DuplicateRecordError{UUID: usr.UUID, Email: usr.Email}) {
+		if errors.As(err, &user.DuplicateRecordError{Email: usr.Email}) {
 			return "", status.Errorf(codes.AlreadyExists, err.Error())
 		}
 		return "", status.Errorf(codes.Internal, codes.Internal.String())

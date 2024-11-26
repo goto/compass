@@ -466,7 +466,6 @@ func (server *APIServer) buildAsset(baseAsset *compassv1beta1.UpsertAssetRequest
 	for _, owner := range dedupe(baseAsset.GetOwners()) {
 		owners = append(owners, user.User{
 			ID:       owner.Id,
-			UUID:     owner.Uuid,
 			Email:    owner.Email,
 			Provider: owner.Provider,
 		})
@@ -572,13 +571,9 @@ func dedupe(owners []*compassv1beta1.User) []*compassv1beta1.User {
 	n := len(owners)
 	uniq := make([]*compassv1beta1.User, 0, n)
 	ids := make(map[string]struct{}, n)
-	uuids := make(map[string]struct{}, n)
 	emails := make(map[string]struct{}, n)
 	for _, o := range owners {
 		if _, ok := ids[o.Id]; ok {
-			continue
-		}
-		if _, ok := uuids[o.Uuid]; ok {
 			continue
 		}
 		if _, ok := emails[o.Email]; ok {
@@ -586,9 +581,6 @@ func dedupe(owners []*compassv1beta1.User) []*compassv1beta1.User {
 		}
 		if o.Id != "" {
 			ids[o.Id] = struct{}{}
-		}
-		if o.Uuid != "" {
-			uuids[o.Uuid] = struct{}{}
 		}
 		if o.Email != "" {
 			emails[o.Email] = struct{}{}

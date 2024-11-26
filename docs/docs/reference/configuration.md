@@ -57,10 +57,6 @@ Compass's required variables to start using it.
 * Example value: `disable`
 * Type: `optional`
 * PostgreSQL DB SSL mode to connect.
-### `IDENTITY_UUID_HEADER`
-* Example value: `Compass-User-UUID`
-* Type: `required`
-* Header key to accept Compass User UUID. See [User](../concepts/user.md) for more information about the usage.
 ### `IDENTITY_EMAIL_HEADER`
 * Example value: `Compass-User-Email`
 * Type: `optional`
