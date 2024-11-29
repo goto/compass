@@ -166,13 +166,13 @@ docker build . -t compass
 Before serving Compass app, we need to run the migration first. Run this docker command to migrate Compass.
 
 ```text
-$ docker run --rm --net compass_storage -p 8080:8080 -e ELASTICSEARCH_BROKERS=http://es:9200 -e ELASTICSEARCH_PASSWORD= -e DB_HOST=postgres -e DB_PORT=5432 -e DB_NAME=compass -e DB_USER=compass -e DB_PASSWORD=compass_password gotocompany/compass compass server migrate
+$ docker run --rm --net compass_storage -p 8080:8080 -e ELASTICSEARCH_BROKERS=http://es:9200 -e ELASTICSEARCH_USERNAME= -e ELASTICSEARCH_PASSWORD= -e DB_HOST=postgres -e DB_PORT=5432 -e DB_NAME=compass -e DB_USER=compass -e DB_PASSWORD=compass_password gotocompany/compass compass server migrate
 ```
 
 If you are using Compass binary, you can run this command.
 
 ```text
-./compass -elasticsearch-brokers "http://<broker-host-name>" -elasticsearch-password "" -db-host "<postgres-host-name>" -db-port 5432 -db-name "<postgres-db-name>" -db-user "<postgres-db-user>" -db-password "<postgres-db-password> server migrate"
+./compass -elasticsearch-brokers "http://<broker-host-name>" -elasticsearch-username "" -elasticsearch-password "" -db-host "<postgres-host-name>" -db-port 5432 -db-name "<postgres-db-name>" -db-user "<postgres-db-user>" -db-password "<postgres-db-password> server migrate"
 ```
 
 ## Serving locally
@@ -180,13 +180,13 @@ If you are using Compass binary, you can run this command.
 Once the migration has been done, Compass server can be started with this command.
 
 ```text
-docker run --net compass_storage -p 8080:8080 -e ELASTICSEARCH_BROKERS=http://es:9200 -e ELASTICSEARCH_PASSWORD= -e DB_HOST=postgres -e DB_PORT=5432 -e DB_NAME=compass -e DB_USER=compass -e DB_PASSWORD=compass_password gotocompany/compass compass server start
+docker run --net compass_storage -p 8080:8080 -e ELASTICSEARCH_BROKERS=http://es:9200 -e ELASTICSEARCH_USERNAME= -e ELASTICSEARCH_PASSWORD= -e DB_HOST=postgres -e DB_PORT=5432 -e DB_NAME=compass -e DB_USER=compass -e DB_PASSWORD=compass_password gotocompany/compass compass server start
 ```
 
 If you are using Compass binary, you can run this command.
 
 ```text
-./compass -elasticsearch-brokers "http://<broker-host-name>" -elasticsearch-password "" -db-host "<postgres-host-name>" -db-port 5432 -db-name "<postgres-db-name>" -db-user "<postgres-db-user>" -db-password "<postgres-db-password> server start"
+./compass -elasticsearch-brokers "http://<broker-host-name>" -elasticsearch-username "" -elasticsearch-password "" -db-host "<postgres-host-name>" -db-port 5432 -db-name "<postgres-db-name>" -db-user "<postgres-db-user>" -db-password "<postgres-db-password> server start"
 ```
 
 ## Running tests

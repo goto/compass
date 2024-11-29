@@ -28,6 +28,7 @@ const (
 
 type Config struct {
 	Brokers        string        `mapstructure:"brokers" default:"http://localhost:9200"`
+	Username       string        `mapstructure:"username" default:""`
 	Password       string        `mapstructure:"password" default:""`
 	RequestTimeout time.Duration `mapstructure:"request_timeout" default:"10s"`
 }
@@ -132,6 +133,7 @@ func NewClient(logger log.Logger, config Config, opts ...ClientOption) (*Client,
 	esClient, err := elasticsearch.NewClient(elasticsearch.Config{
 		Addresses: brokers,
 		Transport: nrelasticsearch.NewRoundTripper(nil),
+		Username:  config.Username,
 		Password:  config.Password,
 		// uncomment below code to debug request and response to elasticsearch
 		// Logger: &estransport.ColorLogger{

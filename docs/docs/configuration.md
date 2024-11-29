@@ -38,6 +38,7 @@ log_level: info                                 # debug|info|warning|error|fatal
 
 elasticsearch:
     brokers: http://localhost:9200              #required
+    username:                                   
     password:                                   
 
 db:
@@ -68,6 +69,7 @@ See [configuration reference](./reference/configuration.md) for the list of all 
 ```sh title=".env"
 LOG_LEVEL=info
 ELASTICSEARCH_BROKERS=http://localhost:9200
+ELASTICSEARCH_USERNAME=
 ELASTICSEARCH_PASSWORD=
 DB_HOST=localhost
 DB_PORT=5432
@@ -240,6 +242,7 @@ app:
 
   secretConfig: {}
     # COMPASS_ELASTICSEARCH_BROKERS: ~
+    # COMPASS_ELASTICSEARCH_USERNAME: ~
     # COMPASS_ELASTICSEARCH_PASSWORD: ~
     # COMPASS_NEWRELIC_LICENSEKEY: ~
     # COMPASS_DB_HOST: ~
