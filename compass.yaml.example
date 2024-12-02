@@ -29,6 +29,8 @@ newrelic:
 
 elasticsearch:
     brokers: http://localhost:9200
+    username:
+    password:
     request_timeout: 10s
 
 db:
