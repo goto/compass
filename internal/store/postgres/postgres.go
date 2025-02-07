@@ -42,7 +42,11 @@ type Client struct {
 }
 
 func (c *Client) RunWithinTx(ctx context.Context, f func(tx *sqlx.Tx) error) error {
-	tx, err := c.db.BeginTxx(ctx, nil)
+	return c.RunWithinTxWithOption(ctx, nil, f)
+}
+
+func (c *Client) RunWithinTxWithOption(ctx context.Context, opts *sql.TxOptions, f func(tx *sqlx.Tx) error) error {
+	tx, err := c.db.BeginTxx(ctx, opts)
 	if err != nil {
 		return fmt.Errorf("starting transaction: %w", err)
 	}
