@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/stretchr/testify/assert"
 	"os"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -1264,6 +1266,53 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 			r.NotEmpty(actual.Owners[1].ID)
 			r.Equal(newAsset.Owners[1].Email, actual.Owners[1].Email)
 		})
+	})
+}
+
+func (r *AssetRepositoryTestSuite) TestUpsertRaceCondition() {
+	r.Run("TestUpsertRaceCondition", func() {
+		ast := asset.Asset{
+			URN:       "urn-u-3",
+			Type:      "table",
+			Service:   "bigquery",
+			URL:       "https://sample-url-old.com",
+			UpdatedBy: r.users[0],
+			Version:   "0.1",
+		}
+
+		id, err := r.repository.Upsert(r.ctx, &ast)
+		r.Require().NoError(err)
+		r.NotEmpty(id)
+		ast.ID = id
+
+		const numGoroutines = 10 // Number of concurrent upserts
+		var wg sync.WaitGroup
+		var mu sync.Mutex
+		results := make([]error, 0, numGoroutines)
+
+		// Concurrently upsert the object
+		for i := 0; i < numGoroutines; i++ {
+			wg.Add(1)
+			go func(index int) {
+				defer wg.Done()
+
+				localAst := ast
+				localAst.URL = fmt.Sprintf("https://sample-url-%d.com", index)
+				_, err := r.repository.Upsert(r.ctx, &localAst)
+
+				mu.Lock()
+				results = append(results, err)
+				mu.Unlock()
+			}(i)
+		}
+
+		wg.Wait()
+
+		// Check for errors
+		for i, err := range results {
+			fmt.Println("err", i, ": ", err)
+			assert.NoError(r.T(), err, "Upsert should not fail under race conditions")
+		}
 	})
 }
 
