@@ -611,7 +611,7 @@ func (r *AssetRepository) insert(ctx context.Context, ast *asset.Asset) (string,
 }
 
 func (r *AssetRepository) update(ctx context.Context, tx *sqlx.Tx, newAsset, oldAsset *asset.Asset, clog diff.Changelog) error {
-	assetID := newAsset.ID
+	assetID := oldAsset.ID
 	if !isValidUUID(assetID) {
 		return asset.InvalidError{AssetID: assetID}
 	}
