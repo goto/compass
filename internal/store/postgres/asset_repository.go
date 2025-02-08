@@ -350,7 +350,7 @@ func (r *AssetRepository) Upsert(ctx context.Context, ast *asset.Asset) (string,
 			return fmt.Errorf("error diffing two assets: %w", err)
 		}
 
-		err = r.update(ctx, tx, fetchedAsset.ID, ast, &fetchedAsset, changelog)
+		err = r.update(ctx, tx, ast, &fetchedAsset, changelog)
 		if err != nil {
 			return fmt.Errorf("error updating asset to DB: %w", err)
 		}
@@ -610,7 +610,8 @@ func (r *AssetRepository) insert(ctx context.Context, ast *asset.Asset) (string,
 	return id, nil
 }
 
-func (r *AssetRepository) update(ctx context.Context, tx *sqlx.Tx, assetID string, newAsset, oldAsset *asset.Asset, clog diff.Changelog) error {
+func (r *AssetRepository) update(ctx context.Context, tx *sqlx.Tx, newAsset, oldAsset *asset.Asset, clog diff.Changelog) error {
+	assetID := newAsset.ID
 	if !isValidUUID(assetID) {
 		return asset.InvalidError{AssetID: assetID}
 	}
