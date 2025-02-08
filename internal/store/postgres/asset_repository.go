@@ -164,7 +164,11 @@ func (r *AssetRepository) GetByID(ctx context.Context, id string) (asset.Asset, 
 }
 
 func (r *AssetRepository) GetByURN(ctx context.Context, urn string) (asset.Asset, error) {
-	ast, err := r.getWithPredicate(ctx, sq.Eq{"a.urn": urn})
+	return r.GetByURNWithTx(ctx, nil, urn)
+}
+
+func (r *AssetRepository) GetByURNWithTx(ctx context.Context, tx *sqlx.Tx, urn string) (asset.Asset, error) {
+	ast, err := r.getWithPredicateWithTx(ctx, tx, sq.Eq{"a.urn": urn})
 	if errors.Is(err, sql.ErrNoRows) {
 		return asset.Asset{}, asset.NotFoundError{URN: urn}
 	}
@@ -176,6 +180,10 @@ func (r *AssetRepository) GetByURN(ctx context.Context, urn string) (asset.Asset
 }
 
 func (r *AssetRepository) getWithPredicate(ctx context.Context, pred sq.Eq) (asset.Asset, error) {
+	return r.getWithPredicateWithTx(ctx, nil, pred)
+}
+
+func (r *AssetRepository) getWithPredicateWithTx(ctx context.Context, tx *sqlx.Tx, pred sq.Eq) (asset.Asset, error) {
 	query, args, err := r.getAssetSQL().
 		Where(pred).
 		Limit(1).
@@ -186,12 +194,16 @@ func (r *AssetRepository) getWithPredicate(ctx context.Context, pred sq.Eq) (ass
 	}
 
 	var am AssetModel
-	err = r.client.db.GetContext(ctx, &am, query, args...)
+	if tx == nil {
+		err = r.client.db.GetContext(ctx, &am, query, args...)
+	} else {
+		err = tx.GetContext(ctx, &am, query, args...)
+	}
 	if err != nil {
 		return asset.Asset{}, err
 	}
 
-	owners, err := r.getOwners(ctx, am.ID)
+	owners, err := r.getOwnersWithTx(ctx, tx, am.ID)
 	if err != nil {
 		return asset.Asset{}, err
 	}
@@ -315,7 +327,7 @@ func (r *AssetRepository) getByVersion(
 func (r *AssetRepository) Upsert(ctx context.Context, ast *asset.Asset) (string, error) {
 	var id string
 	err := r.client.RunWithinTx(ctx, func(tx *sqlx.Tx) error {
-		fetchedAsset, err := r.GetByURN(ctx, ast.URN)
+		fetchedAsset, err := r.GetByURNWithTx(ctx, tx, ast.URN)
 		if errors.As(err, new(asset.NotFoundError)) {
 			err = nil
 		}
@@ -338,7 +350,7 @@ func (r *AssetRepository) Upsert(ctx context.Context, ast *asset.Asset) (string,
 			return fmt.Errorf("error diffing two assets: %w", err)
 		}
 
-		err = r.update(ctx, fetchedAsset.ID, ast, &fetchedAsset, changelog)
+		err = r.update(ctx, tx, fetchedAsset.ID, ast, &fetchedAsset, changelog)
 		if err != nil {
 			return fmt.Errorf("error updating asset to DB: %w", err)
 		}
@@ -598,12 +610,14 @@ func (r *AssetRepository) insert(ctx context.Context, ast *asset.Asset) (string,
 	return id, nil
 }
 
-func (r *AssetRepository) update(ctx context.Context, assetID string, newAsset, oldAsset *asset.Asset, clog diff.Changelog) error {
+func (r *AssetRepository) update(ctx context.Context, tx *sqlx.Tx, assetID string, newAsset, oldAsset *asset.Asset, clog diff.Changelog) error {
 	if !isValidUUID(assetID) {
 		return asset.InvalidError{AssetID: assetID}
 	}
 
 	currentTime := time.Now()
+	// for Upsert API calls, to make currentTime value same for both Postgresql and Elasticsearch,
+	// the currentTime already filled in UpsertAssetWithoutLineage
 	if newAsset.RefreshedAt != nil {
 		currentTime = *newAsset.RefreshedAt
 	}
@@ -613,47 +627,42 @@ func (r *AssetRepository) update(ctx context.Context, assetID string, newAsset, 
 			return nil
 		}
 
-		return r.client.RunWithinTx(ctx, func(tx *sqlx.Tx) error {
-			newAsset.RefreshedAt = &currentTime
-			return r.updateAsset(ctx, tx, assetID, newAsset)
-		})
+		return r.updateAssetRefreshedAt(ctx, tx, assetID, currentTime)
 	}
 
-	return r.client.RunWithinTx(ctx, func(tx *sqlx.Tx) error {
-		// update assets
-		newVersion, err := asset.IncreaseMinorVersion(oldAsset.Version)
-		if err != nil {
-			return err
-		}
-		newAsset.Version = newVersion
-		newAsset.ID = oldAsset.ID
-		newAsset.UpdatedAt = currentTime
-		newAsset.RefreshedAt = &currentTime
+	// update assets
+	newVersion, err := asset.IncreaseMinorVersion(oldAsset.Version)
+	if err != nil {
+		return err
+	}
+	newAsset.Version = newVersion
+	newAsset.ID = oldAsset.ID
+	newAsset.UpdatedAt = currentTime
+	newAsset.RefreshedAt = &currentTime
 
-		if err := r.updateAsset(ctx, tx, assetID, newAsset); err != nil {
-			return err
-		}
+	if err := r.updateAsset(ctx, tx, assetID, newAsset); err != nil {
+		return err
+	}
 
-		// insert versions
-		if err := r.insertAssetVersion(ctx, tx, newAsset, clog); err != nil {
-			return err
-		}
+	// insert versions
+	if err := r.insertAssetVersion(ctx, tx, newAsset, clog); err != nil {
+		return err
+	}
 
-		// managing owners
-		newAssetOwners, err := r.createOrFetchUsers(ctx, tx, newAsset.Owners)
-		if err != nil {
-			return fmt.Errorf("error creating and fetching owners: %w", err)
-		}
-		toInserts, toRemoves := r.compareOwners(oldAsset.Owners, newAssetOwners)
-		if err := r.insertOwners(ctx, tx, assetID, toInserts); err != nil {
-			return fmt.Errorf("error inserting asset's new owners: %w", err)
-		}
-		if err := r.removeOwners(ctx, tx, assetID, toRemoves); err != nil {
-			return fmt.Errorf("error removing asset's old owners: %w", err)
-		}
+	// managing owners
+	newAssetOwners, err := r.createOrFetchUsers(ctx, tx, newAsset.Owners)
+	if err != nil {
+		return fmt.Errorf("error creating and fetching owners: %w", err)
+	}
+	toInserts, toRemoves := r.compareOwners(oldAsset.Owners, newAssetOwners)
+	if err := r.insertOwners(ctx, tx, assetID, toInserts); err != nil {
+		return fmt.Errorf("error inserting asset's new owners: %w", err)
+	}
+	if err := r.removeOwners(ctx, tx, assetID, toRemoves); err != nil {
+		return fmt.Errorf("error removing asset's old owners: %w", err)
+	}
 
-		return nil
-	})
+	return nil
 }
 
 func (r *AssetRepository) updateAsset(ctx context.Context, tx *sqlx.Tx, assetID string, newAsset *asset.Asset) error {
@@ -670,6 +679,23 @@ func (r *AssetRepository) updateAsset(ctx context.Context, tx *sqlx.Tx, assetID 
 		Set("refreshed_at", *newAsset.RefreshedAt).
 		Set("updated_by", newAsset.UpdatedBy.ID).
 		Set("version", newAsset.Version).
+		Where(sq.Eq{"id": assetID}).
+		PlaceholderFormat(sq.Dollar).
+		ToSql()
+	if err != nil {
+		return fmt.Errorf("build query: %w", err)
+	}
+
+	if err := r.execContext(ctx, tx, query, args...); err != nil {
+		return fmt.Errorf("error running update asset query: %w", err)
+	}
+
+	return nil
+}
+
+func (r *AssetRepository) updateAssetRefreshedAt(ctx context.Context, tx *sqlx.Tx, assetID string, currentTime time.Time) error {
+	query, args, err := sq.Update("assets").
+		Set("refreshed_at", currentTime).
 		Where(sq.Eq{"id": assetID}).
 		PlaceholderFormat(sq.Dollar).
 		ToSql()
@@ -715,6 +741,10 @@ func (r *AssetRepository) insertAssetVersion(ctx context.Context, execer sqlx.Ex
 }
 
 func (r *AssetRepository) getOwners(ctx context.Context, assetID string) ([]user.User, error) {
+	return r.getOwnersWithTx(ctx, nil, assetID)
+}
+
+func (r *AssetRepository) getOwnersWithTx(ctx context.Context, tx *sqlx.Tx, assetID string) ([]user.User, error) {
 	if !isValidUUID(assetID) {
 		return nil, asset.InvalidError{AssetID: assetID}
 	}
@@ -730,7 +760,13 @@ func (r *AssetRepository) getOwners(ctx context.Context, assetID string) ([]user
 		JOIN users u on ao.user_id = u.id
 		WHERE asset_id = $1`
 
-	if err := r.client.db.SelectContext(ctx, &userModels, query, assetID); err != nil {
+	var err error
+	if tx == nil {
+		err = r.client.db.SelectContext(ctx, &userModels, query, assetID)
+	} else {
+		err = tx.SelectContext(ctx, &userModels, query, assetID)
+	}
+	if err != nil {
 		return nil, fmt.Errorf("get asset owners: %w", err)
 	}
 
@@ -913,7 +949,8 @@ func (r *AssetRepository) getAssetSQL() sq.SelectBuilder {
 		u.updated_at as "updated_by.updated_at"
 		`).
 		From("assets a").
-		LeftJoin("users u ON a.updated_by = u.id")
+		LeftJoin("users u ON a.updated_by = u.id").
+		Suffix("FOR UPDATE OF a")
 }
 
 func (r *AssetRepository) getAssetVersionSQL() sq.SelectBuilder {

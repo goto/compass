@@ -1298,7 +1298,7 @@ func (r *AssetRepositoryTestSuite) TestUpsertRaceCondition() {
 
 				localAst := ast
 				localAst.URL = fmt.Sprintf("https://sample-url-%d.com", index)
-				_, err := r.repository.Upsert(r.ctx, &localAst)
+				_, err := r.repository.Upsert(context.Background(), &localAst)
 
 				mu.Lock()
 				results = append(results, err)
@@ -1309,8 +1309,7 @@ func (r *AssetRepositoryTestSuite) TestUpsertRaceCondition() {
 		wg.Wait()
 
 		// Check for errors
-		for i, err := range results {
-			fmt.Println("err", i, ": ", err)
+		for _, err := range results {
 			assert.NoError(r.T(), err, "Upsert should not fail under race conditions")
 		}
 	})
