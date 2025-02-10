@@ -212,10 +212,10 @@ However, **please do the best practice that try to simplify the query first** to
 
 ##### Parameters
 
-| Name       | Located in | Description                                                                                                                                                                                                                                                          | Required | Schema |
-|------------|------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------| ------ |
+| Name       | Located in | Description                                                                                                                                                                                                                                                   | Required | Schema |
+|------------|------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------| ------ |
 | query_expr | body       | query expression based on [expr-lang](https://expr-lang.org/) to filtering the assets that wants to be deleted. `refreshed_at`, `type`, and `service` identifiers must exist in the query. The `type` and `service` must using equals (`==`) or `IN` operator | Yes      | string |
-| dry_run    | body       | if set to true, then deletion should not proceed and only return the affected rows. Else, will perform deletion in the background (default)                                                                                                                          | No       | string |
+| dry_run    | body       | (default: false) if set to true, deletion will not be executed but the number of rows matching the query is returned. Else, will perform deletion in the background (default)                                                                                 | No       | string |
 
 ##### Responses
 
@@ -1627,9 +1627,9 @@ Request to be sent to create a tag's template
 
 #### DeleteAssetsResponse
 
-| Name          | Type    | Description                                         | Required |
-|---------------|---------|-----------------------------------------------------|----------|
-| affected_rows | integer | the numbers of assets that match the given query | No       |
+| Name          | Type    | Description                                         |
+|---------------|---------|-----------------------------------------------------|
+| affected_rows | integer | the numbers of assets that match the given query |
 
 
 #### DeleteCommentResponse
