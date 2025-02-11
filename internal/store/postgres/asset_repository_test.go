@@ -87,7 +87,7 @@ func (r *AssetRepositoryTestSuite) createUsers(userRepo user.Repository) []user.
 	return users
 }
 
-func (r *AssetRepositoryTestSuite) BeforeTest(suiteName, testName string) {
+func (r *AssetRepositoryTestSuite) BeforeTest(_, _ string) {
 	err := testutils.RunMigrationsWithClient(r.T(), r.client)
 	r.NoError(err)
 
