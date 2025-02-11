@@ -322,22 +322,11 @@ func (r *AssetRepository) getByVersion(
 	return ast.toVersionedAsset(latest)
 }
 
-func (r *AssetRepository) UpsertPatch(ctx context.Context, ast *asset.Asset, patchData map[string]interface{}) (asset.Asset, error) {
-	return r.upsertWithPatchOption(ctx, ast, patchData)
-}
-
-func (r *AssetRepository) Upsert(ctx context.Context, ast *asset.Asset) (asset.Asset, error) {
-	return r.upsertWithPatchOption(ctx, ast, nil)
-}
-
-// Upsert creates a new asset if it does not exist yet.
+// UpsertPatch creates a new asset if it does not exist yet.
 // It updates if asset does exist.
-// Checking existence is done using "urn", "type", and "service" fields.
-func (r *AssetRepository) upsertWithPatchOption( //nolint:gocognit
-	ctx context.Context,
-	ast *asset.Asset,
-	patchData map[string]interface{},
-) (asset.Asset, error) {
+// Checking existence is done using "urn", "type", and "service" fields
+// And will revalidate again with additional: "data" and "name" fields.
+func (r *AssetRepository) UpsertPatch(ctx context.Context, ast *asset.Asset, patchData map[string]interface{}) (asset.Asset, error) {
 	var upsertedAsset asset.Asset
 	err := r.client.RunWithinTx(ctx, func(tx *sqlx.Tx) error {
 		fetchedAsset, err := r.GetByURNWithTx(ctx, tx, ast.URN)
@@ -346,9 +335,6 @@ func (r *AssetRepository) upsertWithPatchOption( //nolint:gocognit
 		}
 		if err != nil {
 			return fmt.Errorf("error getting asset by URN: %w", err)
-		}
-		if err := r.validateAsset(fetchedAsset); err != nil {
-			return err
 		}
 
 		if fetchedAsset.ID == "" {
@@ -361,13 +347,56 @@ func (r *AssetRepository) upsertWithPatchOption( //nolint:gocognit
 		}
 
 		// update flow
-		if patchData != nil {
-			err := copier.CopyWithOption(&ast, &fetchedAsset, copier.Option{DeepCopy: true})
-			if err != nil {
-				return err
-			}
-			ast.Patch(patchData)
+		if err := copier.CopyWithOption(&ast, &fetchedAsset, copier.Option{DeepCopy: true}); err != nil {
+			return err
 		}
+		ast.Patch(patchData)
+		if err := r.validateAsset(*ast); err != nil {
+			return err
+		}
+		changelog, err := fetchedAsset.Diff(ast)
+		if err != nil {
+			return fmt.Errorf("error diffing two assets: %w", err)
+		}
+
+		upsertedAsset, err = r.update(ctx, tx, ast, &fetchedAsset, changelog)
+		if err != nil {
+			return fmt.Errorf("error updating asset to DB: %w", err)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return asset.Asset{}, err
+	}
+
+	return upsertedAsset, nil
+}
+
+// Upsert creates a new asset if it does not exist yet.
+// It updates if asset does exist.
+// Checking existence is done using "urn", "type", "name", "data", and "service" fields.
+func (r *AssetRepository) Upsert(ctx context.Context, ast *asset.Asset) (asset.Asset, error) {
+	var upsertedAsset asset.Asset
+	err := r.client.RunWithinTx(ctx, func(tx *sqlx.Tx) error {
+		fetchedAsset, err := r.GetByURNWithTx(ctx, tx, ast.URN)
+		if errors.As(err, new(asset.NotFoundError)) {
+			err = nil
+		}
+		if err != nil {
+			return fmt.Errorf("error getting asset by URN: %w", err)
+		}
+
+		if fetchedAsset.ID == "" {
+			// insert flow
+			upsertedAsset, err = r.insert(ctx, tx, ast)
+			if err != nil {
+				return fmt.Errorf("error inserting asset to DB: %w", err)
+			}
+
+			return nil
+		}
+
 		changelog, err := fetchedAsset.Diff(ast)
 		if err != nil {
 			return fmt.Errorf("error diffing two assets: %w", err)
@@ -614,6 +643,7 @@ func (r *AssetRepository) insert(ctx context.Context, tx *sqlx.Tx, ast *asset.As
 			"created_at", "updated_by", "updated_at", "refreshed_at", "version").
 		Values(ast.URN, ast.Type, ast.Service, ast.Name, ast.Description, ast.Data, ast.URL, ast.Labels,
 			ast.CreatedAt, ast.UpdatedBy.ID, ast.UpdatedAt, currentTime, asset.BaseVersion).
+		Suffix("RETURNING \"id\"").
 		PlaceholderFormat(sq.Dollar).
 		ToSql()
 	if err != nil {
@@ -622,9 +652,12 @@ func (r *AssetRepository) insert(ctx context.Context, tx *sqlx.Tx, ast *asset.As
 
 	ast.Version = asset.BaseVersion
 
-	if err := r.execContext(ctx, tx, query, args...); err != nil {
+	var id string
+	err = tx.QueryRowContext(ctx, query, args...).Scan(&id)
+	if err != nil {
 		return asset.Asset{}, fmt.Errorf("run insert query: %w", err)
 	}
+	ast.ID = id
 
 	users, err := r.createOrFetchUsers(ctx, tx, ast.Owners)
 	if err != nil {

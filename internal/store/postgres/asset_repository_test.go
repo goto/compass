@@ -87,7 +87,7 @@ func (r *AssetRepositoryTestSuite) createUsers(userRepo user.Repository) []user.
 	return users
 }
 
-func (r *AssetRepositoryTestSuite) BeforeTest() {
+func (r *AssetRepositoryTestSuite) BeforeTest(suiteName, testName string) {
 	err := testutils.RunMigrationsWithClient(r.T(), r.client)
 	r.NoError(err)
 
@@ -607,18 +607,17 @@ func (r *AssetRepositoryTestSuite) TestGetByID() {
 		}
 
 		var err error
-		upsertedAsset, err := r.repository.Upsert(r.ctx, &asset1)
+		upsertedAsset1, err := r.repository.Upsert(r.ctx, &asset1)
 		r.Require().NoError(err)
-		r.NotEmpty(upsertedAsset.ID)
+		r.NotEmpty(upsertedAsset1.ID)
 
-		upsertedAsset, err = r.repository.Upsert(r.ctx, &asset2)
+		upsertedAsset2, err := r.repository.Upsert(r.ctx, &asset2)
 		r.Require().NoError(err)
-		r.NotEmpty(upsertedAsset.ID)
+		r.NotEmpty(upsertedAsset2.ID)
 
-		result, err := r.repository.GetByID(r.ctx, asset2.ID)
+		result, err := r.repository.GetByID(r.ctx, upsertedAsset2.ID)
 		r.NoError(err)
-		asset2.UpdatedBy = r.users[1]
-		r.assertAsset(&asset2, &result)
+		r.assertAsset(&upsertedAsset2, &result)
 	})
 
 	r.Run("return owners if any", func() {
@@ -637,10 +636,8 @@ func (r *AssetRepositoryTestSuite) TestGetByID() {
 		r.Require().NoError(err)
 		r.Require().NotEmpty(upsertedAsset.ID)
 
-		result, err := r.repository.GetByID(r.ctx, ast.ID)
-		r.NoError(err)
-		r.Len(result.Owners, len(ast.Owners))
-		for i, owner := range result.Owners {
+		r.Len(upsertedAsset.Owners, len(ast.Owners))
+		for i, owner := range upsertedAsset.Owners {
 			r.Equal(ast.Owners[i].ID, owner.ID)
 		}
 	})
@@ -1471,7 +1468,7 @@ func (r *AssetRepositoryTestSuite) TestAddProbe() {
 	})
 
 	r.Run("should populate CreatedAt and persist probe", func() {
-		r.BeforeTest()
+		r.BeforeTest("", "")
 		ast := asset.Asset{
 			URN:       "urn-add-probe-1",
 			Type:      typeJob,
