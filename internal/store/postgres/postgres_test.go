@@ -15,7 +15,6 @@ import (
 )
 
 const (
-	logLevelDebug       = "debug"
 	defaultProviderName = "shield"
 	defaultGetMaxSize   = 7
 )
@@ -54,8 +53,8 @@ func newTestClient(t *testing.T, logger log.Logger) (*postgres.Client, error) {
 
 // helper functions
 func createUser(userRepo user.Repository, email string) (string, error) {
-	user := getUser(email)
-	id, err := userRepo.Create(context.Background(), user)
+	userTest := getUser(email)
+	id, err := userRepo.Create(context.Background(), userTest)
 	if err != nil {
 		return "", err
 	}
@@ -65,12 +64,11 @@ func createUser(userRepo user.Repository, email string) (string, error) {
 func createAsset(assetRepo asset.Repository, updaterID, ownerEmail, assetURN, assetType string) (*asset.Asset, error) {
 	ast := getAsset(ownerEmail, assetURN, assetType)
 	ast.UpdatedBy.ID = updaterID
-	id, err := assetRepo.Upsert(context.Background(), ast)
+	upsertedAsset, err := assetRepo.Upsert(context.Background(), ast)
 	if err != nil {
 		return nil, err
 	}
-	ast.ID = id
-	return ast, nil
+	return &upsertedAsset, nil
 }
 
 func getAsset(ownerEmail, assetURN, assetType string) *asset.Asset {

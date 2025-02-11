@@ -106,17 +106,45 @@ func (s *Service) UpsertAssetWithoutLineage(ctx context.Context, ast *Asset) (st
 	currentTime := time.Now()
 	ast.RefreshedAt = &currentTime
 
-	assetID, err := s.assetRepository.Upsert(ctx, ast)
+	newAsset, err := s.assetRepository.Upsert(ctx, ast)
 	if err != nil {
 		return "", err
 	}
 
-	ast.ID = assetID
-	if err := s.worker.EnqueueIndexAssetJob(ctx, *ast); err != nil {
+	if err := s.worker.EnqueueIndexAssetJob(ctx, newAsset); err != nil {
+		return "", err
+	}
+
+	return newAsset.ID, nil
+}
+
+func (s *Service) UpsertPatchAsset(ctx context.Context, ast *Asset, upstreams, downstreams []string, patchData map[string]interface{}) (string, error) {
+	assetID, err := s.UpsertPatchAssetWithoutLineage(ctx, ast, patchData)
+	if err != nil {
+		return "", err
+	}
+
+	if err := s.lineageRepository.Upsert(ctx, ast.URN, upstreams, downstreams); err != nil {
 		return "", err
 	}
 
 	return assetID, nil
+}
+
+func (s *Service) UpsertPatchAssetWithoutLineage(ctx context.Context, ast *Asset, patchData map[string]interface{}) (string, error) {
+	currentTime := time.Now()
+	ast.RefreshedAt = &currentTime
+
+	newAsset, err := s.assetRepository.UpsertPatch(ctx, ast, patchData)
+	if err != nil {
+		return "", err
+	}
+
+	if err := s.worker.EnqueueIndexAssetJob(ctx, newAsset); err != nil {
+		return "", err
+	}
+
+	return newAsset.ID, nil
 }
 
 func (s *Service) DeleteAsset(ctx context.Context, id string) (err error) {

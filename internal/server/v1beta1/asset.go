@@ -29,6 +29,8 @@ type AssetService interface {
 	GetAssetVersionHistory(ctx context.Context, flt asset.Filter, id string) ([]asset.Asset, error)
 	UpsertAsset(ctx context.Context, ast *asset.Asset, upstreams, downstreams []string) (string, error)
 	UpsertAssetWithoutLineage(ctx context.Context, ast *asset.Asset) (string, error)
+	UpsertPatchAsset(ctx context.Context, ast *asset.Asset, upstreams, downstreams []string, patchData map[string]interface{}) (string, error)
+	UpsertPatchAssetWithoutLineage(ctx context.Context, ast *asset.Asset, patchData map[string]interface{}) (string, error)
 	DeleteAsset(ctx context.Context, id string) error
 	DeleteAssets(ctx context.Context, request asset.DeleteAssetsRequest) (uint32, error)
 
@@ -227,12 +229,17 @@ func (server *APIServer) UpsertAsset(ctx context.Context, req *compassv1beta1.Up
 		return nil, status.Error(codes.InvalidArgument, "asset cannot be empty")
 	}
 
+	if err := server.validateUpsertAsset(baseAsset); err != nil {
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
 	ast := server.buildAsset(baseAsset)
 	ast.UpdatedBy.ID = userID
 
 	assetID, err := server.upsertAsset(
 		ctx,
 		ast,
+		nil,
 		"asset_upsert",
 		req.GetUpstreams(),
 		req.GetDownstreams(),
@@ -257,27 +264,23 @@ func (server *APIServer) UpsertPatchAsset(ctx context.Context, req *compassv1bet
 		return nil, status.Error(codes.InvalidArgument, "asset cannot be empty")
 	}
 
-	urn, err := server.validatePatchAsset(baseAsset)
+	err = server.validateUpsertPatchAsset(baseAsset)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	ast, err := server.assetService.GetAssetByIDWithoutProbes(ctx, urn)
-	if err != nil && !errors.As(err, &asset.NotFoundError{}) {
-		return nil, internalServerError(server.logger, err.Error())
-	}
-
+	newAsset := &asset.Asset{}
 	patchAssetMap := decodePatchAssetToMap(baseAsset)
-	ast.Patch(patchAssetMap)
-	ast.UpdatedBy.ID = userID
+	patchAssetMap["updated_by"] = userID
+	newAsset.Patch(patchAssetMap)
 
 	var assetID string
 	if len(req.Upstreams) != 0 || len(req.Downstreams) != 0 || req.OverwriteLineage {
 		assetID, err = server.upsertAsset(
-			ctx, ast, "asset_upsert_patch", req.GetUpstreams(), req.GetDownstreams(),
+			ctx, *newAsset, patchAssetMap, "asset_upsert_patch", req.GetUpstreams(), req.GetDownstreams(),
 		)
 	} else {
-		assetID, err = server.upsertAssetWithoutLineage(ctx, ast)
+		assetID, err = server.upsertPatchAssetWithoutLineage(ctx, *newAsset, patchAssetMap)
 	}
 	if err != nil {
 		return nil, err
@@ -384,6 +387,7 @@ func (server *APIServer) SyncAssets(ctx context.Context, req *compassv1beta1.Syn
 func (server *APIServer) upsertAsset(
 	ctx context.Context,
 	ast asset.Asset,
+	patchData map[string]interface{},
 	mode string,
 	reqUpstreams,
 	reqDownstreams []*compassv1beta1.LineageNode,
@@ -397,10 +401,6 @@ func (server *APIServer) upsertAsset(
 		))
 	}()
 
-	if err := server.validateAsset(ast); err != nil {
-		return "", status.Error(codes.InvalidArgument, err.Error())
-	}
-
 	upstreams := make([]string, 0, len(reqUpstreams))
 	for _, pb := range reqUpstreams {
 		upstreams = append(upstreams, pb.Urn)
@@ -410,7 +410,13 @@ func (server *APIServer) upsertAsset(
 		downstreams = append(downstreams, pb.Urn)
 	}
 
-	assetID, err := server.assetService.UpsertAsset(ctx, &ast, upstreams, downstreams)
+	var assetID string
+	if patchData == nil {
+		assetID, err = server.assetService.UpsertAsset(ctx, &ast, upstreams, downstreams)
+	} else {
+		assetID, err = server.assetService.UpsertPatchAsset(ctx, &ast, upstreams, downstreams, patchData)
+	}
+
 	if err != nil {
 		switch {
 		case errors.As(err, new(asset.InvalidError)):
@@ -422,7 +428,7 @@ func (server *APIServer) upsertAsset(
 	return assetID, nil
 }
 
-func (server *APIServer) upsertAssetWithoutLineage(ctx context.Context, ast asset.Asset) (id string, err error) {
+func (server *APIServer) upsertPatchAssetWithoutLineage(ctx context.Context, ast asset.Asset, patchData map[string]interface{}) (id string, err error) {
 	const mode = "asset_upsert_patch_without_lineage"
 	defer func() {
 		server.assetUpdateCounter.Add(ctx, 1, metric.WithAttributes(
@@ -433,11 +439,7 @@ func (server *APIServer) upsertAssetWithoutLineage(ctx context.Context, ast asse
 		))
 	}()
 
-	if err := server.validateAsset(ast); err != nil {
-		return "", status.Error(codes.InvalidArgument, err.Error())
-	}
-
-	assetID, err := server.assetService.UpsertAssetWithoutLineage(ctx, &ast)
+	assetID, err := server.assetService.UpsertPatchAssetWithoutLineage(ctx, &ast, patchData)
 	if err != nil {
 		switch {
 		case errors.As(err, new(asset.InvalidError)):
@@ -475,48 +477,54 @@ func (server *APIServer) buildAsset(baseAsset *compassv1beta1.UpsertAssetRequest
 	return ast
 }
 
-func (server *APIServer) validateAsset(ast asset.Asset) error {
-	if ast.URN == "" {
-		return fmt.Errorf("urn is required")
+func (*APIServer) validateUpsertAsset(ast *compassv1beta1.UpsertAssetRequest_Asset) error {
+	if urn := ast.GetUrn(); urn == "" {
+		return fmt.Errorf("urn is required and can't be empty")
 	}
-	if ast.Type == "" {
-		return fmt.Errorf("type is required")
+
+	typ := ast.GetType()
+	if typ == "" {
+		return fmt.Errorf("type is required and can't be empty")
 	}
-	if !ast.Type.IsValid() {
+
+	if !asset.Type(typ).IsValid() {
 		return fmt.Errorf("type is invalid")
 	}
-	if ast.Name == "" {
-		return fmt.Errorf("name is required")
+
+	if name := ast.GetName(); name == "" {
+		return fmt.Errorf("name is required and can't be empty")
 	}
-	if ast.Data == nil {
-		return fmt.Errorf("data is required")
+
+	if data := ast.GetData(); data == nil {
+		return fmt.Errorf("name is required and can't be nil")
 	}
-	if ast.Service == "" {
-		return fmt.Errorf("service is required")
+
+	if service := ast.GetService(); service == "" {
+		return fmt.Errorf("service is required and can't be empty")
 	}
 
 	return nil
 }
 
-func (server *APIServer) validatePatchAsset(ast *compassv1beta1.UpsertPatchAssetRequest_Asset) (urn string, err error) {
-	if urn = ast.GetUrn(); urn == "" {
-		return "", fmt.Errorf("urn is required and can't be empty")
+func (*APIServer) validateUpsertPatchAsset(ast *compassv1beta1.UpsertPatchAssetRequest_Asset) error {
+	if urn := ast.GetUrn(); urn == "" {
+		return fmt.Errorf("urn is required and can't be empty")
 	}
 
 	typ := ast.GetType()
 	if typ == "" {
-		return "", fmt.Errorf("type is required and can't be empty")
+		return fmt.Errorf("type is required and can't be empty")
 	}
 
 	if !asset.Type(typ).IsValid() {
-		return "", fmt.Errorf("type is invalid")
+		return fmt.Errorf("type is invalid")
 	}
 
 	if service := ast.GetService(); service == "" {
-		return "", fmt.Errorf("service is required and can't be empty")
+		return fmt.Errorf("service is required and can't be empty")
 	}
 
-	return urn, nil
+	return nil
 }
 
 func decodePatchAssetToMap(pb *compassv1beta1.UpsertPatchAssetRequest_Asset) map[string]interface{} {

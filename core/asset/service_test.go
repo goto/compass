@@ -194,7 +194,7 @@ func TestService_UpsertAsset(t *testing.T) {
 			Description: `should return error if asset repository upsert return error`,
 			Asset:       sampleAsset,
 			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository, lr *mocks.LineageRepository) {
-				ar.EXPECT().Upsert(ctx, sampleAsset).Return("", errors.New("unknown error"))
+				ar.EXPECT().Upsert(ctx, sampleAsset).Return(asset.Asset{}, errors.New("unknown error"))
 			},
 			Err:        errors.New("unknown error"),
 			ReturnedID: "",
@@ -203,7 +203,7 @@ func TestService_UpsertAsset(t *testing.T) {
 			Description: `should return error if discovery repository upsert return error`,
 			Asset:       sampleAsset,
 			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository, lr *mocks.LineageRepository) {
-				ar.EXPECT().Upsert(ctx, sampleAsset).Return(sampleAsset.ID, nil)
+				ar.EXPECT().Upsert(ctx, sampleAsset).Return(*sampleAsset, nil)
 				dr.EXPECT().Upsert(ctx, mock.AnythingOfType("asset.Asset")).Return(errors.New("unknown error"))
 			},
 			Err:        errors.New("unknown error"),
@@ -215,7 +215,7 @@ func TestService_UpsertAsset(t *testing.T) {
 			Upstreams:   sampleNodes1,
 			Downstreams: sampleNodes2,
 			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository, lr *mocks.LineageRepository) {
-				ar.EXPECT().Upsert(ctx, sampleAsset).Return(sampleAsset.ID, nil)
+				ar.EXPECT().Upsert(ctx, sampleAsset).Return(*sampleAsset, nil)
 				dr.EXPECT().Upsert(ctx, mock.AnythingOfType("asset.Asset")).Return(nil)
 				lr.EXPECT().Upsert(ctx, sampleAsset.URN, sampleNodes1, sampleNodes2).Return(errors.New("unknown error"))
 			},
@@ -228,7 +228,7 @@ func TestService_UpsertAsset(t *testing.T) {
 			Upstreams:   sampleNodes1,
 			Downstreams: sampleNodes2,
 			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository, lr *mocks.LineageRepository) {
-				ar.EXPECT().Upsert(ctx, sampleAsset).Return(sampleAsset.ID, nil)
+				ar.EXPECT().Upsert(ctx, sampleAsset).Return(*sampleAsset, nil)
 				dr.EXPECT().Upsert(ctx, mock.AnythingOfType("asset.Asset")).Return(nil)
 				lr.EXPECT().Upsert(ctx, sampleAsset.URN, sampleNodes1, sampleNodes2).Return(nil)
 			},
@@ -279,7 +279,7 @@ func TestService_UpsertAssetWithoutLineage(t *testing.T) {
 			Description: `should return error if asset repository upsert return error`,
 			Asset:       sampleAsset,
 			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository) {
-				ar.EXPECT().Upsert(ctx, sampleAsset).Return("", errors.New("unknown error"))
+				ar.EXPECT().Upsert(ctx, sampleAsset).Return(asset.Asset{}, errors.New("unknown error"))
 			},
 			Err: errors.New("unknown error"),
 		},
@@ -287,7 +287,7 @@ func TestService_UpsertAssetWithoutLineage(t *testing.T) {
 			Description: `should return error if discovery repository upsert return error`,
 			Asset:       sampleAsset,
 			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository) {
-				ar.EXPECT().Upsert(ctx, sampleAsset).Return(sampleAsset.ID, nil)
+				ar.EXPECT().Upsert(ctx, sampleAsset).Return(*sampleAsset, nil)
 				dr.EXPECT().Upsert(ctx, mock.AnythingOfType("asset.Asset")).Return(errors.New("unknown error"))
 			},
 			Err: errors.New("unknown error"),
@@ -296,7 +296,7 @@ func TestService_UpsertAssetWithoutLineage(t *testing.T) {
 			Description: `should return no error if all repositories upsert return no error`,
 			Asset:       sampleAsset,
 			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository) {
-				ar.EXPECT().Upsert(ctx, sampleAsset).Return(sampleAsset.ID, nil)
+				ar.EXPECT().Upsert(ctx, sampleAsset).Return(*sampleAsset, nil)
 				dr.EXPECT().Upsert(ctx, mock.AnythingOfType("asset.Asset")).Return(nil)
 			},
 			ReturnedID: sampleAsset.ID,

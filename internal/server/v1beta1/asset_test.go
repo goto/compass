@@ -610,17 +610,8 @@ func TestUpsertPatchAsset(t *testing.T) {
 				Url:     "https://sample-url.com",
 			},
 		}
-		currentAsset = asset.Asset{
-			URN:       "test dagger",
-			Type:      asset.Type("table"),
-			Name:      "old-name", // this value will be updated
-			Service:   "kafka",
-			UpdatedBy: user.User{ID: userID},
-			Data:      map[string]interface{}{},
-			URL:       "https://sample-url-old.com",
-			Owners:    []user.User{{ID: "id", Email: "email@email.com", Provider: "provider"}},
-		}
-		currentAssetNew = asset.Asset{
+		mappedAsset = asset.Asset{
+			ID:        "",
 			URN:       "test dagger",
 			Type:      asset.Type("table"),
 			Name:      "new-name", // this value will be updated
@@ -628,7 +619,6 @@ func TestUpsertPatchAsset(t *testing.T) {
 			UpdatedBy: user.User{ID: userID},
 			Data:      map[string]interface{}{},
 			URL:       "https://sample-url.com",
-			Owners:    []user.User{{ID: "id", Email: "email@email.com", Provider: "provider"}},
 		}
 	)
 	type testCase struct {
@@ -711,20 +701,16 @@ func TestUpsertPatchAsset(t *testing.T) {
 			ExpectStatus: codes.InvalidArgument,
 		},
 		{
-			Description: "should return internal server error when finding asset failed",
-			Setup: func(ctx context.Context, as *mocks.AssetService, _ *mocks.UserService) {
-				expectedErr := errors.New("unknown error")
-				as.EXPECT().GetAssetByIDWithoutProbes(ctx, "test dagger").Return(currentAsset, expectedErr)
-			},
-			Request:      validPayload,
-			ExpectStatus: codes.Internal,
-		},
-		{
 			Description: "should return internal server error when upserting asset service failed",
 			Setup: func(ctx context.Context, as *mocks.AssetService, _ *mocks.UserService) {
 				expectedErr := errors.New("unknown error")
-				as.EXPECT().GetAssetByIDWithoutProbes(ctx, "test dagger").Return(currentAsset, nil)
-				as.EXPECT().UpsertAsset(ctx, mock.AnythingOfType("*asset.Asset"), mock.AnythingOfType("[]string"), mock.AnythingOfType("[]string")).Return("1234-5678", expectedErr)
+				as.EXPECT().UpsertPatchAsset(
+					ctx,
+					mock.AnythingOfType("*asset.Asset"),
+					mock.AnythingOfType("[]string"),
+					mock.AnythingOfType("[]string"),
+					mock.Anything).
+					Return("1234-5678", expectedErr)
 			},
 			Request:      validPayload,
 			ExpectStatus: codes.Internal,
@@ -732,8 +718,8 @@ func TestUpsertPatchAsset(t *testing.T) {
 		{
 			Description: "should return invalid argument error when upserting asset without lineage failed, with invalid error",
 			Setup: func(ctx context.Context, as *mocks.AssetService, _ *mocks.UserService) {
-				as.EXPECT().GetAssetByIDWithoutProbes(ctx, "test dagger").Return(currentAssetNew, nil)
-				as.EXPECT().UpsertAssetWithoutLineage(ctx, &currentAssetNew).Return("", asset.InvalidError{})
+				as.EXPECT().UpsertPatchAssetWithoutLineage(ctx, &mappedAsset, mock.Anything).
+					Return("", asset.InvalidError{})
 			},
 			Request:      validPayloadWithoutStreams,
 			ExpectStatus: codes.InvalidArgument,
@@ -741,8 +727,8 @@ func TestUpsertPatchAsset(t *testing.T) {
 		{
 			Description: "should return internal server error when upserting asset without asset failed, with discovery error ",
 			Setup: func(ctx context.Context, as *mocks.AssetService, _ *mocks.UserService) {
-				as.EXPECT().GetAssetByIDWithoutProbes(ctx, "test dagger").Return(currentAssetNew, nil)
-				as.EXPECT().UpsertAssetWithoutLineage(ctx, &currentAssetNew).Return("", asset.DiscoveryError{Err: errors.New("discovery error")})
+				as.EXPECT().UpsertPatchAssetWithoutLineage(ctx, &mappedAsset, mock.Anything).
+					Return("", asset.DiscoveryError{Err: errors.New("discovery error")})
 			},
 			Request:      validPayloadWithoutStreams,
 			ExpectStatus: codes.Internal,
@@ -766,8 +752,8 @@ func TestUpsertPatchAsset(t *testing.T) {
 				assetWithID := patchedAsset
 				assetWithID.ID = assetID
 
-				as.EXPECT().GetAssetByIDWithoutProbes(ctx, "test dagger").Return(currentAsset, nil)
-				as.EXPECT().UpsertAsset(ctx, &patchedAsset, upstreams, downstreams).Return(assetWithID.ID, nil).Run(func(ctx context.Context, ast *asset.Asset, upstreams, downstreams []string) {
+				as.EXPECT().UpsertPatchAsset(ctx, &patchedAsset, upstreams, downstreams, mock.Anything).
+					Return(assetWithID.ID, nil).Run(func(_ context.Context, _ *asset.Asset, _, _ []string, _ map[string]interface{}) {
 					patchedAsset.ID = assetWithID.ID
 				})
 			},
@@ -777,7 +763,7 @@ func TestUpsertPatchAsset(t *testing.T) {
 				expected := &compassv1beta1.UpsertPatchAssetResponse{
 					Id: assetID,
 				}
-				if diff := cmp.Diff(resp, expected, protocmp.Transform()); diff != "" {
+				if diffs := cmp.Diff(resp, expected, protocmp.Transform()); diffs != "" {
 					return fmt.Errorf("expected response to be %+v, was %+v", expected, resp)
 				}
 				return nil
@@ -793,17 +779,15 @@ func TestUpsertPatchAsset(t *testing.T) {
 					Service:   "kafka",
 					UpdatedBy: user.User{ID: userID},
 					Data:      map[string]interface{}{},
-					URL:       "https://sample-url-old.com",
 					Owners:    []user.User{{ID: "id", Email: "email@email.com", Provider: "provider"}},
 				}
 
 				assetWithID := patchedAsset
 				assetWithID.ID = assetID
 
-				as.EXPECT().GetAssetByIDWithoutProbes(ctx, "test dagger").Return(currentAsset, nil)
-				as.EXPECT().UpsertAssetWithoutLineage(ctx, &patchedAsset).
+				as.EXPECT().UpsertPatchAssetWithoutLineage(ctx, &patchedAsset, mock.Anything).
 					Return(assetWithID.ID, nil).
-					Run(func(ctx context.Context, ast *asset.Asset) {
+					Run(func(_ context.Context, _ *asset.Asset, _ map[string]interface{}) {
 						patchedAsset.ID = assetWithID.ID
 					})
 			},
@@ -822,7 +806,7 @@ func TestUpsertPatchAsset(t *testing.T) {
 				expected := &compassv1beta1.UpsertPatchAssetResponse{
 					Id: assetID,
 				}
-				if diff := cmp.Diff(resp, expected, protocmp.Transform()); diff != "" {
+				if diffs := cmp.Diff(resp, expected, protocmp.Transform()); diffs != "" {
 					return fmt.Errorf("expected response to be %+v, was %+v", expected, resp)
 				}
 				return nil
@@ -838,17 +822,15 @@ func TestUpsertPatchAsset(t *testing.T) {
 					Service:   "kafka",
 					UpdatedBy: user.User{ID: userID},
 					Data:      map[string]interface{}{},
-					URL:       "https://sample-url-old.com",
 					Owners:    []user.User{{ID: "id", Email: "email@email.com", Provider: "provider"}},
 				}
 
 				assetWithID := patchedAsset
 				assetWithID.ID = assetID
 
-				as.EXPECT().GetAssetByIDWithoutProbes(ctx, "test dagger").Return(currentAsset, nil)
-				as.EXPECT().UpsertAsset(ctx, &patchedAsset, []string{}, []string{}).
+				as.EXPECT().UpsertPatchAsset(ctx, &patchedAsset, []string{}, []string{}, mock.Anything).
 					Return(assetWithID.ID, nil).
-					Run(func(ctx context.Context, ast *asset.Asset, _, _ []string) {
+					Run(func(_ context.Context, _ *asset.Asset, _, _ []string, _ map[string]interface{}) {
 						patchedAsset.ID = assetWithID.ID
 					})
 			},
@@ -868,7 +850,7 @@ func TestUpsertPatchAsset(t *testing.T) {
 				expected := &compassv1beta1.UpsertPatchAssetResponse{
 					Id: assetID,
 				}
-				if diff := cmp.Diff(resp, expected, protocmp.Transform()); diff != "" {
+				if diffs := cmp.Diff(resp, expected, protocmp.Transform()); diffs != "" {
 					return fmt.Errorf("expected response to be %+v, was %+v", expected, resp)
 				}
 				return nil
