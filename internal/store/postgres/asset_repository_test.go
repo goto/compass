@@ -119,9 +119,10 @@ func (r *AssetRepositoryTestSuite) insertRecord() (assets []asset.Asset) {
 			UpdatedBy:   r.users[0],
 		}
 
-		upsertedAsset, err := r.repository.Upsert(r.ctx, &ast)
+		id, err := r.repository.Upsert(r.ctx, &ast)
 		r.Require().NoError(err)
-		r.Require().NotEmpty(upsertedAsset.ID)
+		r.Require().NotEmpty(id)
+		ast.ID = id
 		assets = append(assets, ast)
 	}
 
@@ -562,9 +563,10 @@ func (r *AssetRepositoryTestSuite) TestGetCount() {
 			Service:   service[0],
 			UpdatedBy: r.users[0],
 		}
-		upsertedAsset, err := r.repository.Upsert(r.ctx, &ast)
+		id, err := r.repository.Upsert(r.ctx, &ast)
 		r.Require().NoError(err)
-		r.Require().NotEmpty(upsertedAsset.ID)
+		r.Require().NotEmpty(id)
+		ast.ID = id
 	}
 
 	r.Run("should return total assets with filter", func() {
@@ -607,17 +609,20 @@ func (r *AssetRepositoryTestSuite) TestGetByID() {
 		}
 
 		var err error
-		upsertedAsset1, err := r.repository.Upsert(r.ctx, &asset1)
+		id, err := r.repository.Upsert(r.ctx, &asset1)
 		r.Require().NoError(err)
-		r.NotEmpty(upsertedAsset1.ID)
+		r.NotEmpty(id)
+		asset1.ID = id
 
-		upsertedAsset2, err := r.repository.Upsert(r.ctx, &asset2)
+		id, err = r.repository.Upsert(r.ctx, &asset2)
 		r.Require().NoError(err)
-		r.NotEmpty(upsertedAsset2.ID)
+		r.NotEmpty(id)
+		asset2.ID = id
 
-		result, err := r.repository.GetByID(r.ctx, upsertedAsset2.ID)
+		result, err := r.repository.GetByID(r.ctx, asset2.ID)
 		r.NoError(err)
-		r.assertAsset(&upsertedAsset2, &result)
+		asset2.UpdatedBy = r.users[1]
+		r.assertAsset(&asset2, &result)
 	})
 
 	r.Run("return owners if any", func() {
@@ -632,12 +637,15 @@ func (r *AssetRepositoryTestSuite) TestGetByID() {
 			UpdatedBy: r.users[1],
 		}
 
-		upsertedAsset, err := r.repository.Upsert(r.ctx, &ast)
+		id, err := r.repository.Upsert(r.ctx, &ast)
 		r.Require().NoError(err)
-		r.Require().NotEmpty(upsertedAsset.ID)
+		r.Require().NotEmpty(id)
+		ast.ID = id
 
-		r.Len(upsertedAsset.Owners, len(ast.Owners))
-		for i, owner := range upsertedAsset.Owners {
+		result, err := r.repository.GetByID(r.ctx, ast.ID)
+		r.NoError(err)
+		r.Len(result.Owners, len(ast.Owners))
+		for i, owner := range result.Owners {
 			r.Equal(ast.Owners[i].ID, owner.ID)
 		}
 	})
@@ -666,13 +674,15 @@ func (r *AssetRepositoryTestSuite) TestGetByURN() {
 			UpdatedBy: r.users[1],
 		}
 
-		upsertedAsset, err := r.repository.Upsert(r.ctx, &asset1)
+		id, err := r.repository.Upsert(r.ctx, &asset1)
 		r.Require().NoError(err)
-		r.NotEmpty(upsertedAsset.ID)
+		r.NotEmpty(id)
+		asset1.ID = id
 
-		upsertedAsset, err = r.repository.Upsert(r.ctx, &asset2)
+		id, err = r.repository.Upsert(r.ctx, &asset2)
 		r.Require().NoError(err)
-		r.NotEmpty(upsertedAsset.ID)
+		r.NotEmpty(id)
+		asset2.ID = id
 
 		result, err := r.repository.GetByURN(r.ctx, "urn-gbi-2")
 		r.NoError(err)
@@ -715,15 +725,16 @@ func (r *AssetRepositoryTestSuite) TestVersions() {
 		RefreshedAt: &currentTime,
 	}
 
-	upsertedAsset, err := r.repository.Upsert(r.ctx, &astVersioning)
+	id, err := r.repository.Upsert(r.ctx, &astVersioning)
 	r.Require().NoError(err)
-	r.Require().NotEmpty(upsertedAsset.ID)
+	r.Require().NotEmpty(id)
+	astVersioning.ID = id
 
 	// v0.2
 	astVersioning.Description = "new description in v0.2"
-	upsertedAsset, err = r.repository.Upsert(r.ctx, &astVersioning)
+	id, err = r.repository.Upsert(r.ctx, &astVersioning)
 	r.Require().NoError(err)
-	r.Require().Equal(upsertedAsset.ID, astVersioning.ID)
+	r.Require().Equal(id, astVersioning.ID)
 
 	// v0.3
 	astVersioning.Owners = []user.User{
@@ -735,26 +746,26 @@ func (r *AssetRepositoryTestSuite) TestVersions() {
 			Provider: "meteor",
 		},
 	}
-	upsertedAsset, err = r.repository.Upsert(r.ctx, &astVersioning)
+	id, err = r.repository.Upsert(r.ctx, &astVersioning)
 	r.Require().NoError(err)
-	r.Require().Equal(upsertedAsset.ID, astVersioning.ID)
+	r.Require().Equal(id, astVersioning.ID)
 
 	// v0.4
 	astVersioning.Data = map[string]interface{}{
 		"data1": float64(12345),
 	}
-	upsertedAsset, err = r.repository.Upsert(r.ctx, &astVersioning)
+	id, err = r.repository.Upsert(r.ctx, &astVersioning)
 	r.Require().NoError(err)
-	r.Require().Equal(upsertedAsset.ID, astVersioning.ID)
+	r.Require().Equal(id, astVersioning.ID)
 
 	// v0.5
 	astVersioning.Labels = map[string]string{
 		"key1": "value1",
 	}
 
-	upsertedAsset, err = r.repository.Upsert(r.ctx, &astVersioning)
+	id, err = r.repository.Upsert(r.ctx, &astVersioning)
 	r.Require().NoError(err)
-	r.Require().Equal(upsertedAsset.ID, astVersioning.ID)
+	r.Require().Equal(id, astVersioning.ID)
 
 	r.Run("should return current version of an assets", func() {
 		expected := asset.Asset{
@@ -885,15 +896,16 @@ func (r *AssetRepositoryTestSuite) TestVersions() {
 			Service:   "bigquery",
 			UpdatedBy: r.users[1],
 		}
-		upsertedAsset, err := r.repository.Upsert(r.ctx, &ast)
+		id, err := r.repository.Upsert(r.ctx, &ast)
 		r.Require().NoError(err)
-		r.Require().NotEmpty(upsertedAsset.ID)
+		r.Require().NotEmpty(id)
+		ast.ID = id
 
 		for i := 2; i < 100; i++ {
 			ast.Description = "new description in v0." + strconv.Itoa(i)
-			upsertedAsset, err = r.repository.Upsert(r.ctx, &ast)
+			id, err = r.repository.Upsert(r.ctx, &ast)
 			r.Require().NoError(err)
-			r.Require().Equal(upsertedAsset.ID, ast.ID)
+			r.Require().Equal(id, ast.ID)
 		}
 
 		expected := []asset.Asset{
@@ -950,15 +962,16 @@ func (r *AssetRepositoryTestSuite) TestVersions() {
 			Service:   "bigquery",
 			UpdatedBy: r.users[1],
 		}
-		upsertedAsset, err := r.repository.Upsert(r.ctx, &ast)
+		id, err := r.repository.Upsert(r.ctx, &ast)
 		r.Require().NoError(err)
-		r.Require().NotEmpty(upsertedAsset.ID)
+		r.Require().NotEmpty(id)
+		ast.ID = id
 
 		for i := 2; i < 100; i++ {
 			ast.Description = "new description in v0." + strconv.Itoa(i)
-			upsertedAsset, err = r.repository.Upsert(r.ctx, &ast)
+			id, err = r.repository.Upsert(r.ctx, &ast)
 			r.Require().NoError(err)
-			r.Require().Equal(upsertedAsset.ID, ast.ID)
+			r.Require().Equal(id, ast.ID)
 		}
 
 		assetVersions, err := r.repository.GetVersionHistory(r.ctx, asset.Filter{Size: 0, Offset: 86}, ast.ID)
@@ -979,40 +992,41 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 	r.Run("on insert", func() {
 		r.Run("set ID to asset and version to base version", func() {
 			ast := asset.Asset{
-				URN:         "urn-u-1",
+				URN:         uuid.NewString() + "urn-u-1",
 				Type:        "table",
 				Service:     "bigquery",
 				URL:         "https://sample-url.com",
 				UpdatedBy:   r.users[0],
 				RefreshedAt: &refreshedAtTime,
 			}
-			upsertedAsset, err := r.repository.Upsert(r.ctx, &ast)
+			id, err := r.repository.Upsert(r.ctx, &ast)
 			r.Equal(asset.BaseVersion, ast.Version)
 			r.NoError(err)
-			r.NotEmpty(upsertedAsset.ID)
+			r.NotEmpty(id)
 			r.NotEmpty(ast.CreatedAt)
 			r.NotEmpty(ast.UpdatedAt)
+			ast.ID = id
 
-			assetInDB, err := r.repository.GetByID(r.ctx, upsertedAsset.ID)
+			assetInDB, err := r.repository.GetByID(r.ctx, ast.ID)
 			r.Require().NoError(err)
 			r.NotEqual(time.Time{}, assetInDB.CreatedAt)
 			r.NotEqual(time.Time{}, assetInDB.UpdatedAt)
 			r.assertAsset(&ast, &assetInDB)
 
-			ast2 := upsertedAsset
-			ast2.RefreshedAt = &refreshedAtTime
+			ast2 := ast
+			ast2.RefreshedAt = nil
 			ast2.Description = "create a new version" // to force fetch from asset_versions.
 			_, err = r.repository.Upsert(r.ctx, &ast2)
 			r.NoError(err)
-			r.Greater(ast2.UpdatedAt.UnixNano(), upsertedAsset.UpdatedAt.UnixNano())
-			assetv1, err := r.repository.GetByVersionWithID(r.ctx, upsertedAsset.ID, asset.BaseVersion)
+			r.Greater(ast2.UpdatedAt.UnixNano(), ast.UpdatedAt.UnixNano())
+			assetv1, err := r.repository.GetByVersionWithID(r.ctx, ast.ID, asset.BaseVersion)
 			r.NoError(err)
 			r.Equal("0.1", assetv1.Version)
 		})
 
 		r.Run("should store owners if any", func() {
 			ast := asset.Asset{
-				URN:     "urn-u-3",
+				URN:     uuid.NewString() + "urn-u-3",
 				Type:    "table",
 				Service: "bigquery",
 				Owners: []user.User{
@@ -1023,11 +1037,12 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 				UpdatedBy: r.users[0],
 			}
 
-			upsertedAsset, err := r.repository.Upsert(r.ctx, &ast)
+			id, err := r.repository.Upsert(r.ctx, &ast)
 			r.Require().NoError(err)
-			r.Require().NotEmpty(upsertedAsset.ID)
+			r.Require().NotEmpty(id)
+			ast.ID = id
 
-			actual, err := r.repository.GetByID(r.ctx, upsertedAsset.ID)
+			actual, err := r.repository.GetByID(r.ctx, ast.ID)
 			r.NoError(err)
 
 			r.Len(actual.Owners, 2)
@@ -1037,7 +1052,7 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 
 		r.Run("should create owners as users if they do not exist yet", func() {
 			ast := asset.Asset{
-				URN:     "urn-u-3a",
+				URN:     uuid.NewString() + "urn-u-3a",
 				Type:    "table",
 				Service: "bigquery",
 				Owners: []user.User{
@@ -1048,11 +1063,11 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 				UpdatedBy: r.users[0],
 			}
 
-			upsertedAsset, err := r.repository.Upsert(r.ctx, &ast)
+			id, err := r.repository.Upsert(r.ctx, &ast)
 			r.Require().NoError(err)
-			r.NotEmpty(upsertedAsset.ID)
+			r.NotEmpty(id)
 
-			actual, err := r.repository.GetByID(r.ctx, upsertedAsset.ID)
+			actual, err := r.repository.GetByID(r.ctx, id)
 			r.NoError(err)
 
 			r.Len(actual.Owners, 2)
@@ -1063,7 +1078,7 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 	r.Run("on update", func() {
 		r.Run("should not create nor updating the asset if asset is identical", func() {
 			ast := asset.Asset{
-				URN:         "urn-u-2",
+				URN:         uuid.NewString() + "urn-u-2",
 				Type:        "table",
 				Service:     "bigquery",
 				UpdatedBy:   r.users[0],
@@ -1072,22 +1087,24 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 			}
 			identicalAsset := ast
 
-			upsertedAsset1, err := r.repository.Upsert(r.ctx, &ast)
+			id, err := r.repository.Upsert(r.ctx, &ast)
 			r.Require().NoError(err)
-			r.NotEmpty(upsertedAsset1.ID)
+			r.NotEmpty(id)
+			ast.ID = id
 
-			upsertedAsset2, err := r.repository.Upsert(r.ctx, &identicalAsset)
+			id, err = r.repository.Upsert(r.ctx, &identicalAsset)
 			r.Require().NoError(err)
-			r.NotEmpty(upsertedAsset2.ID)
+			r.NotEmpty(id)
+			identicalAsset.ID = id
 
-			r.Equal(upsertedAsset1.ID, upsertedAsset2.ID)
-			r.Equal(upsertedAsset1.Version, upsertedAsset2.Version)
+			r.Equal(ast.ID, identicalAsset.ID)
+			r.Equal(ast.Version, identicalAsset.Version)
 		})
 
 		r.Run("should same asset version if asset only has different at RefreshedAt", func() {
 			oneDayAgoRefreshedAtTime := refreshedAtTime.AddDate(0, 0, -1)
 			ast := asset.Asset{
-				URN:         "urn-u-2",
+				URN:         uuid.NewString() + "urn-u-2",
 				Type:        "table",
 				Service:     "bigquery",
 				URL:         "https://sample-url-old.com",
@@ -1096,18 +1113,20 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 				Version:     "0.1",
 			}
 
-			upsertedAsset, err := r.repository.Upsert(r.ctx, &ast)
+			id, err := r.repository.Upsert(r.ctx, &ast)
 			r.Require().NoError(err)
-			r.NotEmpty(upsertedAsset.ID)
+			r.NotEmpty(id)
+			ast.ID = id
 
-			updated := upsertedAsset
+			updated := ast
 			updated.RefreshedAt = &refreshedAtTime
 
-			upsertedAsset2, err := r.repository.Upsert(r.ctx, &updated)
+			id, err = r.repository.Upsert(r.ctx, &updated)
 			r.Require().NoError(err)
-			r.NotEmpty(upsertedAsset2.ID)
+			r.NotEmpty(id)
+			updated.ID = id
 
-			r.Equal(upsertedAsset.ID, upsertedAsset2.ID)
+			r.Equal(ast.ID, updated.ID)
 
 			actual, err := r.repository.GetByID(r.ctx, ast.ID)
 			r.NoError(err)
@@ -1118,7 +1137,7 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 
 		r.Run("should update the asset version if asset is not identical", func() {
 			ast := asset.Asset{
-				URN:       "urn-u-2",
+				URN:       uuid.NewString() + "urn-u-2",
 				Type:      "table",
 				Service:   "bigquery",
 				URL:       "https://sample-url-old.com",
@@ -1126,20 +1145,22 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 				Version:   "0.1",
 			}
 
-			upsertedAsset, err := r.repository.Upsert(r.ctx, &ast)
+			id, err := r.repository.Upsert(r.ctx, &ast)
 			r.Require().NoError(err)
-			r.NotEmpty(upsertedAsset.ID)
+			r.NotEmpty(id)
+			ast.ID = id
 
-			updated := upsertedAsset
+			updated := ast
 			updated.URL = "https://sample-url.com"
 
-			upsertedAsset2, err := r.repository.Upsert(r.ctx, &updated)
+			id, err = r.repository.Upsert(r.ctx, &updated)
 			r.Require().NoError(err)
-			r.NotEmpty(upsertedAsset2.ID)
+			r.NotEmpty(id)
+			updated.ID = id
 
-			r.Equal(upsertedAsset.ID, upsertedAsset2.ID)
+			r.Equal(ast.ID, updated.ID)
 
-			actual, err := r.repository.GetByID(r.ctx, upsertedAsset.ID)
+			actual, err := r.repository.GetByID(r.ctx, ast.ID)
 			r.NoError(err)
 
 			r.Equal(updated.URL, actual.URL)
@@ -1148,7 +1169,7 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 
 		r.Run("should delete old owners if it does not exist on new asset", func() {
 			ast := asset.Asset{
-				URN:     "urn-u-4",
+				URN:     uuid.NewString() + "urn-u-4",
 				Type:    "table",
 				Service: "bigquery",
 				Owners: []user.User{
@@ -1162,21 +1183,25 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 				stripUserID(r.users[2]),
 			}
 
-			upsertedAsset1, err := r.repository.Upsert(r.ctx, &ast)
+			id, err := r.repository.Upsert(r.ctx, &ast)
 			r.Require().NoError(err)
-			r.NotEmpty(upsertedAsset1.ID)
+			r.NotEmpty(id)
+			ast.ID = id
 
-			upsertedAsset2, err := r.repository.Upsert(r.ctx, &newAsset)
+			id, err = r.repository.Upsert(r.ctx, &newAsset)
 			r.Require().NoError(err)
-			r.NotEmpty(upsertedAsset2.ID)
+			r.NotEmpty(id)
+			newAsset.ID = id
 
-			r.Len(upsertedAsset1.Owners, len(upsertedAsset2.Owners))
-			r.Equal(r.users[2].ID, upsertedAsset1.Owners[0].ID)
+			actual, err := r.repository.GetByID(r.ctx, ast.ID)
+			r.NoError(err)
+			r.Len(actual.Owners, len(newAsset.Owners))
+			r.Equal(r.users[2].ID, actual.Owners[0].ID)
 		})
 
 		r.Run("should create new owners if it does not exist on old asset", func() {
 			ast := asset.Asset{
-				URN:     "urn-u-4",
+				URN:     uuid.NewString() + "urn-u-4",
 				Type:    "table",
 				Service: "bigquery",
 				Owners: []user.User{
@@ -1190,22 +1215,26 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 				stripUserID(r.users[2]),
 			}
 
-			upsertedAsset1, err := r.repository.Upsert(r.ctx, &ast)
+			id, err := r.repository.Upsert(r.ctx, &ast)
 			r.Require().NoError(err)
-			r.NotEmpty(upsertedAsset1.ID)
+			r.NotEmpty(id)
+			ast.ID = id
 
-			upsertedAsset2, err := r.repository.Upsert(r.ctx, &newAsset)
+			id, err = r.repository.Upsert(r.ctx, &newAsset)
 			r.Require().NoError(err)
-			r.NotEmpty(upsertedAsset2.ID)
+			r.NotEmpty(id)
+			newAsset.ID = id
 
-			r.Len(upsertedAsset1.Owners, len(upsertedAsset2.Owners))
-			r.Equal(r.users[1].ID, upsertedAsset1.Owners[0].ID)
-			r.Equal(r.users[2].ID, upsertedAsset1.Owners[1].ID)
+			actual, err := r.repository.GetByID(r.ctx, ast.ID)
+			r.NoError(err)
+			r.Len(actual.Owners, len(newAsset.Owners))
+			r.Equal(r.users[1].ID, actual.Owners[0].ID)
+			r.Equal(r.users[2].ID, actual.Owners[1].ID)
 		})
 
 		r.Run("should create users from owners if owner emails do not exist yet", func() {
 			ast := asset.Asset{
-				URN:     "urn-u-4a",
+				URN:     uuid.NewString() + "urn-u-4a",
 				Type:    "table",
 				Service: "bigquery",
 				Owners: []user.User{
@@ -1219,19 +1248,23 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 				{Email: "newuser@example.com"},
 			}
 
-			upsertedAsset1, err := r.repository.Upsert(r.ctx, &ast)
+			id, err := r.repository.Upsert(r.ctx, &ast)
 			r.Require().NoError(err)
-			r.NotEmpty(upsertedAsset1.ID)
+			r.NotEmpty(id)
+			ast.ID = id
 
-			upsertedAsset2, err := r.repository.Upsert(r.ctx, &newAsset)
+			id, err = r.repository.Upsert(r.ctx, &newAsset)
 			r.Require().NoError(err)
-			r.NotEmpty(upsertedAsset2.ID)
+			r.NotEmpty(id)
+			newAsset.ID = id
 
-			r.Len(upsertedAsset1.Owners, len(upsertedAsset2.Owners))
-			r.NotEmpty(upsertedAsset1.Owners[0].ID)
-			r.Equal(r.users[1].ID, upsertedAsset1.Owners[0].ID)
-			r.NotEmpty(upsertedAsset1.Owners[1].ID)
-			r.Equal(upsertedAsset2.Owners[1].Email, upsertedAsset1.Owners[1].Email)
+			actual, err := r.repository.GetByID(r.ctx, ast.ID)
+			r.NoError(err)
+			r.Len(actual.Owners, len(newAsset.Owners))
+			r.NotEmpty(actual.Owners[0].ID)
+			r.Equal(r.users[1].ID, actual.Owners[0].ID)
+			r.NotEmpty(actual.Owners[1].ID)
+			r.Equal(newAsset.Owners[1].Email, actual.Owners[1].Email)
 		})
 	})
 }
@@ -1239,7 +1272,7 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 func (r *AssetRepositoryTestSuite) TestUpsertRaceCondition() {
 	r.Run("TestUpsertRaceCondition", func() {
 		ast := asset.Asset{
-			URN:       "urn-u-3",
+			URN:       "urn-upsert-race-condition",
 			Type:      "table",
 			Service:   "bigquery",
 			URL:       "https://sample-url-old.com",
@@ -1247,9 +1280,9 @@ func (r *AssetRepositoryTestSuite) TestUpsertRaceCondition() {
 			Version:   "0.1",
 		}
 
-		upsertedAsset, err := r.repository.Upsert(r.ctx, &ast)
+		id, err := r.repository.Upsert(r.ctx, &ast)
 		r.Require().NoError(err)
-		r.NotEmpty(upsertedAsset.ID)
+		r.NotEmpty(id)
 
 		const numGoroutines = 10 // Number of concurrent upserts
 		var wg sync.WaitGroup
@@ -1265,6 +1298,476 @@ func (r *AssetRepositoryTestSuite) TestUpsertRaceCondition() {
 				localAst := ast
 				localAst.URL = fmt.Sprintf("https://sample-url-%d.com", index)
 				_, err := r.repository.Upsert(context.Background(), &localAst)
+
+				mu.Lock()
+				results = append(results, err)
+				mu.Unlock()
+			}(i)
+		}
+
+		wg.Wait()
+
+		// Check for errors
+		for _, err := range results {
+			assert.NoError(r.T(), err, "Upsert should not fail under race conditions")
+		}
+	})
+}
+
+func (r *AssetRepositoryTestSuite) TestUpsertPatch() {
+	refreshedAtTime := time.Date(2024, time.August, 20, 8, 19, 49, 0, time.UTC)
+	r.Run("on insert", func() {
+		r.Run("should do nothing for patch data on insert action", func() {
+			ast := asset.Asset{
+				URN:     "urn-i-0",
+				Name:    "urn-test",
+				Type:    "table",
+				Service: "bigquery",
+				Owners: []user.User{
+					r.users[1],
+				},
+				Data: map[string]interface{}{
+					"entity": "gojek",
+				},
+				UpdatedBy: r.users[0],
+			}
+
+			patchData := make(map[string]interface{})
+			patchData["data"] = map[string]interface{}{
+				"entity": "gotocompany",
+			}
+
+			id, err := r.repository.UpsertPatch(r.ctx, &ast, patchData)
+			r.Require().NoError(err)
+			r.NotEmpty(id)
+
+			actual, err := r.repository.GetByID(r.ctx, id)
+			r.NoError(err)
+			r.NotEqual(actual.Data["entity"], "gotocompany")
+			r.Equal(actual.Data["entity"], "gojek")
+		})
+
+		r.Run("set ID to asset and version to base version", func() {
+			ast := asset.Asset{
+				URN:     "urn-i-1",
+				Name:    "urn-test",
+				Type:    "table",
+				Service: "bigquery",
+				URL:     "https://sample-url.com",
+				Data: map[string]interface{}{
+					"entity": "gojek",
+				},
+				UpdatedBy:   r.users[0],
+				RefreshedAt: &refreshedAtTime,
+			}
+
+			id, err := r.repository.UpsertPatch(r.ctx, &ast, nil)
+			r.Equal(asset.BaseVersion, ast.Version)
+			r.NoError(err)
+			r.NotEmpty(id)
+			r.NotEmpty(ast.CreatedAt)
+			r.NotEmpty(ast.UpdatedAt)
+			ast.ID = id
+
+			assetInDB, err := r.repository.GetByID(r.ctx, ast.ID)
+			r.Require().NoError(err)
+			r.NotEqual(time.Time{}, assetInDB.CreatedAt)
+			r.NotEqual(time.Time{}, assetInDB.UpdatedAt)
+			r.assertAsset(&ast, &assetInDB)
+
+			ast2 := ast
+			ast2.RefreshedAt = nil
+			ast2.Description = "create a new version" // to force fetch from asset_versions.
+			_, err = r.repository.UpsertPatch(r.ctx, &ast2, nil)
+			r.NoError(err)
+			r.Greater(ast2.UpdatedAt.UnixNano(), ast.UpdatedAt.UnixNano())
+			assetv1, err := r.repository.GetByVersionWithID(r.ctx, ast.ID, asset.BaseVersion)
+			r.NoError(err)
+			r.Equal("0.1", assetv1.Version)
+		})
+
+		r.Run("should store owners if any", func() {
+			ast := asset.Asset{
+				URN:     "urn-i-3",
+				Name:    "urn-test",
+				Type:    "table",
+				Service: "bigquery",
+				Owners: []user.User{
+					r.users[1],
+					{Email: r.users[2].Email},
+					{ID: r.users[1].ID}, // should get deduplicated by ID
+				},
+				Data: map[string]interface{}{
+					"entity": "gojek",
+				},
+				UpdatedBy: r.users[0],
+			}
+
+			id, err := r.repository.UpsertPatch(r.ctx, &ast, nil)
+			r.Require().NoError(err)
+			r.Require().NotEmpty(id)
+			ast.ID = id
+
+			actual, err := r.repository.GetByID(r.ctx, ast.ID)
+			r.NoError(err)
+
+			r.Len(actual.Owners, 2)
+			r.Equal(r.users[1].ID, actual.Owners[0].ID)
+			r.Equal(r.users[2].ID, actual.Owners[1].ID)
+		})
+
+		r.Run("should create owners as users if they do not exist yet", func() {
+			ast := asset.Asset{
+				URN:     "urn-i-patch-insert-create-owner",
+				Name:    "urn-test",
+				Type:    "table",
+				Service: "bigquery",
+				Owners: []user.User{
+					{Email: "newuserpatch@example.com"},
+					{Email: "newuserpatch2@example.com"},
+					{Email: "newuserpatch@example.com"}, // should get deduplicated by ID on fetch user by email
+				},
+				Data: map[string]interface{}{
+					"entity": "gojek",
+				},
+				UpdatedBy: r.users[0],
+			}
+
+			id, err := r.repository.UpsertPatch(r.ctx, &ast, nil)
+			r.Require().NoError(err)
+			r.NotEmpty(id)
+
+			actual, err := r.repository.GetByID(r.ctx, id)
+			r.NoError(err)
+
+			r.Len(actual.Owners, 2)
+			r.Equal(ast.Owners[0].Email, actual.Owners[0].Email)
+		})
+	})
+
+	r.Run("on update", func() {
+		r.Run("should not create nor updating the asset if asset is identical", func() {
+			ast := asset.Asset{
+				URN:     uuid.NewString() + "urn-u-2",
+				Name:    "urn-test",
+				Type:    "table",
+				Service: "bigquery",
+				Data: map[string]interface{}{
+					"entity": "gotocompany",
+				},
+				UpdatedBy:   r.users[0],
+				RefreshedAt: &refreshedAtTime,
+				Version:     "0.1",
+			}
+			identicalAsset := ast
+
+			id, err := r.repository.UpsertPatch(r.ctx, &ast, nil) // insert
+			r.Require().NoError(err)
+			r.NotEmpty(id)
+			ast.ID = id
+
+			patchData := make(map[string]interface{})
+			patchData["data"] = map[string]interface{}{
+				"entity": "gotocompany",
+			}
+
+			id, err = r.repository.UpsertPatch(r.ctx, &identicalAsset, patchData) // update
+			r.Require().NoError(err)
+			r.NotEmpty(id)
+			identicalAsset.ID = id
+
+			r.Equal(ast.ID, identicalAsset.ID)
+			r.Equal(ast.Version, identicalAsset.Version)
+			r.Equal(identicalAsset.Data["entity"], "gotocompany")
+		})
+
+		r.Run("should same asset version if asset only has different at RefreshedAt", func() {
+			oneDayAgoRefreshedAtTime := refreshedAtTime.AddDate(0, 0, -1)
+			ast := asset.Asset{
+				URN:     uuid.NewString() + "urn-u-2",
+				Name:    "urn-test",
+				Type:    "table",
+				Service: "bigquery",
+				URL:     "https://sample-url-old.com",
+				Data: map[string]interface{}{
+					"entity": "gotocompany",
+				},
+				UpdatedBy:   r.users[0],
+				RefreshedAt: &oneDayAgoRefreshedAtTime,
+				Version:     "0.1",
+			}
+
+			id, err := r.repository.UpsertPatch(r.ctx, &ast, nil) // insert
+			r.Require().NoError(err)
+			r.NotEmpty(id)
+			ast.ID = id
+
+			updated := ast
+			updated.RefreshedAt = &refreshedAtTime
+			patchData := make(map[string]interface{})
+			patchData["data"] = map[string]interface{}{
+				"entity": "gotocompany",
+			}
+
+			id, err = r.repository.UpsertPatch(r.ctx, &updated, patchData) // update
+			r.Require().NoError(err)
+			r.NotEmpty(id)
+			updated.ID = id
+
+			r.Equal(ast.ID, updated.ID)
+
+			actual, err := r.repository.GetByID(r.ctx, ast.ID)
+			r.NoError(err)
+
+			r.Equal(updated.RefreshedAt, actual.RefreshedAt)
+			r.Equal(ast.Version, actual.Version)
+			r.Equal(actual.Data["entity"], "gotocompany")
+		})
+
+		r.Run("should update the asset version if asset is not identical", func() {
+			ast := asset.Asset{
+				URN:     uuid.NewString() + "urn-u-2",
+				Name:    "urn-test",
+				Type:    "table",
+				Service: "bigquery",
+				URL:     "https://sample-url-old.com",
+				Data: map[string]interface{}{
+					"entity": "gotocompany",
+				},
+				UpdatedBy: r.users[0],
+				Version:   "0.1",
+			}
+
+			id, err := r.repository.UpsertPatch(r.ctx, &ast, nil) // insert
+			r.Require().NoError(err)
+			r.NotEmpty(id)
+			ast.ID = id
+
+			updated := ast
+			patchData := make(map[string]interface{})
+			patchData["url"] = "https://sample-url.com"
+
+			id, err = r.repository.UpsertPatch(r.ctx, &updated, patchData) // update
+			r.Require().NoError(err)
+			r.NotEmpty(id)
+			updated.ID = id
+
+			r.Equal(ast.ID, updated.ID)
+
+			actual, err := r.repository.GetByID(r.ctx, ast.ID)
+			r.NoError(err)
+
+			r.Equal(updated.URL, actual.URL)
+			r.NotEqual(ast.Version, actual.Version)
+		})
+
+		r.Run("should keep old data if it does not exist on new asset", func() {
+			ast := asset.Asset{
+				URN:     uuid.NewString() + "urn-u-4",
+				Name:    "urn-test",
+				Type:    "table",
+				Service: "bigquery",
+				Owners: []user.User{
+					stripUserID(r.users[1]),
+				},
+				Data: map[string]interface{}{
+					"entity": "gotocompany",
+				},
+				UpdatedBy: r.users[0],
+			}
+			newAsset := ast
+			newAsset.Owners = []user.User{
+				stripUserID(r.users[2]),
+			}
+
+			id, err := r.repository.UpsertPatch(r.ctx, &ast, nil) // insert
+			r.Require().NoError(err)
+			r.NotEmpty(id)
+
+			patchData := make(map[string]interface{})
+			patchData["data"] = map[string]interface{}{
+				"another": "things",
+			}
+
+			id, err = r.repository.UpsertPatch(r.ctx, &newAsset, patchData) // update
+			r.Require().NoError(err)
+			r.NotEmpty(id)
+
+			actual, err := r.repository.GetByID(r.ctx, ast.ID)
+			r.NoError(err)
+			r.Len(actual.Data, 2)
+			r.Equal(actual.Data["entity"], "gotocompany")
+			r.Equal(actual.Data["another"], "things")
+		})
+
+		r.Run("should delete old owners if it does not exist on new patch", func() {
+			ast := asset.Asset{
+				URN:     uuid.NewString() + "urn-u-4",
+				Name:    "urn-test",
+				Type:    "table",
+				Service: "bigquery",
+				Owners: []user.User{
+					stripUserID(r.users[1]),
+				},
+				Data: map[string]interface{}{
+					"entity": "gotocompany",
+				},
+				UpdatedBy: r.users[0],
+			}
+			newAsset := ast
+
+			id, err := r.repository.UpsertPatch(r.ctx, &ast, nil)
+			r.Require().NoError(err)
+			r.NotEmpty(id)
+			ast.ID = id
+
+			patchData := make(map[string]interface{})
+			patchData["owners"] = []map[string]interface{}{
+				{
+					"id":       r.users[2].ID,
+					"email":    r.users[2].Email,
+					"provider": r.users[2].Provider,
+				},
+			}
+
+			id, err = r.repository.UpsertPatch(r.ctx, &newAsset, patchData)
+			r.Require().NoError(err)
+			r.NotEmpty(id)
+
+			actual, err := r.repository.GetByID(r.ctx, ast.ID)
+			r.NoError(err)
+			r.Len(actual.Owners, len(newAsset.Owners))
+			r.Equal(r.users[2].ID, actual.Owners[0].ID)
+		})
+
+		r.Run("should create new owners if it does not exist on old asset", func() {
+			ast := asset.Asset{
+				URN:     uuid.NewString() + "urn-u-4",
+				Name:    "urn-test",
+				Type:    "table",
+				Service: "bigquery",
+				Owners: []user.User{
+					stripUserID(r.users[1]),
+				},
+				Data: map[string]interface{}{
+					"entity": "gotocompany",
+				},
+				UpdatedBy: r.users[0],
+			}
+			newAsset := ast
+
+			id, err := r.repository.UpsertPatch(r.ctx, &ast, nil)
+			r.Require().NoError(err)
+			r.NotEmpty(id)
+
+			patchData := make(map[string]interface{})
+			patchData["owners"] = []map[string]interface{}{
+				{
+					"id":       r.users[1].ID,
+					"email":    r.users[1].Email,
+					"provider": r.users[1].Provider,
+				},
+				{
+					"id":       r.users[2].ID,
+					"email":    r.users[2].Email,
+					"provider": r.users[2].Provider,
+				},
+			}
+
+			id, err = r.repository.UpsertPatch(r.ctx, &newAsset, patchData)
+			r.Require().NoError(err)
+			r.NotEmpty(id)
+
+			actual, err := r.repository.GetByID(r.ctx, ast.ID)
+			r.NoError(err)
+			r.Len(actual.Owners, len(newAsset.Owners))
+			r.Equal(r.users[1].ID, actual.Owners[0].ID)
+			r.Equal(r.users[2].ID, actual.Owners[1].ID)
+		})
+
+		r.Run("should create users from owners if owner emails do not exist yet", func() {
+			ast := asset.Asset{
+				URN:     uuid.NewString() + "urn-u-4a",
+				Name:    "urn-test",
+				Type:    "table",
+				Service: "bigquery",
+				Owners: []user.User{
+					stripUserID(r.users[1]),
+				},
+				Data: map[string]interface{}{
+					"entity": "gotocompany",
+				},
+				UpdatedBy: r.users[0],
+			}
+			newAsset := ast
+
+			id, err := r.repository.UpsertPatch(r.ctx, &ast, nil) // insert
+			r.Require().NoError(err)
+			r.NotEmpty(id)
+
+			patchData := make(map[string]interface{})
+			patchData["owners"] = []map[string]interface{}{
+				{
+					"id":       r.users[1].ID,
+					"email":    r.users[1].Email,
+					"provider": r.users[1].Provider,
+				},
+				{
+					"email": "newuser@example.com",
+				},
+			}
+
+			id, err = r.repository.UpsertPatch(r.ctx, &newAsset, patchData) // update
+			r.Require().NoError(err)
+			r.NotEmpty(id)
+
+			actual, err := r.repository.GetByID(r.ctx, ast.ID)
+			r.NoError(err)
+			r.Len(actual.Owners, len(newAsset.Owners))
+			r.NotEmpty(actual.Owners[0].ID)
+			r.Equal(r.users[1].ID, actual.Owners[0].ID)
+			r.NotEmpty(actual.Owners[1].ID)
+			r.Equal(newAsset.Owners[1].Email, actual.Owners[1].Email)
+		})
+	})
+}
+
+func (r *AssetRepositoryTestSuite) TestUpsertPatchRaceCondition() {
+	r.Run("TestUpsertPatchRaceCondition", func() {
+		ast := asset.Asset{
+			URN:     "urn-upsert-patch-race-condition",
+			Name:    "urn-test",
+			Type:    "table",
+			Service: "bigquery",
+			URL:     "https://sample-url-old.com",
+			Data: map[string]interface{}{
+				"entity": "gotocompany",
+			},
+			UpdatedBy: r.users[0],
+			Version:   "0.1",
+		}
+
+		id, err := r.repository.UpsertPatch(r.ctx, &ast, nil)
+		r.Require().NoError(err)
+		r.NotEmpty(id)
+
+		const numGoroutines = 10 // Number of concurrent upserts
+		var wg sync.WaitGroup
+		var mu sync.Mutex
+		results := make([]error, 0, numGoroutines)
+
+		// Concurrently upsert the object
+		for i := 0; i < numGoroutines; i++ {
+			wg.Add(1)
+			go func(index int) {
+				defer wg.Done()
+
+				localAst := ast
+				patchData := make(map[string]interface{})
+				patchData["data"] = map[string]interface{}{
+					"entity": fmt.Sprintf("entity-%d", index),
+				}
+				_, err := r.repository.UpsertPatch(context.Background(), &localAst, patchData)
 
 				mu.Lock()
 				results = append(results, err)
@@ -1310,26 +1813,28 @@ func (r *AssetRepositoryTestSuite) TestDeleteByID() {
 		}
 
 		var err error
-		upsertedAsset1, err := r.repository.Upsert(r.ctx, &asset1)
+		id, err := r.repository.Upsert(r.ctx, &asset1)
 		r.Require().NoError(err)
-		r.Require().NotEmpty(upsertedAsset1.ID)
+		r.Require().NotEmpty(id)
+		asset1.ID = id
 
-		upsertedAsset2, err := r.repository.Upsert(r.ctx, &asset2)
+		id, err = r.repository.Upsert(r.ctx, &asset2)
 		r.Require().NoError(err)
-		r.Require().NotEmpty(upsertedAsset2.ID)
+		r.Require().NotEmpty(id)
+		asset2.ID = id
 
-		err = r.repository.DeleteByID(r.ctx, upsertedAsset1.ID)
+		err = r.repository.DeleteByID(r.ctx, asset1.ID)
 		r.NoError(err)
 
-		_, err = r.repository.GetByID(r.ctx, upsertedAsset1.ID)
-		r.ErrorAs(err, &asset.NotFoundError{AssetID: upsertedAsset1.ID})
+		_, err = r.repository.GetByID(r.ctx, asset1.ID)
+		r.ErrorAs(err, &asset.NotFoundError{AssetID: asset1.ID})
 
-		asset2FromDB, err := r.repository.GetByID(r.ctx, upsertedAsset2.ID)
+		asset2FromDB, err := r.repository.GetByID(r.ctx, asset2.ID)
 		r.NoError(err)
-		r.Equal(upsertedAsset2.ID, asset2FromDB.ID)
+		r.Equal(asset2.ID, asset2FromDB.ID)
 
 		// cleanup
-		err = r.repository.DeleteByID(r.ctx, upsertedAsset2.ID)
+		err = r.repository.DeleteByID(r.ctx, asset2.ID)
 		r.NoError(err)
 	})
 }
