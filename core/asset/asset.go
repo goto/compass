@@ -20,8 +20,8 @@ type Repository interface {
 	GetByVersionWithID(ctx context.Context, id, version string) (Asset, error)
 	GetByVersionWithURN(ctx context.Context, urn, version string) (Asset, error)
 	GetTypes(ctx context.Context, flt Filter) (map[Type]int, error)
-	Upsert(ctx context.Context, ast *Asset) (Asset, error)
-	UpsertPatch(ctx context.Context, ast *Asset, patchData map[string]interface{}) (Asset, error)
+	Upsert(ctx context.Context, ast *Asset) (string, error)
+	UpsertPatch(ctx context.Context, ast *Asset, patchData map[string]interface{}) (string, error)
 	DeleteByID(ctx context.Context, id string) error
 	DeleteByURN(ctx context.Context, urn string) error
 	DeleteByQueryExpr(ctx context.Context, queryExpr queryexpr.ExprStr) ([]string, error)
