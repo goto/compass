@@ -668,6 +668,10 @@ func (r *AssetRepository) insert(ctx context.Context, tx *sqlx.Tx, ast *asset.As
 	var id string
 	err = tx.QueryRowContext(ctx, query, args...).Scan(&id)
 	if err != nil {
+		if strings.Contains(err.Error(), "assets_idx_urn") {
+			return "", asset.ErrURNExist
+		}
+
 		return "", fmt.Errorf("run insert query: %w", err)
 	}
 	ast.ID = id

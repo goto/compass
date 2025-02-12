@@ -2,6 +2,7 @@ package asset
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -107,6 +108,10 @@ func (s *Service) UpsertAssetWithoutLineage(ctx context.Context, ast *Asset) (st
 	ast.RefreshedAt = &currentTime
 
 	assetID, err := s.assetRepository.Upsert(ctx, ast)
+	// retry possibility due to race condition
+	if err != nil && errors.Is(err, ErrURNExist) {
+		assetID, err = s.assetRepository.Upsert(ctx, ast)
+	}
 	if err != nil {
 		return "", err
 	}
@@ -137,6 +142,10 @@ func (s *Service) UpsertPatchAssetWithoutLineage(ctx context.Context, ast *Asset
 	ast.RefreshedAt = &currentTime
 
 	assetID, err := s.assetRepository.UpsertPatch(ctx, ast, patchData)
+	// retry possibility due to race condition
+	if err != nil && errors.Is(err, ErrURNExist) {
+		assetID, err = s.assetRepository.UpsertPatch(ctx, ast, patchData)
+	}
 	if err != nil {
 		return "", err
 	}
