@@ -108,8 +108,8 @@ func (s *Service) UpsertAssetWithoutLineage(ctx context.Context, ast *Asset) (st
 	ast.RefreshedAt = &currentTime
 
 	assetID, err := s.assetRepository.Upsert(ctx, ast)
-	// retry possibility due to race condition
-	if err != nil && errors.Is(err, ErrURNExist) {
+	// retry due to race condition possibility on insert
+	if errors.Is(err, ErrURNExist) {
 		assetID, err = s.assetRepository.Upsert(ctx, ast)
 	}
 	if err != nil {
@@ -142,8 +142,8 @@ func (s *Service) UpsertPatchAssetWithoutLineage(ctx context.Context, ast *Asset
 	ast.RefreshedAt = &currentTime
 
 	assetID, err := s.assetRepository.UpsertPatch(ctx, ast, patchData)
-	// retry possibility due to race condition
-	if err != nil && errors.Is(err, ErrURNExist) {
+	// retry due to race condition possibility on insert
+	if errors.Is(err, ErrURNExist) {
 		assetID, err = s.assetRepository.UpsertPatch(ctx, ast, patchData)
 	}
 	if err != nil {
