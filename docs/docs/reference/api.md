@@ -7,7 +7,7 @@ Documentation of our Compass API with gRPC and gRPC-Gateway.
 
 [More about Compass](https://goto.github.io/compass/)
 
-## default
+## Assets
 
 ### /v1beta1/assets
 
@@ -180,6 +180,51 @@ Delete a single asset with given ID
 | 500 | Returned when theres is something wrong on the server side. | [Status](#status) |
 | default | An unexpected error response. | [Status](#status) |
 
+### /v1beta1/assets/delete-by-query
+##### Summary
+
+Delete assets by [query expression](https://expr-lang.org/).
+
+##### Description
+
+Delete all assets that match the given [query expression](https://expr-lang.org/). 
+The query expr at least must consist `refreshed_at`, `type`, and `service` identifiers. 
+`type` and `service` identifiers valid only if it's using equals (`==`) or `IN` operator, to prevent human error on deleting assets.
+For example of the correct query:
+```
+refreshed_at <= "2023-12-12 23:59:59" && service in ["service-1", "service-2"] && type == "table"
+```
+```
+refreshed_at <= (now() - duration('24h') && service == "service-1" && (type == "table" || data.foo != "bar")
+```
+
+The idea of query expr converter is convert `query_expr` to AST (Abstract Syntax Tree), then make it as SQL Query and Elasticsearch Query so can used as filter query on deletion process.
+Currently, the expr query **already support most of the frequently used cases, except** ChainNode, SliceNode, CallNode, ClosureNode, PointerNode, VariableDeclaratorNode, MapNode, and PairNode.
+For more contexts, please refer to [AST Node](https://github.com/expr-lang/expr/blob/master/ast/node.go) in expr-lang library and [Query Expr Converter](https://github.com/goto/compass/tree/main/pkg/query_expr) in Compass.
+Example of **unsupported query for now** due to not directly produce a value is
+```
+service in filter(assets, .Service startsWith "T")
+```
+
+Complex query covered only if it directly produces a value, like `bool_identifier == !(findLast([1, 2, 3, 4], # > 2) == 4)` will produce `bool_identifier == false`. 
+However, **please do the best practice that try to simplify the query first** to makes readable and prevent unwanted things like errors or false positive result. Like example before, please write `false` instead of `!(findLast([1, 2, 3, 4], # > 2) == 4)`. You can use [expr-lang playground](https://expr-lang.org/playground) to simplify the query expr.
+
+
+##### Parameters
+
+| Name       | Located in | Description                                                                                                                                                                                                                                                   | Required | Schema |
+|------------|------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------| ------ |
+| query_expr | body       | query expression based on [expr-lang](https://expr-lang.org/) to filtering the assets that wants to be deleted. `refreshed_at`, `type`, and `service` identifiers must exist in the query. The `type` and `service` must using equals (`==`) or `IN` operator | Yes      | string |
+| dry_run    | body       | (default: false) if set to true, deletion will not be executed but the number of rows matching the query is returned. Else, will perform deletion in the background (default)                                                                                 | No       | string |
+
+##### Responses
+
+| Code | Description | Schema                                        |
+| ---- | ----------- |-----------------------------------------------|
+| 200 | A successful response. | [DeleteAssetsResponse](#deleteassetsresponse) |
+| 400 | Returned when the data that user input is wrong. | [Status](#status)                           |
+| 500 | Returned when theres is something wrong on the server side. | [Status](#status)                             |
+| default | An unexpected error response. | [Status](#status)                             |
 ### /v1beta1/assets/{id}/stargazers
 
 #### GET
@@ -1579,6 +1624,13 @@ Request to be sent to create a tag's template
 | Name | Type | Description | Required |
 | ---- | ---- | ----------- | -------- |
 | DeleteAssetResponse | object |  |  |
+
+#### DeleteAssetsResponse
+
+| Name          | Type    | Description                                         |
+|---------------|---------|-----------------------------------------------------|
+| affected_rows | integer | the numbers of assets that match the given query |
+
 
 #### DeleteCommentResponse
 
