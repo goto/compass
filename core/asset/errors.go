@@ -13,6 +13,7 @@ var (
 	ErrEmptyQuery  = errors.New("query is empty")
 	ErrUnknownType = errors.New("unknown type")
 	ErrNilAsset    = errors.New("nil asset")
+	ErrURNExist    = errors.New("urn asset is already exist")
 )
 
 type NotFoundError struct {

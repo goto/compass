@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/stretchr/testify/assert"
 	"os"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -60,7 +62,7 @@ func (r *AssetRepositoryTestSuite) SetupSuite() {
 
 func (r *AssetRepositoryTestSuite) createUsers(userRepo user.Repository) []user.User {
 	var err error
-	users := []user.User{}
+	var users []user.User
 
 	user1 := user.User{Email: "user-test-1@gotocompany.com", Provider: defaultProviderName}
 	user1.ID, err = userRepo.Create(r.ctx, &user1)
@@ -85,7 +87,7 @@ func (r *AssetRepositoryTestSuite) createUsers(userRepo user.Repository) []user.
 	return users
 }
 
-func (r *AssetRepositoryTestSuite) BeforeTest(suiteName, testName string) {
+func (r *AssetRepositoryTestSuite) BeforeTest(_, _ string) {
 	err := testutils.RunMigrationsWithClient(r.T(), r.client)
 	r.NoError(err)
 
@@ -259,7 +261,7 @@ func (r *AssetRepositoryTestSuite) TestGetAll() {
 
 	r.Run("should filter using type", func() {
 		results, err := r.repository.GetAll(r.ctx, asset.Filter{
-			Types:         []asset.Type{asset.Type("table")},
+			Types:         []asset.Type{"table"},
 			SortBy:        "urn",
 			SortDirection: "desc",
 		})
@@ -585,9 +587,9 @@ func (r *AssetRepositoryTestSuite) TestGetByID() {
 	})
 
 	r.Run("return NotFoundError if asset does not exist", func() {
-		uuid := "2aabb450-f986-44e2-a6db-7996861d5004"
-		_, err := r.repository.GetByID(r.ctx, uuid)
-		r.ErrorAs(err, &asset.NotFoundError{AssetID: uuid})
+		uuidTest := "2aabb450-f986-44e2-a6db-7996861d5004"
+		_, err := r.repository.GetByID(r.ctx, uuidTest)
+		r.ErrorAs(err, &asset.NotFoundError{AssetID: uuidTest})
 	})
 
 	r.Run("return correct asset from db", func() {
@@ -990,7 +992,7 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 	r.Run("on insert", func() {
 		r.Run("set ID to asset and version to base version", func() {
 			ast := asset.Asset{
-				URN:         "urn-u-1",
+				URN:         uuid.NewString() + "urn-u-1",
 				Type:        "table",
 				Service:     "bigquery",
 				URL:         "https://sample-url.com",
@@ -1012,7 +1014,7 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 			r.assertAsset(&ast, &assetInDB)
 
 			ast2 := ast
-			ast2.RefreshedAt = &refreshedAtTime
+			ast2.RefreshedAt = nil
 			ast2.Description = "create a new version" // to force fetch from asset_versions.
 			_, err = r.repository.Upsert(r.ctx, &ast2)
 			r.NoError(err)
@@ -1024,7 +1026,7 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 
 		r.Run("should store owners if any", func() {
 			ast := asset.Asset{
-				URN:     "urn-u-3",
+				URN:     uuid.NewString() + "urn-u-3",
 				Type:    "table",
 				Service: "bigquery",
 				Owners: []user.User{
@@ -1050,7 +1052,7 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 
 		r.Run("should create owners as users if they do not exist yet", func() {
 			ast := asset.Asset{
-				URN:     "urn-u-3a",
+				URN:     uuid.NewString() + "urn-u-3a",
 				Type:    "table",
 				Service: "bigquery",
 				Owners: []user.User{
@@ -1076,7 +1078,7 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 	r.Run("on update", func() {
 		r.Run("should not create nor updating the asset if asset is identical", func() {
 			ast := asset.Asset{
-				URN:         "urn-u-2",
+				URN:         uuid.NewString() + "urn-u-2",
 				Type:        "table",
 				Service:     "bigquery",
 				UpdatedBy:   r.users[0],
@@ -1102,7 +1104,7 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 		r.Run("should same asset version if asset only has different at RefreshedAt", func() {
 			oneDayAgoRefreshedAtTime := refreshedAtTime.AddDate(0, 0, -1)
 			ast := asset.Asset{
-				URN:         "urn-u-2",
+				URN:         uuid.NewString() + "urn-u-2",
 				Type:        "table",
 				Service:     "bigquery",
 				URL:         "https://sample-url-old.com",
@@ -1135,7 +1137,7 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 
 		r.Run("should update the asset version if asset is not identical", func() {
 			ast := asset.Asset{
-				URN:       "urn-u-2",
+				URN:       uuid.NewString() + "urn-u-2",
 				Type:      "table",
 				Service:   "bigquery",
 				URL:       "https://sample-url-old.com",
@@ -1167,7 +1169,7 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 
 		r.Run("should delete old owners if it does not exist on new asset", func() {
 			ast := asset.Asset{
-				URN:     "urn-u-4",
+				URN:     uuid.NewString() + "urn-u-4",
 				Type:    "table",
 				Service: "bigquery",
 				Owners: []user.User{
@@ -1199,7 +1201,7 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 
 		r.Run("should create new owners if it does not exist on old asset", func() {
 			ast := asset.Asset{
-				URN:     "urn-u-4",
+				URN:     uuid.NewString() + "urn-u-4",
 				Type:    "table",
 				Service: "bigquery",
 				Owners: []user.User{
@@ -1232,7 +1234,7 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 
 		r.Run("should create users from owners if owner emails do not exist yet", func() {
 			ast := asset.Asset{
-				URN:     "urn-u-4a",
+				URN:     uuid.NewString() + "urn-u-4a",
 				Type:    "table",
 				Service: "bigquery",
 				Owners: []user.User{
@@ -1267,6 +1269,521 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 	})
 }
 
+func (r *AssetRepositoryTestSuite) TestUpsertRaceCondition() {
+	r.Run("TestUpsertRaceCondition", func() {
+		ast := asset.Asset{
+			URN:       "urn-upsert-race-condition",
+			Type:      "table",
+			Service:   "bigquery",
+			URL:       "https://sample-url-old.com",
+			UpdatedBy: r.users[0],
+			Version:   "0.1",
+		}
+
+		id, err := r.repository.Upsert(r.ctx, &ast)
+		r.Require().NoError(err)
+		r.NotEmpty(id)
+
+		const numGoroutines = 10 // Number of concurrent upserts
+		var wg sync.WaitGroup
+		var mu sync.Mutex
+		results := make([]error, 0, numGoroutines)
+
+		// Concurrently upsert the object
+		for i := 0; i < numGoroutines; i++ {
+			wg.Add(1)
+			go func(index int) {
+				defer wg.Done()
+
+				localAst := ast
+				localAst.URL = fmt.Sprintf("https://sample-url-%d.com", index)
+				_, err := r.repository.Upsert(context.Background(), &localAst)
+
+				mu.Lock()
+				results = append(results, err)
+				mu.Unlock()
+			}(i)
+		}
+
+		wg.Wait()
+
+		// Check for errors
+		for _, err := range results {
+			assert.NoError(r.T(), err, "Upsert should not fail under race conditions")
+		}
+	})
+}
+
+func (r *AssetRepositoryTestSuite) TestUpsertPatch() {
+	refreshedAtTime := time.Date(2024, time.August, 20, 8, 19, 49, 0, time.UTC)
+	r.Run("on insert", func() {
+		r.Run("should do nothing for patch data on insert action", func() {
+			ast := asset.Asset{
+				URN:     "urn-i-0",
+				Name:    "urn-test",
+				Type:    "table",
+				Service: "bigquery",
+				Owners: []user.User{
+					r.users[1],
+				},
+				Data: map[string]interface{}{
+					"entity": "gojek",
+				},
+				UpdatedBy: r.users[0],
+			}
+
+			patchData := make(map[string]interface{})
+			patchData["data"] = map[string]interface{}{
+				"entity": "gotocompany",
+			}
+
+			id, err := r.repository.UpsertPatch(r.ctx, &ast, patchData)
+			r.Require().NoError(err)
+			r.NotEmpty(id)
+
+			actual, err := r.repository.GetByID(r.ctx, id)
+			r.NoError(err)
+			r.NotEqual(actual.Data["entity"], "gotocompany")
+			r.Equal(actual.Data["entity"], "gojek")
+		})
+
+		r.Run("set ID to asset and version to base version", func() {
+			ast := asset.Asset{
+				URN:     "urn-i-1",
+				Name:    "urn-test",
+				Type:    "table",
+				Service: "bigquery",
+				URL:     "https://sample-url.com",
+				Data: map[string]interface{}{
+					"entity": "gojek",
+				},
+				UpdatedBy:   r.users[0],
+				RefreshedAt: &refreshedAtTime,
+			}
+
+			id, err := r.repository.UpsertPatch(r.ctx, &ast, nil)
+			r.Equal(asset.BaseVersion, ast.Version)
+			r.NoError(err)
+			r.NotEmpty(id)
+			r.NotEmpty(ast.CreatedAt)
+			r.NotEmpty(ast.UpdatedAt)
+			ast.ID = id
+
+			assetInDB, err := r.repository.GetByID(r.ctx, ast.ID)
+			r.Require().NoError(err)
+			r.NotEqual(time.Time{}, assetInDB.CreatedAt)
+			r.NotEqual(time.Time{}, assetInDB.UpdatedAt)
+			r.assertAsset(&ast, &assetInDB)
+
+			ast2 := ast
+			ast2.RefreshedAt = nil
+			ast2.Description = "create a new version" // to force fetch from asset_versions.
+			_, err = r.repository.UpsertPatch(r.ctx, &ast2, nil)
+			r.NoError(err)
+			r.Greater(ast2.UpdatedAt.UnixNano(), ast.UpdatedAt.UnixNano())
+			assetv1, err := r.repository.GetByVersionWithID(r.ctx, ast.ID, asset.BaseVersion)
+			r.NoError(err)
+			r.Equal("0.1", assetv1.Version)
+		})
+
+		r.Run("should store owners if any", func() {
+			ast := asset.Asset{
+				URN:     "urn-i-3",
+				Name:    "urn-test",
+				Type:    "table",
+				Service: "bigquery",
+				Owners: []user.User{
+					r.users[1],
+					{Email: r.users[2].Email},
+					{ID: r.users[1].ID}, // should get deduplicated by ID
+				},
+				Data: map[string]interface{}{
+					"entity": "gojek",
+				},
+				UpdatedBy: r.users[0],
+			}
+
+			id, err := r.repository.UpsertPatch(r.ctx, &ast, nil)
+			r.Require().NoError(err)
+			r.Require().NotEmpty(id)
+			ast.ID = id
+
+			actual, err := r.repository.GetByID(r.ctx, ast.ID)
+			r.NoError(err)
+
+			r.Len(actual.Owners, 2)
+			r.Equal(r.users[1].ID, actual.Owners[0].ID)
+			r.Equal(r.users[2].ID, actual.Owners[1].ID)
+		})
+
+		r.Run("should create owners as users if they do not exist yet", func() {
+			ast := asset.Asset{
+				URN:     "urn-i-patch-insert-create-owner",
+				Name:    "urn-test",
+				Type:    "table",
+				Service: "bigquery",
+				Owners: []user.User{
+					{Email: "newuserpatch@example.com"},
+					{Email: "newuserpatch2@example.com"},
+					{Email: "newuserpatch@example.com"}, // should get deduplicated by ID on fetch user by email
+				},
+				Data: map[string]interface{}{
+					"entity": "gojek",
+				},
+				UpdatedBy: r.users[0],
+			}
+
+			id, err := r.repository.UpsertPatch(r.ctx, &ast, nil)
+			r.Require().NoError(err)
+			r.NotEmpty(id)
+
+			actual, err := r.repository.GetByID(r.ctx, id)
+			r.NoError(err)
+
+			r.Len(actual.Owners, 2)
+			r.Equal(ast.Owners[0].Email, actual.Owners[0].Email)
+		})
+	})
+
+	r.Run("on update", func() {
+		r.Run("should not create nor updating the asset if asset is identical", func() {
+			ast := asset.Asset{
+				URN:     uuid.NewString() + "urn-u-2",
+				Name:    "urn-test",
+				Type:    "table",
+				Service: "bigquery",
+				Data: map[string]interface{}{
+					"entity": "gotocompany",
+				},
+				UpdatedBy:   r.users[0],
+				RefreshedAt: &refreshedAtTime,
+				Version:     "0.1",
+			}
+			identicalAsset := ast
+
+			id, err := r.repository.UpsertPatch(r.ctx, &ast, nil) // insert
+			r.Require().NoError(err)
+			r.NotEmpty(id)
+			ast.ID = id
+
+			patchData := make(map[string]interface{})
+			patchData["data"] = map[string]interface{}{
+				"entity": "gotocompany",
+			}
+
+			id, err = r.repository.UpsertPatch(r.ctx, &identicalAsset, patchData) // update
+			r.Require().NoError(err)
+			r.NotEmpty(id)
+			identicalAsset.ID = id
+
+			r.Equal(ast.ID, identicalAsset.ID)
+			r.Equal(ast.Version, identicalAsset.Version)
+			r.Equal(identicalAsset.Data["entity"], "gotocompany")
+		})
+
+		r.Run("should same asset version if asset only has different at RefreshedAt", func() {
+			oneDayAgoRefreshedAtTime := refreshedAtTime.AddDate(0, 0, -1)
+			ast := asset.Asset{
+				URN:     uuid.NewString() + "urn-u-2",
+				Name:    "urn-test",
+				Type:    "table",
+				Service: "bigquery",
+				URL:     "https://sample-url-old.com",
+				Data: map[string]interface{}{
+					"entity": "gotocompany",
+				},
+				UpdatedBy:   r.users[0],
+				RefreshedAt: &oneDayAgoRefreshedAtTime,
+				Version:     "0.1",
+			}
+
+			id, err := r.repository.UpsertPatch(r.ctx, &ast, nil) // insert
+			r.Require().NoError(err)
+			r.NotEmpty(id)
+			ast.ID = id
+
+			updated := ast
+			updated.RefreshedAt = &refreshedAtTime
+			patchData := make(map[string]interface{})
+			patchData["data"] = map[string]interface{}{
+				"entity": "gotocompany",
+			}
+
+			id, err = r.repository.UpsertPatch(r.ctx, &updated, patchData) // update
+			r.Require().NoError(err)
+			r.NotEmpty(id)
+			updated.ID = id
+
+			r.Equal(ast.ID, updated.ID)
+
+			actual, err := r.repository.GetByID(r.ctx, ast.ID)
+			r.NoError(err)
+
+			r.Equal(updated.RefreshedAt, actual.RefreshedAt)
+			r.Equal(ast.Version, actual.Version)
+			r.Equal(actual.Data["entity"], "gotocompany")
+		})
+
+		r.Run("should update the asset version if asset is not identical", func() {
+			ast := asset.Asset{
+				URN:     uuid.NewString() + "urn-u-2",
+				Name:    "urn-test",
+				Type:    "table",
+				Service: "bigquery",
+				URL:     "https://sample-url-old.com",
+				Data: map[string]interface{}{
+					"entity": "gotocompany",
+				},
+				UpdatedBy: r.users[0],
+				Version:   "0.1",
+			}
+
+			id, err := r.repository.UpsertPatch(r.ctx, &ast, nil) // insert
+			r.Require().NoError(err)
+			r.NotEmpty(id)
+			ast.ID = id
+
+			updated := ast
+			patchData := make(map[string]interface{})
+			patchData["url"] = "https://sample-url.com"
+
+			id, err = r.repository.UpsertPatch(r.ctx, &updated, patchData) // update
+			r.Require().NoError(err)
+			r.NotEmpty(id)
+			updated.ID = id
+
+			r.Equal(ast.ID, updated.ID)
+
+			actual, err := r.repository.GetByID(r.ctx, ast.ID)
+			r.NoError(err)
+
+			r.Equal(updated.URL, actual.URL)
+			r.NotEqual(ast.Version, actual.Version)
+		})
+
+		r.Run("should keep old data if it does not exist on new asset", func() {
+			ast := asset.Asset{
+				URN:     uuid.NewString() + "urn-u-4",
+				Name:    "urn-test",
+				Type:    "table",
+				Service: "bigquery",
+				Owners: []user.User{
+					stripUserID(r.users[1]),
+				},
+				Data: map[string]interface{}{
+					"entity": "gotocompany",
+				},
+				UpdatedBy: r.users[0],
+			}
+			newAsset := ast
+			newAsset.Owners = []user.User{
+				stripUserID(r.users[2]),
+			}
+
+			id, err := r.repository.UpsertPatch(r.ctx, &ast, nil) // insert
+			r.Require().NoError(err)
+			r.NotEmpty(id)
+
+			patchData := make(map[string]interface{})
+			patchData["data"] = map[string]interface{}{
+				"another": "things",
+			}
+
+			id, err = r.repository.UpsertPatch(r.ctx, &newAsset, patchData) // update
+			r.Require().NoError(err)
+			r.NotEmpty(id)
+
+			actual, err := r.repository.GetByID(r.ctx, ast.ID)
+			r.NoError(err)
+			r.Len(actual.Data, 2)
+			r.Equal(actual.Data["entity"], "gotocompany")
+			r.Equal(actual.Data["another"], "things")
+		})
+
+		r.Run("should delete old owners if it does not exist on new patch", func() {
+			ast := asset.Asset{
+				URN:     uuid.NewString() + "urn-u-4",
+				Name:    "urn-test",
+				Type:    "table",
+				Service: "bigquery",
+				Owners: []user.User{
+					stripUserID(r.users[1]),
+				},
+				Data: map[string]interface{}{
+					"entity": "gotocompany",
+				},
+				UpdatedBy: r.users[0],
+			}
+			newAsset := ast
+
+			id, err := r.repository.UpsertPatch(r.ctx, &ast, nil)
+			r.Require().NoError(err)
+			r.NotEmpty(id)
+			ast.ID = id
+
+			patchData := make(map[string]interface{})
+			patchData["owners"] = []map[string]interface{}{
+				{
+					"id":       r.users[2].ID,
+					"email":    r.users[2].Email,
+					"provider": r.users[2].Provider,
+				},
+			}
+
+			id, err = r.repository.UpsertPatch(r.ctx, &newAsset, patchData)
+			r.Require().NoError(err)
+			r.NotEmpty(id)
+
+			actual, err := r.repository.GetByID(r.ctx, ast.ID)
+			r.NoError(err)
+			r.Len(actual.Owners, len(newAsset.Owners))
+			r.Equal(r.users[2].ID, actual.Owners[0].ID)
+		})
+
+		r.Run("should create new owners if it does not exist on old asset", func() {
+			ast := asset.Asset{
+				URN:     uuid.NewString() + "urn-u-4",
+				Name:    "urn-test",
+				Type:    "table",
+				Service: "bigquery",
+				Owners: []user.User{
+					stripUserID(r.users[1]),
+				},
+				Data: map[string]interface{}{
+					"entity": "gotocompany",
+				},
+				UpdatedBy: r.users[0],
+			}
+			newAsset := ast
+
+			id, err := r.repository.UpsertPatch(r.ctx, &ast, nil)
+			r.Require().NoError(err)
+			r.NotEmpty(id)
+
+			patchData := make(map[string]interface{})
+			patchData["owners"] = []map[string]interface{}{
+				{
+					"id":       r.users[1].ID,
+					"email":    r.users[1].Email,
+					"provider": r.users[1].Provider,
+				},
+				{
+					"id":       r.users[2].ID,
+					"email":    r.users[2].Email,
+					"provider": r.users[2].Provider,
+				},
+			}
+
+			id, err = r.repository.UpsertPatch(r.ctx, &newAsset, patchData)
+			r.Require().NoError(err)
+			r.NotEmpty(id)
+
+			actual, err := r.repository.GetByID(r.ctx, ast.ID)
+			r.NoError(err)
+			r.Len(actual.Owners, len(newAsset.Owners))
+			r.Equal(r.users[1].ID, actual.Owners[0].ID)
+			r.Equal(r.users[2].ID, actual.Owners[1].ID)
+		})
+
+		r.Run("should create users from owners if owner emails do not exist yet", func() {
+			ast := asset.Asset{
+				URN:     uuid.NewString() + "urn-u-4a",
+				Name:    "urn-test",
+				Type:    "table",
+				Service: "bigquery",
+				Owners: []user.User{
+					stripUserID(r.users[1]),
+				},
+				Data: map[string]interface{}{
+					"entity": "gotocompany",
+				},
+				UpdatedBy: r.users[0],
+			}
+			newAsset := ast
+
+			id, err := r.repository.UpsertPatch(r.ctx, &ast, nil) // insert
+			r.Require().NoError(err)
+			r.NotEmpty(id)
+
+			patchData := make(map[string]interface{})
+			patchData["owners"] = []map[string]interface{}{
+				{
+					"id":       r.users[1].ID,
+					"email":    r.users[1].Email,
+					"provider": r.users[1].Provider,
+				},
+				{
+					"email": "newuser@example.com",
+				},
+			}
+
+			id, err = r.repository.UpsertPatch(r.ctx, &newAsset, patchData) // update
+			r.Require().NoError(err)
+			r.NotEmpty(id)
+
+			actual, err := r.repository.GetByID(r.ctx, ast.ID)
+			r.NoError(err)
+			r.Len(actual.Owners, len(newAsset.Owners))
+			r.NotEmpty(actual.Owners[0].ID)
+			r.Equal(r.users[1].ID, actual.Owners[0].ID)
+			r.NotEmpty(actual.Owners[1].ID)
+			r.Equal(newAsset.Owners[1].Email, actual.Owners[1].Email)
+		})
+	})
+}
+
+func (r *AssetRepositoryTestSuite) TestUpsertPatchRaceCondition() {
+	r.Run("TestUpsertPatchRaceCondition", func() {
+		ast := asset.Asset{
+			URN:     "urn-upsert-patch-race-condition",
+			Name:    "urn-test",
+			Type:    "table",
+			Service: "bigquery",
+			URL:     "https://sample-url-old.com",
+			Data: map[string]interface{}{
+				"entity": "gotocompany",
+			},
+			UpdatedBy: r.users[0],
+			Version:   "0.1",
+		}
+
+		id, err := r.repository.UpsertPatch(r.ctx, &ast, nil)
+		r.Require().NoError(err)
+		r.NotEmpty(id)
+
+		const numGoroutines = 10 // Number of concurrent upserts
+		var wg sync.WaitGroup
+		var mu sync.Mutex
+		results := make([]error, 0, numGoroutines)
+
+		// Concurrently upsert the object
+		for i := 0; i < numGoroutines; i++ {
+			wg.Add(1)
+			go func(index int) {
+				defer wg.Done()
+
+				localAst := ast
+				patchData := make(map[string]interface{})
+				patchData["data"] = map[string]interface{}{
+					"entity": fmt.Sprintf("entity-%d", index),
+				}
+				_, err := r.repository.UpsertPatch(context.Background(), &localAst, patchData)
+
+				mu.Lock()
+				results = append(results, err)
+				mu.Unlock()
+			}(i)
+		}
+
+		wg.Wait()
+
+		// Check for errors
+		for _, err := range results {
+			assert.NoError(r.T(), err, "Upsert should not fail under race conditions")
+		}
+	})
+}
+
 func (r *AssetRepositoryTestSuite) TestDeleteByID() {
 	r.Run("return error from client if any", func() {
 		err := r.repository.DeleteByID(r.ctx, "invalid-uuid")
@@ -1275,9 +1792,9 @@ func (r *AssetRepositoryTestSuite) TestDeleteByID() {
 	})
 
 	r.Run("return NotFoundError if asset does not exist", func() {
-		uuid := "2aabb450-f986-44e2-a6db-7996861d5004"
-		err := r.repository.DeleteByID(r.ctx, uuid)
-		r.ErrorAs(err, &asset.NotFoundError{AssetID: uuid})
+		uuidTest := "2aabb450-f986-44e2-a6db-7996861d5004"
+		err := r.repository.DeleteByID(r.ctx, uuidTest)
+		r.ErrorAs(err, &asset.NotFoundError{AssetID: uuidTest})
 	})
 
 	r.Run("should delete correct asset", func() {

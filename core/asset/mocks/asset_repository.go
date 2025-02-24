@@ -859,6 +859,60 @@ func (_c *AssetRepository_Upsert_Call) RunAndReturn(run func(context.Context, *a
 	return _c
 }
 
+// UpsertPatch provides a mock function with given fields: ctx, ast, patchData
+func (_m *AssetRepository) UpsertPatch(ctx context.Context, ast *asset.Asset, patchData map[string]interface{}) (string, error) {
+	ret := _m.Called(ctx, ast, patchData)
+
+	var r0 string
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *asset.Asset, map[string]interface{}) (string, error)); ok {
+		return rf(ctx, ast, patchData)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *asset.Asset, map[string]interface{}) string); ok {
+		r0 = rf(ctx, ast, patchData)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *asset.Asset, map[string]interface{}) error); ok {
+		r1 = rf(ctx, ast, patchData)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// AssetRepository_UpsertPatch_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpsertPatch'
+type AssetRepository_UpsertPatch_Call struct {
+	*mock.Call
+}
+
+// UpsertPatch is a helper method to define mock.On call
+//   - ctx context.Context
+//   - ast *asset.Asset
+//   - patchData map[string]interface{}
+func (_e *AssetRepository_Expecter) UpsertPatch(ctx interface{}, ast interface{}, patchData interface{}) *AssetRepository_UpsertPatch_Call {
+	return &AssetRepository_UpsertPatch_Call{Call: _e.mock.On("UpsertPatch", ctx, ast, patchData)}
+}
+
+func (_c *AssetRepository_UpsertPatch_Call) Run(run func(ctx context.Context, ast *asset.Asset, patchData map[string]interface{})) *AssetRepository_UpsertPatch_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*asset.Asset), args[2].(map[string]interface{}))
+	})
+	return _c
+}
+
+func (_c *AssetRepository_UpsertPatch_Call) Return(_a0 string, _a1 error) *AssetRepository_UpsertPatch_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *AssetRepository_UpsertPatch_Call) RunAndReturn(run func(context.Context, *asset.Asset, map[string]interface{}) (string, error)) *AssetRepository_UpsertPatch_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 type mockConstructorTestingTNewAssetRepository interface {
 	mock.TestingT
 	Cleanup(func())

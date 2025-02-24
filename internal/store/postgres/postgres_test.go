@@ -15,7 +15,6 @@ import (
 )
 
 const (
-	logLevelDebug       = "debug"
 	defaultProviderName = "shield"
 	defaultGetMaxSize   = 7
 )
@@ -54,8 +53,8 @@ func newTestClient(t *testing.T, logger log.Logger) (*postgres.Client, error) {
 
 // helper functions
 func createUser(userRepo user.Repository, email string) (string, error) {
-	user := getUser(email)
-	id, err := userRepo.Create(context.Background(), user)
+	userTest := getUser(email)
+	id, err := userRepo.Create(context.Background(), userTest)
 	if err != nil {
 		return "", err
 	}

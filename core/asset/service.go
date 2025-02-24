@@ -2,6 +2,7 @@ package asset
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -107,6 +108,44 @@ func (s *Service) UpsertAssetWithoutLineage(ctx context.Context, ast *Asset) (st
 	ast.RefreshedAt = &currentTime
 
 	assetID, err := s.assetRepository.Upsert(ctx, ast)
+	// retry due to race condition possibility on insert
+	if errors.Is(err, ErrURNExist) {
+		assetID, err = s.assetRepository.Upsert(ctx, ast)
+	}
+	if err != nil {
+		return "", err
+	}
+
+	ast.ID = assetID
+	if err := s.worker.EnqueueIndexAssetJob(ctx, *ast); err != nil {
+		return "", err
+	}
+
+	return assetID, nil
+}
+
+func (s *Service) UpsertPatchAsset(ctx context.Context, ast *Asset, upstreams, downstreams []string, patchData map[string]interface{}) (string, error) {
+	assetID, err := s.UpsertPatchAssetWithoutLineage(ctx, ast, patchData)
+	if err != nil {
+		return "", err
+	}
+
+	if err := s.lineageRepository.Upsert(ctx, ast.URN, upstreams, downstreams); err != nil {
+		return "", err
+	}
+
+	return assetID, nil
+}
+
+func (s *Service) UpsertPatchAssetWithoutLineage(ctx context.Context, ast *Asset, patchData map[string]interface{}) (string, error) {
+	currentTime := time.Now()
+	ast.RefreshedAt = &currentTime
+
+	assetID, err := s.assetRepository.UpsertPatch(ctx, ast, patchData)
+	// retry due to race condition possibility on insert
+	if errors.Is(err, ErrURNExist) {
+		assetID, err = s.assetRepository.UpsertPatch(ctx, ast, patchData)
+	}
 	if err != nil {
 		return "", err
 	}

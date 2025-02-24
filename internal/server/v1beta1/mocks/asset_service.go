@@ -867,6 +867,116 @@ func (_c *AssetService_UpsertAssetWithoutLineage_Call) RunAndReturn(run func(con
 	return _c
 }
 
+// UpsertPatchAsset provides a mock function with given fields: ctx, ast, upstreams, downstreams, patchData
+func (_m *AssetService) UpsertPatchAsset(ctx context.Context, ast *asset.Asset, upstreams []string, downstreams []string, patchData map[string]interface{}) (string, error) {
+	ret := _m.Called(ctx, ast, upstreams, downstreams, patchData)
+
+	var r0 string
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *asset.Asset, []string, []string, map[string]interface{}) (string, error)); ok {
+		return rf(ctx, ast, upstreams, downstreams, patchData)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *asset.Asset, []string, []string, map[string]interface{}) string); ok {
+		r0 = rf(ctx, ast, upstreams, downstreams, patchData)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *asset.Asset, []string, []string, map[string]interface{}) error); ok {
+		r1 = rf(ctx, ast, upstreams, downstreams, patchData)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// AssetService_UpsertPatchAsset_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpsertPatchAsset'
+type AssetService_UpsertPatchAsset_Call struct {
+	*mock.Call
+}
+
+// UpsertPatchAsset is a helper method to define mock.On call
+//   - ctx context.Context
+//   - ast *asset.Asset
+//   - upstreams []string
+//   - downstreams []string
+//   - patchData map[string]interface{}
+func (_e *AssetService_Expecter) UpsertPatchAsset(ctx interface{}, ast interface{}, upstreams interface{}, downstreams interface{}, patchData interface{}) *AssetService_UpsertPatchAsset_Call {
+	return &AssetService_UpsertPatchAsset_Call{Call: _e.mock.On("UpsertPatchAsset", ctx, ast, upstreams, downstreams, patchData)}
+}
+
+func (_c *AssetService_UpsertPatchAsset_Call) Run(run func(ctx context.Context, ast *asset.Asset, upstreams []string, downstreams []string, patchData map[string]interface{})) *AssetService_UpsertPatchAsset_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*asset.Asset), args[2].([]string), args[3].([]string), args[4].(map[string]interface{}))
+	})
+	return _c
+}
+
+func (_c *AssetService_UpsertPatchAsset_Call) Return(_a0 string, _a1 error) *AssetService_UpsertPatchAsset_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *AssetService_UpsertPatchAsset_Call) RunAndReturn(run func(context.Context, *asset.Asset, []string, []string, map[string]interface{}) (string, error)) *AssetService_UpsertPatchAsset_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// UpsertPatchAssetWithoutLineage provides a mock function with given fields: ctx, ast, patchData
+func (_m *AssetService) UpsertPatchAssetWithoutLineage(ctx context.Context, ast *asset.Asset, patchData map[string]interface{}) (string, error) {
+	ret := _m.Called(ctx, ast, patchData)
+
+	var r0 string
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, *asset.Asset, map[string]interface{}) (string, error)); ok {
+		return rf(ctx, ast, patchData)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, *asset.Asset, map[string]interface{}) string); ok {
+		r0 = rf(ctx, ast, patchData)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, *asset.Asset, map[string]interface{}) error); ok {
+		r1 = rf(ctx, ast, patchData)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// AssetService_UpsertPatchAssetWithoutLineage_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'UpsertPatchAssetWithoutLineage'
+type AssetService_UpsertPatchAssetWithoutLineage_Call struct {
+	*mock.Call
+}
+
+// UpsertPatchAssetWithoutLineage is a helper method to define mock.On call
+//   - ctx context.Context
+//   - ast *asset.Asset
+//   - patchData map[string]interface{}
+func (_e *AssetService_Expecter) UpsertPatchAssetWithoutLineage(ctx interface{}, ast interface{}, patchData interface{}) *AssetService_UpsertPatchAssetWithoutLineage_Call {
+	return &AssetService_UpsertPatchAssetWithoutLineage_Call{Call: _e.mock.On("UpsertPatchAssetWithoutLineage", ctx, ast, patchData)}
+}
+
+func (_c *AssetService_UpsertPatchAssetWithoutLineage_Call) Run(run func(ctx context.Context, ast *asset.Asset, patchData map[string]interface{})) *AssetService_UpsertPatchAssetWithoutLineage_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(*asset.Asset), args[2].(map[string]interface{}))
+	})
+	return _c
+}
+
+func (_c *AssetService_UpsertPatchAssetWithoutLineage_Call) Return(_a0 string, _a1 error) *AssetService_UpsertPatchAssetWithoutLineage_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *AssetService_UpsertPatchAssetWithoutLineage_Call) RunAndReturn(run func(context.Context, *asset.Asset, map[string]interface{}) (string, error)) *AssetService_UpsertPatchAssetWithoutLineage_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 type mockConstructorTestingTNewAssetService interface {
 	mock.TestingT
 	Cleanup(func())
