@@ -405,6 +405,7 @@ func (r *AssetRepository) UpsertPatch( //nolint:gocognit
 		if err != nil {
 			return fmt.Errorf("error getting asset by URN: %w", err)
 		}
+		newAsset.RefreshedAt = ast.RefreshedAt
 		newAsset.Patch(patchData)
 		if err := r.validateAsset(newAsset); err != nil {
 			return err
