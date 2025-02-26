@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"os"
 	"sort"
 	"strconv"
@@ -12,6 +11,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/google/go-cmp/cmp"
@@ -1328,6 +1329,9 @@ func (r *AssetRepositoryTestSuite) TestUpsertPatch() {
 				},
 				Data: map[string]interface{}{
 					"entity": "gojek",
+					"data": map[string]interface{}{
+						"foo": "bar",
+					},
 				},
 				UpdatedBy: r.users[0],
 			}
@@ -1335,6 +1339,9 @@ func (r *AssetRepositoryTestSuite) TestUpsertPatch() {
 			patchData := make(map[string]interface{})
 			patchData["data"] = map[string]interface{}{
 				"entity": "gotocompany",
+				"data": map[string]interface{}{
+					"foo": "cookie",
+				},
 			}
 
 			id, err := r.repository.UpsertPatch(r.ctx, &ast, patchData)
@@ -1345,6 +1352,7 @@ func (r *AssetRepositoryTestSuite) TestUpsertPatch() {
 			r.NoError(err)
 			r.NotEqual(actual.Data["entity"], "gotocompany")
 			r.Equal(actual.Data["entity"], "gojek")
+			r.Equal(actual.Data["data"], map[string]interface{}{"foo": "cookie"})
 		})
 
 		r.Run("set ID to asset and version to base version", func() {
