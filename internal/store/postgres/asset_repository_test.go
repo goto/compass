@@ -1554,7 +1554,7 @@ func (r *AssetRepositoryTestSuite) TestUpsertPatch() {
 				Data: map[string]interface{}{
 					"entity": "gotocompany",
 					"data": map[string]interface{}{
-						"foo": "bar",
+						"foo": "old",
 					},
 				},
 				UpdatedBy: r.users[0],
@@ -1567,13 +1567,13 @@ func (r *AssetRepositoryTestSuite) TestUpsertPatch() {
 			ast.ID = id
 
 			updated := ast
-			patchData := make(map[string]interface{})
-			patchData["url"] = "https://sample-url.com"
+			patchData := map[string]interface{}{}
 			patchData["data"] = map[string]interface{}{
 				"data": map[string]interface{}{
-					"foo": "cookie",
+					"foo": "new",
 				},
 			}
+			updated.Patch(patchData)
 
 			id, err = r.repository.UpsertPatch(r.ctx, &updated, patchData) // update
 			r.Require().NoError(err)
@@ -1587,7 +1587,7 @@ func (r *AssetRepositoryTestSuite) TestUpsertPatch() {
 
 			r.Equal(updated.URL, actual.URL)
 			r.Equal("gotocompany", actual.Data["entity"])
-			r.Equal(map[string]interface{}{"foo": "cookie"}, actual.Data["data"])
+			r.Equal(map[string]interface{}{"foo": "new"}, actual.Data["data"])
 			r.NotEqual(ast.Version, actual.Version)
 		})
 

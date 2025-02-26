@@ -13,6 +13,7 @@ import (
 	"github.com/goto/compass/core/asset"
 	"github.com/goto/compass/core/user"
 	"github.com/goto/compass/pkg/queryexpr"
+	"github.com/jinzhu/copier"
 	"github.com/jmoiron/sqlx"
 	"github.com/r3labs/diff/v2"
 )
@@ -336,13 +337,6 @@ func (r *AssetRepository) Upsert(ctx context.Context, ast *asset.Asset) (assetID
 	err = r.client.RunWithinTx(ctx, func(tx *sqlx.Tx) (err error) {
 		fetchedAsset, err := r.GetByURNWithTx(ctx, tx, ast.URN)
 		if errors.As(err, new(asset.NotFoundError)) {
-			err = nil
-		}
-		if err != nil {
-			return fmt.Errorf("error getting asset by URN: %w", err)
-		}
-
-		if fetchedAsset.ID == "" {
 			// insert flow
 			assetID, err = r.insert(ctx, tx, ast)
 			if err != nil {
@@ -350,6 +344,9 @@ func (r *AssetRepository) Upsert(ctx context.Context, ast *asset.Asset) (assetID
 			}
 
 			return nil
+		}
+		if err != nil {
+			return fmt.Errorf("error getting asset by URN: %w", err)
 		}
 
 		changelog, err := fetchedAsset.Diff(ast)
@@ -383,13 +380,6 @@ func (r *AssetRepository) UpsertPatch( //nolint:gocognit
 	err = r.client.RunWithinTx(ctx, func(tx *sqlx.Tx) (err error) {
 		fetchedAsset, err := r.GetByURNWithTx(ctx, tx, ast.URN)
 		if errors.As(err, new(asset.NotFoundError)) {
-			err = nil
-		}
-		if err != nil {
-			return fmt.Errorf("error getting asset by URN: %w", err)
-		}
-
-		if fetchedAsset.ID == "" {
 			// insert flow
 			if err := r.validateAsset(*ast); err != nil {
 				return err
@@ -400,13 +390,17 @@ func (r *AssetRepository) UpsertPatch( //nolint:gocognit
 			}
 			return nil
 		}
-
-		newAsset, err := r.GetByURNWithTx(ctx, tx, ast.URN)
 		if err != nil {
 			return fmt.Errorf("error getting asset by URN: %w", err)
 		}
-		newAsset.RefreshedAt = ast.RefreshedAt
+
+		// update flow
+		var newAsset asset.Asset
+		if err := copier.CopyWithOption(&newAsset, fetchedAsset, copier.Option{DeepCopy: true}); err != nil {
+			return err
+		}
 		newAsset.Patch(patchData)
+		newAsset.RefreshedAt = ast.RefreshedAt
 		if err := r.validateAsset(newAsset); err != nil {
 			return err
 		}
