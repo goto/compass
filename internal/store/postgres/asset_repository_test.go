@@ -12,8 +12,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-
 	sq "github.com/Masterminds/squirrel"
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/uuid"
@@ -24,6 +22,7 @@ import (
 	"github.com/goto/compass/pkg/queryexpr"
 	"github.com/goto/salt/log"
 	"github.com/r3labs/diff/v2"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
 
