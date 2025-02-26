@@ -22,7 +22,6 @@ require (
 	github.com/jackc/pgconn v1.10.0
 	github.com/jackc/pgerrcode v0.0.0-20201024163028-a0d42d470451
 	github.com/jackc/pgx/v4 v4.13.0
-	github.com/jinzhu/copier v0.4.0
 	github.com/jmoiron/sqlx v1.3.5
 	github.com/lib/pq v1.10.2
 	github.com/newrelic/go-agent/v3 v3.15.2
