@@ -1546,11 +1546,12 @@ func (r *AssetRepositoryTestSuite) TestUpsertPatch() {
 
 		r.Run("should update the asset version if asset is not identical", func() {
 			ast := asset.Asset{
-				URN:     uuid.NewString() + "urn-u-2",
-				Name:    "urn-test",
-				Type:    "table",
-				Service: "bigquery",
-				URL:     "https://sample-url.com",
+				URN:         uuid.NewString() + "urn-u-2",
+				Description: "existing",
+				Name:        "urn-test",
+				Type:        "table",
+				Service:     "bigquery",
+				URL:         "https://sample-url.com",
 				Data: map[string]interface{}{
 					"entity": "gotocompany",
 					"data": map[string]interface{}{
@@ -1567,6 +1568,7 @@ func (r *AssetRepositoryTestSuite) TestUpsertPatch() {
 			ast.ID = id
 
 			updated := ast
+			updated.Description = "bluffing"
 			patchData := map[string]interface{}{}
 			patchData["data"] = map[string]interface{}{
 				"data": map[string]interface{}{
@@ -1585,7 +1587,7 @@ func (r *AssetRepositoryTestSuite) TestUpsertPatch() {
 			actual, err := r.repository.GetByID(r.ctx, ast.ID)
 			r.NoError(err)
 
-			r.Equal(updated.URL, actual.URL)
+			r.Equal("existing", actual.Description)
 			r.Equal("gotocompany", actual.Data["entity"])
 			r.Equal(map[string]interface{}{"foo": "new"}, actual.Data["data"])
 			r.NotEqual(ast.Version, actual.Version)
