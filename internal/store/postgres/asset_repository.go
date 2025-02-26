@@ -13,7 +13,6 @@ import (
 	"github.com/goto/compass/core/asset"
 	"github.com/goto/compass/core/user"
 	"github.com/goto/compass/pkg/queryexpr"
-	"github.com/jinzhu/copier"
 	"github.com/jmoiron/sqlx"
 	"github.com/r3labs/diff/v2"
 )
@@ -402,20 +401,20 @@ func (r *AssetRepository) UpsertPatch( //nolint:gocognit
 			return nil
 		}
 
-		// update flow
-		if err := copier.CopyWithOption(&ast, &fetchedAsset, copier.Option{DeepCopy: true}); err != nil {
+		newAsset, err := r.GetByURNWithTx(ctx, tx, ast.URN)
+		if err != nil {
+			return fmt.Errorf("error getting asset by URN: %w", err)
+		}
+		newAsset.Patch(patchData)
+		if err := r.validateAsset(newAsset); err != nil {
 			return err
 		}
-		ast.Patch(patchData)
-		if err := r.validateAsset(*ast); err != nil {
-			return err
-		}
-		changelog, err := fetchedAsset.Diff(ast)
+		changelog, err := fetchedAsset.Diff(&newAsset)
 		if err != nil {
 			return fmt.Errorf("error diffing two assets: %w", err)
 		}
 
-		if err := r.update(ctx, tx, ast, &fetchedAsset, changelog); err != nil {
+		if err := r.update(ctx, tx, &newAsset, &fetchedAsset, changelog); err != nil {
 			return fmt.Errorf("error updating asset to DB: %w", err)
 		}
 		assetID = fetchedAsset.ID
