@@ -337,13 +337,6 @@ func (r *AssetRepository) Upsert(ctx context.Context, ast *asset.Asset) (assetID
 	err = r.client.RunWithinTx(ctx, func(tx *sqlx.Tx) (err error) {
 		fetchedAsset, err := r.GetByURNWithTx(ctx, tx, ast.URN)
 		if errors.As(err, new(asset.NotFoundError)) {
-			err = nil
-		}
-		if err != nil {
-			return fmt.Errorf("error getting asset by URN: %w", err)
-		}
-
-		if fetchedAsset.ID == "" {
 			// insert flow
 			assetID, err = r.insert(ctx, tx, ast)
 			if err != nil {
@@ -351,6 +344,9 @@ func (r *AssetRepository) Upsert(ctx context.Context, ast *asset.Asset) (assetID
 			}
 
 			return nil
+		}
+		if err != nil {
+			return fmt.Errorf("error getting asset by URN: %w", err)
 		}
 
 		changelog, err := fetchedAsset.Diff(ast)
@@ -384,13 +380,6 @@ func (r *AssetRepository) UpsertPatch( //nolint:gocognit
 	err = r.client.RunWithinTx(ctx, func(tx *sqlx.Tx) (err error) {
 		fetchedAsset, err := r.GetByURNWithTx(ctx, tx, ast.URN)
 		if errors.As(err, new(asset.NotFoundError)) {
-			err = nil
-		}
-		if err != nil {
-			return fmt.Errorf("error getting asset by URN: %w", err)
-		}
-
-		if fetchedAsset.ID == "" {
 			// insert flow
 			if err := r.validateAsset(*ast); err != nil {
 				return err
@@ -401,21 +390,26 @@ func (r *AssetRepository) UpsertPatch( //nolint:gocognit
 			}
 			return nil
 		}
+		if err != nil {
+			return fmt.Errorf("error getting asset by URN: %w", err)
+		}
 
 		// update flow
-		if err := copier.CopyWithOption(&ast, &fetchedAsset, copier.Option{DeepCopy: true}); err != nil {
+		var newAsset asset.Asset
+		if err := copier.CopyWithOption(&newAsset, fetchedAsset, copier.Option{DeepCopy: true}); err != nil {
 			return err
 		}
-		ast.Patch(patchData)
-		if err := r.validateAsset(*ast); err != nil {
+		newAsset.Patch(patchData)
+		newAsset.RefreshedAt = ast.RefreshedAt
+		if err := r.validateAsset(newAsset); err != nil {
 			return err
 		}
-		changelog, err := fetchedAsset.Diff(ast)
+		changelog, err := fetchedAsset.Diff(&newAsset)
 		if err != nil {
 			return fmt.Errorf("error diffing two assets: %w", err)
 		}
 
-		if err := r.update(ctx, tx, ast, &fetchedAsset, changelog); err != nil {
+		if err := r.update(ctx, tx, &newAsset, &fetchedAsset, changelog); err != nil {
 			return fmt.Errorf("error updating asset to DB: %w", err)
 		}
 		assetID = fetchedAsset.ID

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"os"
 	"sort"
 	"strconv"
@@ -23,6 +22,7 @@ import (
 	"github.com/goto/compass/pkg/queryexpr"
 	"github.com/goto/salt/log"
 	"github.com/r3labs/diff/v2"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -1328,6 +1328,9 @@ func (r *AssetRepositoryTestSuite) TestUpsertPatch() {
 				},
 				Data: map[string]interface{}{
 					"entity": "gojek",
+					"data": map[string]interface{}{
+						"foo": "bar",
+					},
 				},
 				UpdatedBy: r.users[0],
 			}
@@ -1335,6 +1338,9 @@ func (r *AssetRepositoryTestSuite) TestUpsertPatch() {
 			patchData := make(map[string]interface{})
 			patchData["data"] = map[string]interface{}{
 				"entity": "gotocompany",
+				"data": map[string]interface{}{
+					"foo": "cookie",
+				},
 			}
 
 			id, err := r.repository.UpsertPatch(r.ctx, &ast, patchData)
@@ -1343,8 +1349,9 @@ func (r *AssetRepositoryTestSuite) TestUpsertPatch() {
 
 			actual, err := r.repository.GetByID(r.ctx, id)
 			r.NoError(err)
-			r.NotEqual(actual.Data["entity"], "gotocompany")
-			r.Equal(actual.Data["entity"], "gojek")
+			r.NotEqual("gotocompany", actual.Data["entity"])
+			r.Equal("gojek", actual.Data["entity"])
+			r.Equal(map[string]interface{}{"foo": "bar"}, actual.Data["data"])
 		})
 
 		r.Run("set ID to asset and version to base version", func() {
@@ -1375,12 +1382,25 @@ func (r *AssetRepositoryTestSuite) TestUpsertPatch() {
 			r.NotEqual(time.Time{}, assetInDB.UpdatedAt)
 			r.assertAsset(&ast, &assetInDB)
 
-			ast2 := ast
-			ast2.RefreshedAt = nil
-			ast2.Description = "create a new version" // to force fetch from asset_versions.
-			_, err = r.repository.UpsertPatch(r.ctx, &ast2, nil)
+			// Same with ast1
+			ast2 := asset.Asset{
+				URN:       ast.URN,
+				Name:      ast.Name,
+				Type:      ast.Type,
+				Service:   ast.Service,
+				URL:       ast.URL,
+				Data:      make(map[string]interface{}),
+				UpdatedBy: ast.UpdatedBy,
+				Version:   ast.Version,
+			}
+			// Deep copy the Data map
+			for key, value := range ast.Data {
+				ast2.Data[key] = value
+			}
+			patchData := make(map[string]interface{})
+			patchData["description"] = "create a new version" // to force fetch from asset_versions
+			_, err = r.repository.UpsertPatch(r.ctx, &ast2, patchData)
 			r.NoError(err)
-			r.Greater(ast2.UpdatedAt.UnixNano(), ast.UpdatedAt.UnixNano())
 			assetv1, err := r.repository.GetByVersionWithID(r.ctx, ast.ID, asset.BaseVersion)
 			r.NoError(err)
 			r.Equal("0.1", assetv1.Version)
@@ -1526,13 +1546,17 @@ func (r *AssetRepositoryTestSuite) TestUpsertPatch() {
 
 		r.Run("should update the asset version if asset is not identical", func() {
 			ast := asset.Asset{
-				URN:     uuid.NewString() + "urn-u-2",
-				Name:    "urn-test",
-				Type:    "table",
-				Service: "bigquery",
-				URL:     "https://sample-url-old.com",
+				URN:         uuid.NewString() + "urn-u-2",
+				Description: "existing",
+				Name:        "urn-test",
+				Type:        "table",
+				Service:     "bigquery",
+				URL:         "https://sample-url.com",
 				Data: map[string]interface{}{
 					"entity": "gotocompany",
+					"data": map[string]interface{}{
+						"foo": "old",
+					},
 				},
 				UpdatedBy: r.users[0],
 				Version:   "0.1",
@@ -1544,8 +1568,14 @@ func (r *AssetRepositoryTestSuite) TestUpsertPatch() {
 			ast.ID = id
 
 			updated := ast
-			patchData := make(map[string]interface{})
-			patchData["url"] = "https://sample-url.com"
+			updated.Description = "bluffing"
+			patchData := map[string]interface{}{}
+			patchData["data"] = map[string]interface{}{
+				"data": map[string]interface{}{
+					"foo": "new",
+				},
+			}
+			updated.Patch(patchData)
 
 			id, err = r.repository.UpsertPatch(r.ctx, &updated, patchData) // update
 			r.Require().NoError(err)
@@ -1557,7 +1587,9 @@ func (r *AssetRepositoryTestSuite) TestUpsertPatch() {
 			actual, err := r.repository.GetByID(r.ctx, ast.ID)
 			r.NoError(err)
 
-			r.Equal(updated.URL, actual.URL)
+			r.Equal("existing", actual.Description)
+			r.Equal("gotocompany", actual.Data["entity"])
+			r.Equal(map[string]interface{}{"foo": "new"}, actual.Data["data"])
 			r.NotEqual(ast.Version, actual.Version)
 		})
 
@@ -1680,7 +1712,7 @@ func (r *AssetRepositoryTestSuite) TestUpsertPatch() {
 
 			actual, err := r.repository.GetByID(r.ctx, ast.ID)
 			r.NoError(err)
-			r.Len(actual.Owners, len(newAsset.Owners))
+			r.Len(actual.Owners, 2)
 			r.Equal(r.users[1].ID, actual.Owners[0].ID)
 			r.Equal(r.users[2].ID, actual.Owners[1].ID)
 		})
@@ -1723,11 +1755,10 @@ func (r *AssetRepositoryTestSuite) TestUpsertPatch() {
 
 			actual, err := r.repository.GetByID(r.ctx, ast.ID)
 			r.NoError(err)
-			r.Len(actual.Owners, len(newAsset.Owners))
+			r.Len(actual.Owners, 2)
 			r.NotEmpty(actual.Owners[0].ID)
 			r.Equal(r.users[1].ID, actual.Owners[0].ID)
 			r.NotEmpty(actual.Owners[1].ID)
-			r.Equal(newAsset.Owners[1].Email, actual.Owners[1].Email)
 		})
 	})
 }

@@ -269,7 +269,7 @@ func (server *APIServer) UpsertPatchAsset(ctx context.Context, req *compassv1bet
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	newAsset := &asset.Asset{}
+	newAsset := asset.Asset{}
 	patchAssetMap := decodePatchAssetToMap(baseAsset)
 	patchAssetMap["updated_by"] = userID
 	newAsset.Patch(patchAssetMap)
@@ -277,10 +277,10 @@ func (server *APIServer) UpsertPatchAsset(ctx context.Context, req *compassv1bet
 	var assetID string
 	if len(req.Upstreams) != 0 || len(req.Downstreams) != 0 || req.OverwriteLineage {
 		assetID, err = server.upsertAsset(
-			ctx, *newAsset, patchAssetMap, "asset_upsert_patch", req.GetUpstreams(), req.GetDownstreams(),
+			ctx, newAsset, patchAssetMap, "asset_upsert_patch", req.GetUpstreams(), req.GetDownstreams(),
 		)
 	} else {
-		assetID, err = server.upsertPatchAssetWithoutLineage(ctx, *newAsset, patchAssetMap)
+		assetID, err = server.upsertPatchAssetWithoutLineage(ctx, newAsset, patchAssetMap)
 	}
 	if err != nil {
 		return nil, err
