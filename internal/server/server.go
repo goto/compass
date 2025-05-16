@@ -86,6 +86,8 @@ func Serve(
 
 	// init grpc
 	grpcServer := grpc.NewServer(
+		grpc.MaxRecvMsgSize(config.GRPC.MaxRecvMsgSize),
+		grpc.MaxSendMsgSize(config.GRPC.MaxSendMsgSize),
 		grpc.UnaryInterceptor(grpcmiddleware.ChainUnaryServer(
 			grpclogrus.UnaryServerInterceptor(logger.Entry()),
 			otelgrpc.UnaryServerInterceptor(),
