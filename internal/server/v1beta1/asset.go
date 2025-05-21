@@ -32,6 +32,7 @@ type AssetService interface {
 	UpsertPatchAsset(ctx context.Context, ast *asset.Asset, upstreams, downstreams []string, patchData map[string]interface{}) (string, error)
 	UpsertPatchAssetWithoutLineage(ctx context.Context, ast *asset.Asset, patchData map[string]interface{}) (string, error)
 	DeleteAsset(ctx context.Context, id string) error
+	SoftDeleteAsset(ctx context.Context, id, updatedBy string) error
 	DeleteAssets(ctx context.Context, request asset.DeleteAssetsRequest) (uint32, error)
 
 	GetLineage(ctx context.Context, urn string, query asset.LineageQuery) (asset.Lineage, error)
@@ -291,13 +292,14 @@ func (server *APIServer) UpsertPatchAsset(ctx context.Context, req *compassv1bet
 	}, nil
 }
 
+// DeleteAsset can accept ID or URN of asset
 func (server *APIServer) DeleteAsset(ctx context.Context, req *compassv1beta1.DeleteAssetRequest) (*compassv1beta1.DeleteAssetResponse, error) {
-	_, err := server.ValidateUserInCtx(ctx)
+	userID, err := server.ValidateUserInCtx(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := server.assetService.DeleteAsset(ctx, req.GetId()); err != nil {
+	if err := server.assetService.SoftDeleteAsset(ctx, req.GetId(), userID); err != nil {
 		if errors.As(err, new(asset.InvalidError)) {
 			return nil, status.Error(codes.InvalidArgument, err.Error())
 		}

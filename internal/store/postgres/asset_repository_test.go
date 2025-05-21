@@ -1817,14 +1817,14 @@ func (r *AssetRepositoryTestSuite) TestUpsertPatchRaceCondition() {
 
 func (r *AssetRepositoryTestSuite) TestDeleteByID() {
 	r.Run("return error from client if any", func() {
-		err := r.repository.DeleteByID(r.ctx, "invalid-uuid")
+		_, err := r.repository.DeleteByID(r.ctx, "invalid-uuid")
 		r.Error(err)
 		r.Contains(err.Error(), "invalid asset id: \"invalid-uuid\"")
 	})
 
 	r.Run("return NotFoundError if asset does not exist", func() {
 		uuidTest := "2aabb450-f986-44e2-a6db-7996861d5004"
-		err := r.repository.DeleteByID(r.ctx, uuidTest)
+		_, err := r.repository.DeleteByID(r.ctx, uuidTest)
 		r.ErrorAs(err, &asset.NotFoundError{AssetID: uuidTest})
 	})
 
@@ -1854,7 +1854,7 @@ func (r *AssetRepositoryTestSuite) TestDeleteByID() {
 		r.Require().NotEmpty(id)
 		asset2.ID = id
 
-		err = r.repository.DeleteByID(r.ctx, asset1.ID)
+		_, err = r.repository.DeleteByID(r.ctx, asset1.ID)
 		r.NoError(err)
 
 		_, err = r.repository.GetByID(r.ctx, asset1.ID)
@@ -1865,7 +1865,7 @@ func (r *AssetRepositoryTestSuite) TestDeleteByID() {
 		r.Equal(asset2.ID, asset2FromDB.ID)
 
 		// cleanup
-		err = r.repository.DeleteByID(r.ctx, asset2.ID)
+		_, err = r.repository.DeleteByID(r.ctx, asset2.ID)
 		r.NoError(err)
 	})
 }

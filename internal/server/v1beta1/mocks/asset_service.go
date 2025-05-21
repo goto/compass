@@ -661,6 +661,50 @@ func (_c *AssetService_SearchAssets_Call) RunAndReturn(run func(context.Context,
 	return _c
 }
 
+// SoftDeleteAsset provides a mock function with given fields: ctx, id, updatedBy
+func (_m *AssetService) SoftDeleteAsset(ctx context.Context, id string, updatedBy string) error {
+	ret := _m.Called(ctx, id, updatedBy)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, string) error); ok {
+		r0 = rf(ctx, id, updatedBy)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// AssetService_SoftDeleteAsset_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SoftDeleteAsset'
+type AssetService_SoftDeleteAsset_Call struct {
+	*mock.Call
+}
+
+// SoftDeleteAsset is a helper method to define mock.On call
+//   - ctx context.Context
+//   - id string
+//   - updatedBy string
+func (_e *AssetService_Expecter) SoftDeleteAsset(ctx interface{}, id interface{}, updatedBy interface{}) *AssetService_SoftDeleteAsset_Call {
+	return &AssetService_SoftDeleteAsset_Call{Call: _e.mock.On("SoftDeleteAsset", ctx, id, updatedBy)}
+}
+
+func (_c *AssetService_SoftDeleteAsset_Call) Run(run func(ctx context.Context, id string, updatedBy string)) *AssetService_SoftDeleteAsset_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(string))
+	})
+	return _c
+}
+
+func (_c *AssetService_SoftDeleteAsset_Call) Return(_a0 error) *AssetService_SoftDeleteAsset_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *AssetService_SoftDeleteAsset_Call) RunAndReturn(run func(context.Context, string, string) error) *AssetService_SoftDeleteAsset_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // SuggestAssets provides a mock function with given fields: ctx, cfg
 func (_m *AssetService) SuggestAssets(ctx context.Context, cfg asset.SearchConfig) ([]string, error) {
 	ret := _m.Called(ctx, cfg)

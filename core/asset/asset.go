@@ -22,8 +22,10 @@ type Repository interface {
 	GetTypes(ctx context.Context, flt Filter) (map[Type]int, error)
 	Upsert(ctx context.Context, ast *Asset) (string, error)
 	UpsertPatch(ctx context.Context, ast *Asset, patchData map[string]interface{}) (string, error)
-	DeleteByID(ctx context.Context, id string) error
+	DeleteByID(ctx context.Context, id string) (string, error)
 	DeleteByURN(ctx context.Context, urn string) error
+	SoftDeleteByID(ctx context.Context, id string, softDeleteAsset SoftDeleteAsset) (string, error)
+	SoftDeleteByURN(ctx context.Context, urn string, softDeleteAsset SoftDeleteAsset) error
 	DeleteByQueryExpr(ctx context.Context, queryExpr queryexpr.ExprStr) ([]string, error)
 	AddProbe(ctx context.Context, assetURN string, probe *Probe) error
 	GetProbes(ctx context.Context, assetURN string) ([]Probe, error)
@@ -47,8 +49,36 @@ type Asset struct {
 	RefreshedAt *time.Time             `json:"refreshed_at" diff:"-"`
 	Version     string                 `json:"version" diff:"-"`
 	UpdatedBy   user.User              `json:"updated_by" diff:"-"`
+	IsDeleted   bool                   `json:"is_deleted"`
 	Changelog   diff.Changelog         `json:"changelog,omitempty" diff:"-"`
 	Probes      []Probe                `json:"probes,omitempty"`
+}
+
+type SoftDeleteAsset struct {
+	URN         string         `json:"urn"`
+	UpdatedAt   time.Time      `json:"updated_at"`
+	RefreshedAt time.Time      `json:"refreshed_at"`
+	Version     string         `json:"version"`
+	UpdatedBy   string         `json:"updated_by"`
+	IsDeleted   bool           `json:"is_deleted"`
+	Changelog   diff.Changelog `json:"changelog"`
+}
+
+func NewSoftDeleteAsset(updatedAt, refreshedAt time.Time, updatedBy string) SoftDeleteAsset {
+	return SoftDeleteAsset{
+		UpdatedAt:   updatedAt,
+		RefreshedAt: refreshedAt,
+		UpdatedBy:   updatedBy,
+		IsDeleted:   true,
+		Changelog: diff.Changelog{
+			{
+				Type: "delete",
+				Path: []string{"is_deleted"},
+				From: false,
+				To:   true,
+			},
+		},
+	}
 }
 
 // Diff returns nil changelog with nil error if equal
