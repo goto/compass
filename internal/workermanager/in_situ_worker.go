@@ -41,6 +41,13 @@ func (m *InSituWorker) EnqueueDeleteAssetJob(ctx context.Context, urn string) er
 	return nil
 }
 
+func (m *InSituWorker) EnqueueSoftDeleteAssetJob(ctx context.Context, softDeleteAsset asset.SoftDeleteAsset) error {
+	if err := m.discoveryRepo.SoftDeleteByURN(ctx, softDeleteAsset); err != nil {
+		return fmt.Errorf("soft delete asset from discovery repo: %w: urn '%s'", err, softDeleteAsset.URN)
+	}
+	return nil
+}
+
 func (m *InSituWorker) EnqueueDeleteAssetsByQueryExprJob(ctx context.Context, queryExpr string) error {
 	deleteESExpr := asset.DeleteAssetExpr{
 		ExprStr: queryexpr.ESExpr(queryExpr),

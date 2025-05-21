@@ -144,7 +144,7 @@ func (srv *ElasticsearchTestServer) Close() error {
 }
 
 func (*ElasticsearchTestServer) purge(cli *elasticsearch.Client) error {
-	req, err := http.NewRequest("DELETE", "/_all", nil)
+	req, err := http.NewRequest(http.MethodDelete, "/_all", nil)
 	if err != nil {
 		return fmt.Errorf("purge: %w", err)
 	}

@@ -164,8 +164,25 @@ func (r *AssetRepository) GetByID(ctx context.Context, id string) (asset.Asset, 
 	return ast, nil
 }
 
+// GetByIDWithTx retrieves asset by its ID with Transaction
+func (r *AssetRepository) GetByIDWithTx(ctx context.Context, tx *sqlx.Tx, id string) (asset.Asset, error) {
+	if !isValidUUID(id) {
+		return asset.Asset{}, asset.InvalidError{AssetID: id}
+	}
+
+	ast, err := r.getWithPredicateWithTx(ctx, tx, sq.Eq{"a.id": id})
+	if errors.Is(err, sql.ErrNoRows) {
+		return asset.Asset{}, asset.NotFoundError{AssetID: id}
+	}
+	if err != nil {
+		return asset.Asset{}, fmt.Errorf("error getting asset with ID = %q: %w", id, err)
+	}
+
+	return ast, nil
+}
+
 func (r *AssetRepository) GetByURN(ctx context.Context, urn string) (asset.Asset, error) {
-	ast, err := r.getWithPredicateWithTx(ctx, nil, sq.Eq{"a.urn": urn})
+	ast, err := r.getWithPredicate(ctx, sq.Eq{"a.urn": urn})
 	if errors.Is(err, sql.ErrNoRows) {
 		return asset.Asset{}, asset.NotFoundError{URN: urn}
 	}
@@ -447,29 +464,95 @@ func (*AssetRepository) validateAsset(ast asset.Asset) error {
 }
 
 // DeleteByID removes asset using its ID
-func (r *AssetRepository) DeleteByID(ctx context.Context, id string) error {
-	if !isValidUUID(id) {
-		return asset.InvalidError{AssetID: id}
+func (r *AssetRepository) DeleteByID(ctx context.Context, id string) (urn string, err error) {
+	err = r.client.RunWithinTx(ctx, func(tx *sqlx.Tx) error {
+		fetchedAsset, err := r.GetByIDWithTx(ctx, tx, id)
+		if err != nil {
+			return asset.NotFoundError{AssetID: id}
+		}
+		urn = fetchedAsset.URN
+
+		err = r.deleteWithPredicate(ctx, tx, sq.Eq{"id": id})
+		if err != nil {
+			return fmt.Errorf("error deleting asset with ID = %q: %w", id, err)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return urn, err
 	}
 
-	affectedRows, err := r.deleteWithPredicate(ctx, sq.Eq{"id": id})
+	return urn, nil
+}
+
+func (r *AssetRepository) DeleteByURN(ctx context.Context, urn string) error {
+	err := r.client.RunWithinTx(ctx, func(tx *sqlx.Tx) (err error) {
+		err = r.deleteWithPredicate(ctx, tx, sq.Eq{"urn": urn})
+		if err != nil {
+			return fmt.Errorf("error deleting asset with URN = %q: %w", urn, err)
+		}
+
+		return nil
+	})
 	if err != nil {
-		return fmt.Errorf("error deleting asset with ID = %q: %w", id, err)
-	}
-	if affectedRows == 0 {
-		return asset.NotFoundError{AssetID: id}
+		return err
 	}
 
 	return nil
 }
 
-func (r *AssetRepository) DeleteByURN(ctx context.Context, urn string) error {
-	affectedRows, err := r.deleteWithPredicate(ctx, sq.Eq{"urn": urn})
+// SoftDeleteByID soft delete the asset using its ID
+func (r *AssetRepository) SoftDeleteByID(ctx context.Context, id string, softDeleteAsset asset.SoftDeleteAsset) (urn string, err error) {
+	err = r.client.RunWithinTx(ctx, func(tx *sqlx.Tx) error {
+		fetchedAsset, err := r.GetByIDWithTx(ctx, tx, id)
+		if err != nil {
+			return asset.NotFoundError{AssetID: id}
+		}
+		urn = fetchedAsset.URN
+
+		newVersion, err := asset.IncreaseMinorVersion(fetchedAsset.Version)
+		if err != nil {
+			return err
+		}
+		softDeleteAsset.Version = newVersion
+
+		err = r.softDeleteWithPredicate(ctx, tx, sq.Eq{"id": id}, fetchedAsset, softDeleteAsset)
+		if err != nil {
+			return fmt.Errorf("error deleting asset with ID = %q: %w", id, err)
+		}
+
+		return nil
+	})
 	if err != nil {
-		return fmt.Errorf("error deleting asset with URN = %q: %w", urn, err)
+		return urn, err
 	}
-	if affectedRows == 0 {
-		return asset.NotFoundError{URN: urn}
+
+	return urn, nil
+}
+
+// SoftDeleteByURN soft delete the asset using its URN
+func (r *AssetRepository) SoftDeleteByURN(ctx context.Context, urn string, softDeleteAsset asset.SoftDeleteAsset) error {
+	err := r.client.RunWithinTx(ctx, func(tx *sqlx.Tx) (err error) {
+		fetchedAsset, err := r.GetByURNWithTx(ctx, tx, urn)
+		if err != nil {
+			return asset.NotFoundError{URN: urn}
+		}
+		newVersion, err := asset.IncreaseMinorVersion(fetchedAsset.Version)
+		if err != nil {
+			return err
+		}
+		softDeleteAsset.Version = newVersion
+
+		err = r.softDeleteWithPredicate(ctx, tx, sq.Eq{"urn": urn}, fetchedAsset, softDeleteAsset)
+		if err != nil {
+			return fmt.Errorf("error deleting asset with URN = %q: %w", urn, err)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return err
 	}
 
 	return nil
@@ -616,26 +699,41 @@ func (r *AssetRepository) GetProbesWithFilter(ctx context.Context, flt asset.Pro
 	return results, nil
 }
 
-func (r *AssetRepository) deleteWithPredicate(ctx context.Context, pred sq.Eq) (int64, error) {
+func (r *AssetRepository) deleteWithPredicate(ctx context.Context, tx *sqlx.Tx, pred sq.Eq) error {
 	query, args, err := sq.Delete("assets").
 		Where(pred).
 		PlaceholderFormat(sq.Dollar).
 		ToSql()
 	if err != nil {
-		return 0, fmt.Errorf("error building query: %w", err)
+		return fmt.Errorf("error building query: %w", err)
 	}
 
-	res, err := r.client.db.ExecContext(ctx, query, args...)
+	return r.execContext(ctx, tx, query, args...)
+}
+
+func (r *AssetRepository) softDeleteWithPredicate(
+	ctx context.Context,
+	tx *sqlx.Tx,
+	pred sq.Eq,
+	oldAsset asset.Asset,
+	softDeleteAsset asset.SoftDeleteAsset,
+) error {
+	query, args, err := sq.Update("assets").
+		Set("is_deleted", true).
+		Set("updated_at", softDeleteAsset.UpdatedAt).
+		Set("refreshed_at", softDeleteAsset.RefreshedAt).
+		Set("version", softDeleteAsset.Version).
+		Where(pred).
+		PlaceholderFormat(sq.Dollar).
+		ToSql()
 	if err != nil {
-		return 0, err
+		return fmt.Errorf("error building query: %w", err)
+	}
+	if err := r.execContext(ctx, tx, query, args...); err != nil {
+		return err
 	}
 
-	affectedRows, err := res.RowsAffected()
-	if err != nil {
-		return 0, fmt.Errorf("error getting affected rows: %w", err)
-	}
-
-	return affectedRows, nil
+	return r.insertAssetVersion(ctx, tx, &oldAsset, softDeleteAsset.Changelog)
 }
 
 func (r *AssetRepository) insert(ctx context.Context, tx *sqlx.Tx, ast *asset.Asset) (string, error) {
@@ -719,7 +817,7 @@ func (r *AssetRepository) update(ctx context.Context, tx *sqlx.Tx, newAsset, old
 	}
 
 	// insert versions
-	if err := r.insertAssetVersion(ctx, tx, newAsset, clog); err != nil {
+	if err := r.insertAssetVersion(ctx, tx, oldAsset, clog); err != nil {
 		return err
 	}
 

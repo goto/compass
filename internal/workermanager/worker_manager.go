@@ -129,6 +129,7 @@ func (m *Manager) init() error {
 	jobHandlers := map[string]worker.JobHandler{
 		jobIndexAsset:          m.indexAssetHandler(),
 		jobDeleteAsset:         m.deleteAssetHandler(),
+		jobSoftDeleteAsset:     m.softDeleteAssetHandler(),
 		jobDeleteAssetsByQuery: m.deleteAssetsByQueryHandler(),
 		jobSyncAsset:           m.syncAssetHandler(),
 	}

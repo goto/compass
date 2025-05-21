@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/goto/compass/core/asset"
-	queryexpr "github.com/goto/compass/pkg/queryexpr"
+	"github.com/goto/compass/pkg/queryexpr"
 	"github.com/goto/salt/log"
 )
 
@@ -145,6 +145,14 @@ func (repo *DiscoveryRepository) DeleteByURN(ctx context.Context, assetURN strin
 	return repo.deleteWithQuery(ctx, "DeleteByURN", fmt.Sprintf(`{"query":{"term":{"urn.keyword": %q}}}`, assetURN))
 }
 
+func (repo *DiscoveryRepository) SoftDeleteByURN(ctx context.Context, softDeleteAsset asset.SoftDeleteAsset) error {
+	if softDeleteAsset.URN == "" {
+		return asset.ErrEmptyURN
+	}
+
+	return repo.softDeleteAsset(ctx, "DeleteByURN", softDeleteAsset)
+}
+
 func (repo *DiscoveryRepository) DeleteByQueryExpr(ctx context.Context, queryExpr queryexpr.ExprStr) error {
 	if strings.TrimSpace(queryExpr.String()) == "" {
 		return asset.ErrEmptyQuery
@@ -191,6 +199,77 @@ func (repo *DiscoveryRepository) deleteWithQuery(ctx context.Context, discoveryO
 			Op:     "DeleteDoc",
 			ESCode: code,
 			Err:    fmt.Errorf("query: %s: %s", qry, reason),
+		}
+	}
+
+	return nil
+}
+
+func (repo *DiscoveryRepository) softDeleteAsset(ctx context.Context, discoveryOp string, softDeleteAsset asset.SoftDeleteAsset) (err error) {
+	defer func(start time.Time) {
+		const op = "soft_delete_by_query"
+		repo.cli.instrumentOp(ctx, instrumentParams{
+			op:          op,
+			discoveryOp: discoveryOp,
+			start:       start,
+			err:         err,
+		})
+	}(time.Now())
+
+	// Create the update request body
+	body := map[string]interface{}{
+		"query": map[string]interface{}{
+			"term": map[string]interface{}{
+				"urn.keyword": softDeleteAsset.URN,
+			},
+		},
+		"script": map[string]interface{}{
+			"source": `
+                ctx._source.is_deleted = true;
+                ctx._source.updated_at = params.updated_at;
+                ctx._source.refreshed_at = params.refreshed_at;
+                ctx._source.updated_by = params.updated_by
+            `,
+			"lang": "painless",
+			"params": map[string]interface{}{
+				"updated_at":   softDeleteAsset.UpdatedAt,
+				"refreshed_at": softDeleteAsset.RefreshedAt,
+				"updated_by":   softDeleteAsset.UpdatedBy,
+			},
+		},
+	}
+
+	// Convert body to JSON
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(body); err != nil {
+		return asset.DiscoveryError{
+			Op:  "SoftDeleteByURN",
+			Err: fmt.Errorf("failed to encode request body: %w", err),
+		}
+	}
+
+	// Execute UpdateByQuery
+	res, err := repo.cli.client.UpdateByQuery(
+		[]string{defaultSearchIndex},
+		repo.cli.client.UpdateByQuery.WithContext(ctx),
+		repo.cli.client.UpdateByQuery.WithBody(&buf),
+		repo.cli.client.UpdateByQuery.WithRefresh(true),
+		repo.cli.client.UpdateByQuery.WithIgnoreUnavailable(true),
+	)
+	if err != nil {
+		return asset.DiscoveryError{
+			Op:  "DeleteDoc",
+			Err: fmt.Errorf("urn: %s: %w", softDeleteAsset.URN, err),
+		}
+	}
+
+	defer drainBody(res)
+	if res.IsError() {
+		code, reason := errorCodeAndReason(res)
+		return asset.DiscoveryError{
+			Op:     "DeleteDoc",
+			ESCode: code,
+			Err:    fmt.Errorf("urn: %s: %s", softDeleteAsset.URN, reason),
 		}
 	}
 
