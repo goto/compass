@@ -171,10 +171,10 @@ func (s *Service) DeleteAsset(ctx context.Context, id string) (err error) {
 		if err != nil {
 			return err
 		}
-	}
-
-	if err := s.assetRepository.DeleteByURN(ctx, urn); err != nil {
-		return err
+	} else {
+		if err := s.assetRepository.DeleteByURN(ctx, urn); err != nil {
+			return err
+		}
 	}
 
 	if err := s.worker.EnqueueDeleteAssetJob(ctx, urn); err != nil {
@@ -199,10 +199,10 @@ func (s *Service) SoftDeleteAsset(ctx context.Context, id, updatedBy string) (er
 		if err != nil {
 			return err
 		}
-	}
-
-	if err := s.assetRepository.SoftDeleteByURN(ctx, urn, softDeleteAsset); err != nil {
-		return err
+	} else {
+		if err := s.assetRepository.SoftDeleteByURN(ctx, urn, softDeleteAsset); err != nil {
+			return err
+		}
 	}
 
 	softDeleteAsset.URN = urn

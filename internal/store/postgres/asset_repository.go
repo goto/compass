@@ -463,7 +463,7 @@ func (*AssetRepository) validateAsset(ast asset.Asset) error {
 	return nil
 }
 
-// DeleteByID removes asset using its ID
+// DeleteByID hard delete asset using its ID
 func (r *AssetRepository) DeleteByID(ctx context.Context, id string) (urn string, err error) {
 	err = r.client.RunWithinTx(ctx, func(tx *sqlx.Tx) error {
 		fetchedAsset, err := r.GetByIDWithTx(ctx, tx, id)
@@ -486,6 +486,7 @@ func (r *AssetRepository) DeleteByID(ctx context.Context, id string) (urn string
 	return urn, nil
 }
 
+// DeleteByURN hard delete asset using its URN
 func (r *AssetRepository) DeleteByURN(ctx context.Context, urn string) error {
 	err := r.client.RunWithinTx(ctx, func(tx *sqlx.Tx) (err error) {
 		err = r.deleteWithPredicate(ctx, tx, sq.Eq{"urn": urn})
@@ -502,7 +503,6 @@ func (r *AssetRepository) DeleteByURN(ctx context.Context, urn string) error {
 	return nil
 }
 
-// SoftDeleteByID soft delete the asset using its ID
 func (r *AssetRepository) SoftDeleteByID(ctx context.Context, id string, softDeleteAsset asset.SoftDeleteAsset) (urn string, err error) {
 	err = r.client.RunWithinTx(ctx, func(tx *sqlx.Tx) error {
 		fetchedAsset, err := r.GetByIDWithTx(ctx, tx, id)
@@ -531,7 +531,6 @@ func (r *AssetRepository) SoftDeleteByID(ctx context.Context, id string, softDel
 	return urn, nil
 }
 
-// SoftDeleteByURN soft delete the asset using its URN
 func (r *AssetRepository) SoftDeleteByURN(ctx context.Context, urn string, softDeleteAsset asset.SoftDeleteAsset) error {
 	err := r.client.RunWithinTx(ctx, func(tx *sqlx.Tx) (err error) {
 		fetchedAsset, err := r.GetByURNWithTx(ctx, tx, urn)
