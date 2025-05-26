@@ -150,7 +150,30 @@ func (repo *DiscoveryRepository) SoftDeleteByURN(ctx context.Context, softDelete
 		return asset.ErrEmptyURN
 	}
 
-	return repo.softDeleteAsset(ctx, "DeleteByURN", softDeleteAsset)
+	// Create the update request body
+	bodyRequest := map[string]interface{}{
+		"query": map[string]interface{}{
+			"term": map[string]interface{}{
+				"urn.keyword": softDeleteAsset.URN,
+			},
+		},
+		"script": map[string]interface{}{
+			"source": `
+                ctx._source.is_deleted = true;
+                ctx._source.updated_at = params.updated_at;
+                ctx._source.refreshed_at = params.refreshed_at;
+                ctx._source.updated_by = params.updated_by
+            `,
+			"lang": "painless",
+			"params": map[string]interface{}{
+				"updated_at":   softDeleteAsset.UpdatedAt,
+				"refreshed_at": softDeleteAsset.RefreshedAt,
+				"updated_by":   softDeleteAsset.UpdatedBy,
+			},
+		},
+	}
+
+	return repo.softDeleteAsset(ctx, "DeleteByURN", bodyRequest)
 }
 
 func (repo *DiscoveryRepository) DeleteByQueryExpr(ctx context.Context, queryExpr queryexpr.ExprStr) error {
@@ -164,6 +187,39 @@ func (repo *DiscoveryRepository) DeleteByQueryExpr(ctx context.Context, queryExp
 	}
 
 	return repo.deleteWithQuery(ctx, "DeleteByQueryExpr", esQuery)
+}
+
+func (repo *DiscoveryRepository) SoftDeleteByQueryExpr(ctx context.Context, softDeleteAssets asset.SoftDeleteAssets) error {
+	if strings.TrimSpace(softDeleteAssets.QueryExpr.String()) == "" {
+		return asset.ErrEmptyQuery
+	}
+
+	esQuery, err := queryexpr.ValidateAndGetQueryFromExpr(softDeleteAssets.QueryExpr)
+	if err != nil {
+		return err
+	}
+	queryMap, err := queryexpr.QueryStringToMap(esQuery)
+
+	// Create the update request body
+	bodyRequest := map[string]interface{}{
+		"query": queryMap["query"],
+		"script": map[string]interface{}{
+			"source": `
+                ctx._source.is_deleted = true;
+                ctx._source.updated_at = params.updated_at;
+                ctx._source.refreshed_at = params.refreshed_at;
+                ctx._source.updated_by = params.updated_by
+            `,
+			"lang": "painless",
+			"params": map[string]interface{}{
+				"updated_at":   softDeleteAssets.UpdatedAt,
+				"refreshed_at": softDeleteAssets.RefreshedAt,
+				"updated_by":   softDeleteAssets.UpdatedBy,
+			},
+		},
+	}
+
+	return repo.softDeleteAsset(ctx, "DeleteByQueryExpr", bodyRequest)
 }
 
 func (repo *DiscoveryRepository) deleteWithQuery(ctx context.Context, discoveryOp, qry string) (err error) {
@@ -205,7 +261,7 @@ func (repo *DiscoveryRepository) deleteWithQuery(ctx context.Context, discoveryO
 	return nil
 }
 
-func (repo *DiscoveryRepository) softDeleteAsset(ctx context.Context, discoveryOp string, softDeleteAsset asset.SoftDeleteAsset) (err error) {
+func (repo *DiscoveryRepository) softDeleteAsset(ctx context.Context, discoveryOp string, bodyRequest map[string]interface{}) (err error) {
 	defer func(start time.Time) {
 		const op = "soft_delete_by_query"
 		repo.cli.instrumentOp(ctx, instrumentParams{
@@ -216,32 +272,9 @@ func (repo *DiscoveryRepository) softDeleteAsset(ctx context.Context, discoveryO
 		})
 	}(time.Now())
 
-	// Create the update request body
-	body := map[string]interface{}{
-		"query": map[string]interface{}{
-			"term": map[string]interface{}{
-				"urn.keyword": softDeleteAsset.URN,
-			},
-		},
-		"script": map[string]interface{}{
-			"source": `
-                ctx._source.is_deleted = true;
-                ctx._source.updated_at = params.updated_at;
-                ctx._source.refreshed_at = params.refreshed_at;
-                ctx._source.updated_by = params.updated_by
-            `,
-			"lang": "painless",
-			"params": map[string]interface{}{
-				"updated_at":   softDeleteAsset.UpdatedAt,
-				"refreshed_at": softDeleteAsset.RefreshedAt,
-				"updated_by":   softDeleteAsset.UpdatedBy,
-			},
-		},
-	}
-
 	// Convert body to JSON
 	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(body); err != nil {
+	if err := json.NewEncoder(&buf).Encode(bodyRequest); err != nil {
 		return asset.DiscoveryError{
 			Op:  "SoftDeleteByURN",
 			Err: fmt.Errorf("failed to encode request body: %w", err),
@@ -259,7 +292,7 @@ func (repo *DiscoveryRepository) softDeleteAsset(ctx context.Context, discoveryO
 	if err != nil {
 		return asset.DiscoveryError{
 			Op:  "DeleteDoc",
-			Err: fmt.Errorf("urn: %s: %w", softDeleteAsset.URN, err),
+			Err: fmt.Errorf("query: %s: %w", bodyRequest["query"], err),
 		}
 	}
 
@@ -269,7 +302,7 @@ func (repo *DiscoveryRepository) softDeleteAsset(ctx context.Context, discoveryO
 		return asset.DiscoveryError{
 			Op:     "DeleteDoc",
 			ESCode: code,
-			Err:    fmt.Errorf("urn: %s: %s", softDeleteAsset.URN, reason),
+			Err:    fmt.Errorf("query: %s: %w", bodyRequest["query"], reason),
 		}
 	}
 

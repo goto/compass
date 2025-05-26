@@ -58,6 +58,18 @@ func (m *InSituWorker) EnqueueDeleteAssetsByQueryExprJob(ctx context.Context, qu
 	return nil
 }
 
+func (m *InSituWorker) EnqueueSoftDeleteAssetsByQueryExprJob(ctx context.Context, softDeleteAssets asset.SoftDeleteAssets) error {
+	queryExpr := asset.DeleteAssetExpr{
+		ExprStr: queryexpr.ESExpr(softDeleteAssets.QueryExpr.String()),
+	}
+	softDeleteAssets.QueryExpr = queryExpr
+
+	if err := m.discoveryRepo.SoftDeleteByQueryExpr(ctx, softDeleteAssets); err != nil {
+		return fmt.Errorf("delete asset from discovery repo: %w: query expr: '%s'", err, queryExpr)
+	}
+	return nil
+}
+
 func (m *InSituWorker) EnqueueSyncAssetJob(ctx context.Context, service string) error {
 	const batchSize = 1000
 
