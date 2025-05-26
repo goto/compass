@@ -299,7 +299,8 @@ func (server *APIServer) DeleteAsset(ctx context.Context, req *compassv1beta1.De
 		return nil, err
 	}
 
-	if err := server.assetService.SoftDeleteAsset(ctx, req.GetId(), userID); err != nil {
+	err = server.assetService.SoftDeleteAsset(ctx, req.GetId(), userID)
+	if err != nil {
 		if errors.As(err, new(asset.InvalidError)) {
 			return nil, status.Error(codes.InvalidArgument, err.Error())
 		}

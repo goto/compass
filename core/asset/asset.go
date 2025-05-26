@@ -49,7 +49,7 @@ type Asset struct {
 	RefreshedAt *time.Time             `json:"refreshed_at" diff:"-"`
 	Version     string                 `json:"version" diff:"-"`
 	UpdatedBy   user.User              `json:"updated_by" diff:"-"`
-	IsDeleted   bool                   `json:"is_deleted"`
+	IsDeleted   bool                   `json:"is_deleted" diff:"is_deleted"`
 	Changelog   diff.Changelog         `json:"changelog,omitempty" diff:"-"`
 	Probes      []Probe                `json:"probes,omitempty"`
 }
@@ -61,7 +61,7 @@ type SoftDeleteAsset struct {
 	Version     string         `json:"version"`
 	UpdatedBy   string         `json:"updated_by"`
 	IsDeleted   bool           `json:"is_deleted"`
-	Changelog   diff.Changelog `json:"changelog"`
+	Changelog   diff.Changelog `json:"changelog,omitempty"`
 }
 
 func NewSoftDeleteAsset(updatedAt, refreshedAt time.Time, updatedBy string) SoftDeleteAsset {

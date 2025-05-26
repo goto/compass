@@ -206,11 +206,7 @@ func (s *Service) SoftDeleteAsset(ctx context.Context, id, updatedBy string) (er
 	}
 
 	softDeleteAsset.URN = urn
-	if err := s.worker.EnqueueSoftDeleteAssetJob(ctx, softDeleteAsset); err != nil {
-		return err
-	}
-
-	return s.lineageRepository.DeleteByURN(ctx, urn)
+	return s.worker.EnqueueSoftDeleteAssetJob(ctx, softDeleteAsset)
 }
 
 func (s *Service) DeleteAssets(ctx context.Context, request DeleteAssetsRequest) (affectedRows uint32, err error) {

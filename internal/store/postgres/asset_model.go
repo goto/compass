@@ -23,6 +23,7 @@ type AssetModel struct {
 	Data        JSONMap    `db:"data"`
 	URL         string     `db:"url"`
 	Labels      JSONMap    `db:"labels"`
+	IsDeleted   bool       `db:"is_deleted"`
 	Version     string     `db:"version"`
 	UpdatedBy   UserModel  `db:"updated_by"`
 	CreatedAt   time.Time  `db:"created_at"`
@@ -44,6 +45,7 @@ func (a *AssetModel) toAsset(owners []user.User) asset.Asset {
 		Data:        a.Data,
 		URL:         a.URL,
 		Labels:      a.buildLabels(),
+		IsDeleted:   a.IsDeleted,
 		Owners:      owners,
 		Version:     a.Version,
 		UpdatedBy:   a.UpdatedBy.toUser(),
@@ -65,6 +67,7 @@ func (a *AssetModel) toAssetVersion() (asset.Asset, error) {
 		URN:         a.URN,
 		Type:        asset.Type(a.Type),
 		Service:     a.Service,
+		IsDeleted:   a.IsDeleted,
 		Version:     a.Version,
 		Changelog:   clog,
 		UpdatedBy:   a.UpdatedBy.toUser(),
@@ -96,6 +99,7 @@ func (a *AssetModel) toVersionedAsset(latestAssetVersion asset.Asset) (asset.Ass
 		Description: a.Description,
 		Data:        a.Data,
 		Labels:      a.buildLabels(),
+		IsDeleted:   a.IsDeleted,
 		Owners:      owners,
 		Version:     a.Version,
 		UpdatedBy:   a.UpdatedBy.toUser(),

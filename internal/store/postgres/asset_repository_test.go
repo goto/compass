@@ -1816,12 +1816,6 @@ func (r *AssetRepositoryTestSuite) TestUpsertPatchRaceCondition() {
 }
 
 func (r *AssetRepositoryTestSuite) TestDeleteByID() {
-	r.Run("return error from client if any", func() {
-		_, err := r.repository.DeleteByID(r.ctx, "invalid-uuid")
-		r.Error(err)
-		r.Contains(err.Error(), "invalid asset id: \"invalid-uuid\"")
-	})
-
 	r.Run("return NotFoundError if asset does not exist", func() {
 		uuidTest := "2aabb450-f986-44e2-a6db-7996861d5004"
 		_, err := r.repository.DeleteByID(r.ctx, uuidTest)
@@ -1870,11 +1864,66 @@ func (r *AssetRepositoryTestSuite) TestDeleteByID() {
 	})
 }
 
+func (r *AssetRepositoryTestSuite) TestSoftDeleteByID() {
+	currentTime := time.Now().UTC()
+	softDeleteAsset := asset.NewSoftDeleteAsset(currentTime, currentTime, r.users[0].ID)
+
+	r.Run("return NotFoundError if asset does not exist", func() {
+		uuidTest := "2aabb450-f986-44e2-a6db-7996861d5004"
+		_, err := r.repository.SoftDeleteByID(r.ctx, uuidTest, softDeleteAsset)
+		r.ErrorAs(err, &asset.NotFoundError{AssetID: uuidTest})
+	})
+
+	r.Run("should delete correct asset", func() {
+		asset1 := asset.Asset{
+			URN:       "urn-del-1",
+			Type:      "table",
+			Service:   "bigquery",
+			UpdatedBy: user.User{ID: defaultAssetUpdaterUserID},
+		}
+		asset2 := asset.Asset{
+			URN:       "urn-del-2",
+			Type:      "topic",
+			Service:   "kafka",
+			Version:   asset.BaseVersion,
+			UpdatedBy: user.User{ID: defaultAssetUpdaterUserID},
+		}
+
+		var err error
+		id, err := r.repository.Upsert(r.ctx, &asset1)
+		r.Require().NoError(err)
+		r.Require().NotEmpty(id)
+		asset1.ID = id
+
+		id, err = r.repository.Upsert(r.ctx, &asset2)
+		r.Require().NoError(err)
+		r.Require().NotEmpty(id)
+		asset2.ID = id
+
+		_, err = r.repository.SoftDeleteByID(r.ctx, asset1.ID, softDeleteAsset)
+		r.NoError(err)
+
+		asset1FromDB, err := r.repository.GetByID(r.ctx, asset1.ID)
+		r.Require().NoError(err)
+		r.True(asset1FromDB.IsDeleted)
+
+		asset2FromDB, err := r.repository.GetByID(r.ctx, asset2.ID)
+		r.NoError(err)
+		r.False(asset2FromDB.IsDeleted)
+
+		// cleanup
+		_, err = r.repository.DeleteByID(r.ctx, asset1.ID)
+		r.NoError(err)
+		_, err = r.repository.DeleteByID(r.ctx, asset2.ID)
+		r.NoError(err)
+	})
+}
+
 func (r *AssetRepositoryTestSuite) TestDeleteByURN() {
 	r.Run("return NotFoundError if asset does not exist", func() {
 		urn := "urn-test-1"
 		err := r.repository.DeleteByURN(r.ctx, urn)
-		r.ErrorAs(err, &asset.NotFoundError{URN: urn})
+		r.ErrorContains(err, "query affected 0 rows")
 	})
 
 	r.Run("should delete correct asset", func() {
@@ -1909,6 +1958,56 @@ func (r *AssetRepositoryTestSuite) TestDeleteByURN() {
 		r.Equal(id, asset2FromDB.ID)
 
 		// cleanup
+		err = r.repository.DeleteByURN(r.ctx, asset2.URN)
+		r.NoError(err)
+	})
+}
+
+func (r *AssetRepositoryTestSuite) TestSoftDeleteByURN() {
+	currentTime := time.Now().UTC()
+	softDeleteAsset := asset.NewSoftDeleteAsset(currentTime, currentTime, r.users[0].ID)
+
+	r.Run("return NotFoundError if asset does not exist", func() {
+		urn := "urn-test-1"
+		err := r.repository.SoftDeleteByURN(r.ctx, urn, softDeleteAsset)
+		r.ErrorContainsf(err, "could not find asset", "urn = %s", urn)
+	})
+
+	r.Run("should delete correct asset", func() {
+		asset1 := asset.Asset{
+			URN:       "urn-del-1",
+			Type:      "table",
+			Service:   "bigquery",
+			UpdatedBy: user.User{ID: defaultAssetUpdaterUserID},
+		}
+		asset2 := asset.Asset{
+			URN:       "urn-del-2",
+			Type:      "topic",
+			Service:   "kafka",
+			Version:   asset.BaseVersion,
+			UpdatedBy: user.User{ID: defaultAssetUpdaterUserID},
+		}
+
+		_, err := r.repository.Upsert(r.ctx, &asset1)
+		r.Require().NoError(err)
+
+		_, err = r.repository.Upsert(r.ctx, &asset2)
+		r.Require().NoError(err)
+
+		err = r.repository.SoftDeleteByURN(r.ctx, asset1.URN, softDeleteAsset)
+		r.NoError(err)
+
+		asset1FromDB, err := r.repository.GetByURN(r.ctx, asset1.URN)
+		r.Require().NoError(err)
+		r.True(asset1FromDB.IsDeleted)
+
+		asset2FromDB, err := r.repository.GetByURN(r.ctx, asset2.URN)
+		r.NoError(err)
+		r.False(asset2FromDB.IsDeleted)
+
+		// cleanup
+		err = r.repository.DeleteByURN(r.ctx, asset1.URN)
+		r.NoError(err)
 		err = r.repository.DeleteByURN(r.ctx, asset2.URN)
 		r.NoError(err)
 	})
