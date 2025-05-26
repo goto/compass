@@ -617,6 +617,22 @@ func (r *AssetRepository) DeleteByQueryExpr(ctx context.Context, queryExpr query
 	return urns, err
 }
 
+func (r *AssetRepository) SoftDeleteByQueryExpr(
+	ctx context.Context,
+	softDeleteAssets asset.SoftDeleteAssets,
+) error {
+	err := r.client.RunWithinTx(ctx, func(tx *sqlx.Tx) error {
+		query, err := queryexpr.ValidateAndGetQueryFromExpr(softDeleteAssets.QueryExpr)
+		if err != nil {
+			return err
+		}
+
+		return r.softDeleteByQuery(ctx, tx, query, softDeleteAssets.SoftDeleteAsset)
+	})
+
+	return err
+}
+
 // deleteByQueryAndReturnURNS remove all assets that match to query and return array of urn of asset that deleted.
 func (r *AssetRepository) deleteByQueryAndReturnURNS(ctx context.Context, whereCondition string) ([]string, error) {
 	builder := sq.Delete("assets").
@@ -634,6 +650,28 @@ func (r *AssetRepository) deleteByQueryAndReturnURNS(ctx context.Context, whereC
 	}
 
 	return urns, nil
+}
+
+// softDeleteByQuery soft delete all assets that match to query
+func (r *AssetRepository) softDeleteByQuery(
+	ctx context.Context,
+	tx *sqlx.Tx,
+	whereCondition string,
+	softDeleteAsset asset.SoftDeleteAsset,
+) error {
+	query, args, err := sq.Update("assets").
+		Set("is_deleted", true).
+		Set("updated_at", softDeleteAsset.UpdatedAt).
+		Set("refreshed_at", softDeleteAsset.RefreshedAt).
+		Set("version", softDeleteAsset.Version).
+		Where(whereCondition).
+		PlaceholderFormat(sq.Dollar).
+		ToSql()
+	if err != nil {
+		return fmt.Errorf("error building query: %w", err)
+	}
+
+	return r.execContext(ctx, tx, query, args...)
 }
 
 func (r *AssetRepository) AddProbe(ctx context.Context, assetURN string, probe *asset.Probe) error {

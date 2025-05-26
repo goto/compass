@@ -27,6 +27,7 @@ type Repository interface {
 	SoftDeleteByID(ctx context.Context, id string, softDeleteAsset SoftDeleteAsset) (string, error)
 	SoftDeleteByURN(ctx context.Context, urn string, softDeleteAsset SoftDeleteAsset) error
 	DeleteByQueryExpr(ctx context.Context, queryExpr queryexpr.ExprStr) ([]string, error)
+	SoftDeleteByQueryExpr(ctx context.Context, softDeleteAssets SoftDeleteAssets) error
 	AddProbe(ctx context.Context, assetURN string, probe *Probe) error
 	GetProbes(ctx context.Context, assetURN string) ([]Probe, error)
 	GetProbesWithFilter(ctx context.Context, flt ProbesFilter) (map[string][]Probe, error)
@@ -62,6 +63,11 @@ type SoftDeleteAsset struct {
 	UpdatedBy   string         `json:"updated_by"`
 	IsDeleted   bool           `json:"is_deleted"`
 	Changelog   diff.Changelog `json:"changelog,omitempty"`
+}
+
+type SoftDeleteAssets struct {
+	SoftDeleteAsset
+	QueryExpr queryexpr.ExprStr
 }
 
 func NewSoftDeleteAsset(updatedAt, refreshedAt time.Time, updatedBy string) SoftDeleteAsset {

@@ -34,6 +34,7 @@ type AssetService interface {
 	DeleteAsset(ctx context.Context, id string) error
 	SoftDeleteAsset(ctx context.Context, id, updatedBy string) error
 	DeleteAssets(ctx context.Context, request asset.DeleteAssetsRequest) (uint32, error)
+	SoftDeleteAssets(ctx context.Context, request asset.DeleteAssetsRequest, updatedBy string) (uint32, error)
 
 	GetLineage(ctx context.Context, urn string, query asset.LineageQuery) (asset.Lineage, error)
 	GetTypes(ctx context.Context, flt asset.Filter) (map[asset.Type]int, error)
@@ -315,7 +316,8 @@ func (server *APIServer) DeleteAsset(ctx context.Context, req *compassv1beta1.De
 
 func (server *APIServer) DeleteAssets(ctx context.Context, req *compassv1beta1.DeleteAssetsRequest) (*compassv1beta1.DeleteAssetsResponse, error) {
 	var affectedRows uint32
-	if _, err := server.ValidateUserInCtx(ctx); err != nil {
+	userId, err := server.ValidateUserInCtx(ctx)
+	if err != nil {
 		return nil, err
 	}
 	defer func() {
@@ -329,7 +331,7 @@ func (server *APIServer) DeleteAssets(ctx context.Context, req *compassv1beta1.D
 		QueryExpr: req.QueryExpr,
 		DryRun:    req.DryRun,
 	}
-	affectedRows, err := server.assetService.DeleteAssets(ctx, deleteAssetsRequest)
+	affectedRows, err = server.assetService.SoftDeleteAssets(ctx, deleteAssetsRequest, userId)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}

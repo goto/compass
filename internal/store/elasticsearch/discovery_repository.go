@@ -167,6 +167,39 @@ func (repo *DiscoveryRepository) DeleteByQueryExpr(ctx context.Context, queryExp
 	return repo.deleteWithQuery(ctx, "DeleteByQueryExpr", esQuery)
 }
 
+func (repo *DiscoveryRepository) SoftDeleteByQueryExpr(ctx context.Context, softDeleteAssets asset.SoftDeleteAssets) error {
+	if strings.TrimSpace(softDeleteAssets.QueryExpr.String()) == "" {
+		return asset.ErrEmptyQuery
+	}
+
+	esQuery, err := queryexpr.ValidateAndGetQueryFromExpr(softDeleteAssets.QueryExpr)
+	if err != nil {
+		return err
+	}
+	queryMap, err := queryexpr.QueryStringToMap(esQuery)
+
+	// Create the update request body
+	bodyRequest := map[string]interface{}{
+		"query": queryMap["query"],
+		"script": map[string]interface{}{
+			"source": `
+                ctx._source.is_deleted = true;
+                ctx._source.updated_at = params.updated_at;
+                ctx._source.refreshed_at = params.refreshed_at;
+                ctx._source.updated_by = params.updated_by
+            `,
+			"lang": "painless",
+			"params": map[string]interface{}{
+				"updated_at":   softDeleteAssets.UpdatedAt,
+				"refreshed_at": softDeleteAssets.RefreshedAt,
+				"updated_by":   softDeleteAssets.UpdatedBy,
+			},
+		},
+	}
+
+	return repo.softDeleteAsset(ctx, "DeleteByQueryExpr", bodyRequest)
+}
+
 func (repo *DiscoveryRepository) deleteWithQuery(ctx context.Context, discoveryOp, qry string) (err error) {
 	defer func(start time.Time) {
 		const op = "delete_by_query"
