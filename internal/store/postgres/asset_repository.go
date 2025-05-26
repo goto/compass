@@ -18,6 +18,8 @@ import (
 	"github.com/r3labs/diff/v2"
 )
 
+var errAssetAlreadyDeleted = errors.New("asset already deleted")
+
 // AssetRepository is a type that manages user operation to the primary database
 type AssetRepository struct {
 	client              *Client
@@ -366,6 +368,9 @@ func (r *AssetRepository) Upsert(ctx context.Context, ast *asset.Asset) (assetID
 			return fmt.Errorf("error getting asset by URN: %w", err)
 		}
 
+		// reset IsDeleted flag if asset is resync'd
+		ast.IsDeleted = false
+
 		changelog, err := fetchedAsset.Diff(ast)
 		if err != nil {
 			return fmt.Errorf("error diffing two assets: %w", err)
@@ -418,6 +423,10 @@ func (r *AssetRepository) UpsertPatch( //nolint:gocognit
 		}
 		newAsset.Patch(patchData)
 		newAsset.RefreshedAt = ast.RefreshedAt
+
+		// reset IsDeleted flag if asset is resync'd
+		newAsset.IsDeleted = false
+
 		if err := r.validateAsset(newAsset); err != nil {
 			return err
 		}
@@ -511,13 +520,25 @@ func (r *AssetRepository) SoftDeleteByID(ctx context.Context, id string, softDel
 		}
 		urn = fetchedAsset.URN
 
+		if fetchedAsset.IsDeleted {
+			return errAssetAlreadyDeleted
+		}
+
 		newVersion, err := asset.IncreaseMinorVersion(fetchedAsset.Version)
 		if err != nil {
 			return err
 		}
 		softDeleteAsset.Version = newVersion
 
-		err = r.softDeleteWithPredicate(ctx, tx, sq.Eq{"id": id}, fetchedAsset, softDeleteAsset)
+		// just need soft copy since fetchedAsset is not used anymore
+		newAsset := fetchedAsset
+		newAsset.Version = newVersion
+		newAsset.UpdatedAt = softDeleteAsset.UpdatedAt
+		newAsset.RefreshedAt = &softDeleteAsset.RefreshedAt
+		newAsset.IsDeleted = true
+		newAsset.Changelog = softDeleteAsset.Changelog
+
+		err = r.softDeleteWithPredicate(ctx, tx, sq.Eq{"id": id}, newAsset)
 		if err != nil {
 			return fmt.Errorf("error deleting asset with ID = %q: %w", id, err)
 		}
@@ -537,13 +558,26 @@ func (r *AssetRepository) SoftDeleteByURN(ctx context.Context, urn string, softD
 		if err != nil {
 			return asset.NotFoundError{URN: urn}
 		}
+
+		if fetchedAsset.IsDeleted {
+			return errAssetAlreadyDeleted
+		}
+
 		newVersion, err := asset.IncreaseMinorVersion(fetchedAsset.Version)
 		if err != nil {
 			return err
 		}
 		softDeleteAsset.Version = newVersion
 
-		err = r.softDeleteWithPredicate(ctx, tx, sq.Eq{"urn": urn}, fetchedAsset, softDeleteAsset)
+		// just need soft copy since fetchedAsset is not used anymore
+		newAsset := fetchedAsset
+		newAsset.Version = newVersion
+		newAsset.UpdatedAt = softDeleteAsset.UpdatedAt
+		newAsset.RefreshedAt = &softDeleteAsset.RefreshedAt
+		newAsset.IsDeleted = true
+		newAsset.Changelog = softDeleteAsset.Changelog
+
+		err = r.softDeleteWithPredicate(ctx, tx, sq.Eq{"urn": urn}, newAsset)
 		if err != nil {
 			return fmt.Errorf("error deleting asset with URN = %q: %w", urn, err)
 		}
@@ -710,18 +744,12 @@ func (r *AssetRepository) deleteWithPredicate(ctx context.Context, tx *sqlx.Tx, 
 	return r.execContext(ctx, tx, query, args...)
 }
 
-func (r *AssetRepository) softDeleteWithPredicate(
-	ctx context.Context,
-	tx *sqlx.Tx,
-	pred sq.Eq,
-	oldAsset asset.Asset,
-	softDeleteAsset asset.SoftDeleteAsset,
-) error {
+func (r *AssetRepository) softDeleteWithPredicate(ctx context.Context, tx *sqlx.Tx, pred sq.Eq, newAsset asset.Asset) error {
 	query, args, err := sq.Update("assets").
 		Set("is_deleted", true).
-		Set("updated_at", softDeleteAsset.UpdatedAt).
-		Set("refreshed_at", softDeleteAsset.RefreshedAt).
-		Set("version", softDeleteAsset.Version).
+		Set("updated_at", newAsset.UpdatedAt).
+		Set("refreshed_at", newAsset.RefreshedAt).
+		Set("version", newAsset.Version).
 		Where(pred).
 		PlaceholderFormat(sq.Dollar).
 		ToSql()
@@ -732,7 +760,7 @@ func (r *AssetRepository) softDeleteWithPredicate(
 		return err
 	}
 
-	return r.insertAssetVersion(ctx, tx, &oldAsset, softDeleteAsset.Changelog)
+	return r.insertAssetVersion(ctx, tx, &newAsset, newAsset.Changelog)
 }
 
 func (r *AssetRepository) insert(ctx context.Context, tx *sqlx.Tx, ast *asset.Asset) (string, error) {
@@ -816,7 +844,7 @@ func (r *AssetRepository) update(ctx context.Context, tx *sqlx.Tx, newAsset, old
 	}
 
 	// insert versions
-	if err := r.insertAssetVersion(ctx, tx, oldAsset, clog); err != nil {
+	if err := r.insertAssetVersion(ctx, tx, newAsset, clog); err != nil {
 		return err
 	}
 
@@ -846,6 +874,7 @@ func (r *AssetRepository) updateAsset(ctx context.Context, tx *sqlx.Tx, assetID 
 		Set("data", newAsset.Data).
 		Set("url", newAsset.URL).
 		Set("labels", newAsset.Labels).
+		Set("is_deleted", newAsset.IsDeleted).
 		Set("updated_at", newAsset.UpdatedAt).
 		Set("refreshed_at", *newAsset.RefreshedAt).
 		Set("updated_by", newAsset.UpdatedBy.ID).
@@ -881,8 +910,9 @@ func (r *AssetRepository) updateAssetRefreshedAt(ctx context.Context, tx *sqlx.T
 	return nil
 }
 
-func (r *AssetRepository) insertAssetVersion(ctx context.Context, execer sqlx.ExecerContext, oldAsset *asset.Asset, clog diff.Changelog) error {
-	if oldAsset == nil {
+// insertAssetVersion implemented after insert and update, so newest assert version is same with current asset
+func (r *AssetRepository) insertAssetVersion(ctx context.Context, execer sqlx.ExecerContext, newAsset *asset.Asset, clog diff.Changelog) error {
+	if newAsset == nil {
 		return asset.ErrNilAsset
 	}
 
@@ -896,8 +926,8 @@ func (r *AssetRepository) insertAssetVersion(ctx context.Context, execer sqlx.Ex
 	}
 	query, args, err := sq.Insert("assets_versions").
 		Columns("asset_id", "urn", "type", "service", "name", "description", "data", "labels", "created_at", "updated_at", "updated_by", "version", "owners", "changelog").
-		Values(oldAsset.ID, oldAsset.URN, oldAsset.Type, oldAsset.Service, oldAsset.Name, oldAsset.Description, oldAsset.Data, oldAsset.Labels,
-			oldAsset.CreatedAt, oldAsset.UpdatedAt, oldAsset.UpdatedBy.ID, oldAsset.Version, oldAsset.Owners, jsonChangelog).
+		Values(newAsset.ID, newAsset.URN, newAsset.Type, newAsset.Service, newAsset.Name, newAsset.Description, newAsset.Data, newAsset.Labels,
+			newAsset.CreatedAt, newAsset.UpdatedAt, newAsset.UpdatedBy.ID, newAsset.Version, newAsset.Owners, jsonChangelog).
 		PlaceholderFormat(sq.Dollar).
 		ToSql()
 	if err != nil {
@@ -1109,6 +1139,7 @@ func (r *AssetRepository) getAssetSQL() sq.SelectBuilder {
 		a.data as data,
 		COALESCE(a.url, '') as url,
 		a.labels as labels,
+		a.is_deleted as is_deleted,
 		a.version as version,
 		a.created_at as created_at,
 		a.updated_at as updated_at,
@@ -1134,6 +1165,7 @@ func (r *AssetRepository) getAssetVersionSQL() sq.SelectBuilder {
 		a.description as description,
 		a.data as data,
 		a.labels as labels,
+		a.is_deleted as is_deleted,
 		a.version as version,
 		a.created_at as created_at,
 		a.updated_at as updated_at,
