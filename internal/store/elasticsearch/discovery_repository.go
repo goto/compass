@@ -151,7 +151,30 @@ func (repo *DiscoveryRepository) SoftDeleteByURN(ctx context.Context, softDelete
 		return asset.ErrEmptyURN
 	}
 
-	return repo.softDeleteAsset(ctx, "DeleteByURN", softDeleteAsset)
+	// Create the update request body
+	bodyRequest := map[string]interface{}{
+		"query": map[string]interface{}{
+			"term": map[string]interface{}{
+				"urn.keyword": softDeleteAsset.URN,
+			},
+		},
+		"script": map[string]interface{}{
+			"source": `
+                ctx._source.is_deleted = true;
+                ctx._source.updated_at = params.updated_at;
+                ctx._source.refreshed_at = params.refreshed_at;
+                ctx._source.updated_by = params.updated_by
+            `,
+			"lang": "painless",
+			"params": map[string]interface{}{
+				"updated_at":   softDeleteAsset.UpdatedAt,
+				"refreshed_at": softDeleteAsset.RefreshedAt,
+				"updated_by":   softDeleteAsset.UpdatedBy,
+			},
+		},
+	}
+
+	return repo.softDeleteAsset(ctx, "DeleteByURN", bodyRequest)
 }
 
 func (repo *DiscoveryRepository) DeleteByQueryExpr(ctx context.Context, queryExpr queryexpr.ExprStr) error {
@@ -177,6 +200,9 @@ func (repo *DiscoveryRepository) SoftDeleteByQueryExpr(ctx context.Context, soft
 		return err
 	}
 	queryMap, err := queryexpr.QueryStringToMap(esQuery)
+	if err != nil {
+		return err
+	}
 
 	// Create the update request body
 	bodyRequest := map[string]interface{}{

@@ -316,7 +316,7 @@ func (server *APIServer) DeleteAsset(ctx context.Context, req *compassv1beta1.De
 
 func (server *APIServer) DeleteAssets(ctx context.Context, req *compassv1beta1.DeleteAssetsRequest) (*compassv1beta1.DeleteAssetsResponse, error) {
 	var affectedRows uint32
-	userId, err := server.ValidateUserInCtx(ctx)
+	userID, err := server.ValidateUserInCtx(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -331,7 +331,7 @@ func (server *APIServer) DeleteAssets(ctx context.Context, req *compassv1beta1.D
 		QueryExpr: req.QueryExpr,
 		DryRun:    req.DryRun,
 	}
-	affectedRows, err = server.assetService.SoftDeleteAssets(ctx, deleteAssetsRequest, userId)
+	affectedRows, err = server.assetService.SoftDeleteAssets(ctx, deleteAssetsRequest, userID)
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}

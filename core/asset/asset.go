@@ -67,7 +67,7 @@ type SoftDeleteAsset struct {
 
 type SoftDeleteAssets struct {
 	SoftDeleteAsset
-	QueryExpr queryexpr.ExprStr
+	QueryExpr queryexpr.ExprStr `json:"query_expr"`
 }
 
 func NewSoftDeleteAsset(updatedAt, refreshedAt time.Time, updatedBy string) SoftDeleteAsset {

@@ -870,6 +870,49 @@ func (_c *AssetRepository_SoftDeleteByID_Call) RunAndReturn(run func(context.Con
 	return _c
 }
 
+// SoftDeleteByQueryExpr provides a mock function with given fields: ctx, softDeleteAssets
+func (_m *AssetRepository) SoftDeleteByQueryExpr(ctx context.Context, softDeleteAssets asset.SoftDeleteAssets) error {
+	ret := _m.Called(ctx, softDeleteAssets)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, asset.SoftDeleteAssets) error); ok {
+		r0 = rf(ctx, softDeleteAssets)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// AssetRepository_SoftDeleteByQueryExpr_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SoftDeleteByQueryExpr'
+type AssetRepository_SoftDeleteByQueryExpr_Call struct {
+	*mock.Call
+}
+
+// SoftDeleteByQueryExpr is a helper method to define mock.On call
+//   - ctx context.Context
+//   - softDeleteAssets asset.SoftDeleteAssets
+func (_e *AssetRepository_Expecter) SoftDeleteByQueryExpr(ctx interface{}, softDeleteAssets interface{}) *AssetRepository_SoftDeleteByQueryExpr_Call {
+	return &AssetRepository_SoftDeleteByQueryExpr_Call{Call: _e.mock.On("SoftDeleteByQueryExpr", ctx, softDeleteAssets)}
+}
+
+func (_c *AssetRepository_SoftDeleteByQueryExpr_Call) Run(run func(ctx context.Context, softDeleteAssets asset.SoftDeleteAssets)) *AssetRepository_SoftDeleteByQueryExpr_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(asset.SoftDeleteAssets))
+	})
+	return _c
+}
+
+func (_c *AssetRepository_SoftDeleteByQueryExpr_Call) Return(_a0 error) *AssetRepository_SoftDeleteByQueryExpr_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *AssetRepository_SoftDeleteByQueryExpr_Call) RunAndReturn(run func(context.Context, asset.SoftDeleteAssets) error) *AssetRepository_SoftDeleteByQueryExpr_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // SoftDeleteByURN provides a mock function with given fields: ctx, urn, softDeleteAsset
 func (_m *AssetRepository) SoftDeleteByURN(ctx context.Context, urn string, softDeleteAsset asset.SoftDeleteAsset) error {
 	ret := _m.Called(ctx, urn, softDeleteAsset)
