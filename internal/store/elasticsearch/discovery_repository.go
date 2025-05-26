@@ -199,6 +199,9 @@ func (repo *DiscoveryRepository) SoftDeleteByQueryExpr(ctx context.Context, soft
 		return err
 	}
 	queryMap, err := queryexpr.QueryStringToMap(esQuery)
+	if err != nil {
+		return err
+	}
 
 	// Create the update request body
 	bodyRequest := map[string]interface{}{
@@ -302,7 +305,7 @@ func (repo *DiscoveryRepository) softDeleteAsset(ctx context.Context, discoveryO
 		return asset.DiscoveryError{
 			Op:     "DeleteDoc",
 			ESCode: code,
-			Err:    fmt.Errorf("query: %s: %w", bodyRequest["query"], reason),
+			Err:    fmt.Errorf("query: %s: %s", bodyRequest["query"], reason),
 		}
 	}
 

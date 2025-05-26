@@ -236,6 +236,49 @@ func (_c *Worker_EnqueueSoftDeleteAssetJob_Call) RunAndReturn(run func(context.C
 	return _c
 }
 
+// EnqueueSoftDeleteAssetsByQueryExprJob provides a mock function with given fields: ctx, softDeleteAssets
+func (_m *Worker) EnqueueSoftDeleteAssetsByQueryExprJob(ctx context.Context, softDeleteAssets asset.SoftDeleteAssets) error {
+	ret := _m.Called(ctx, softDeleteAssets)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, asset.SoftDeleteAssets) error); ok {
+		r0 = rf(ctx, softDeleteAssets)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// Worker_EnqueueSoftDeleteAssetsByQueryExprJob_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'EnqueueSoftDeleteAssetsByQueryExprJob'
+type Worker_EnqueueSoftDeleteAssetsByQueryExprJob_Call struct {
+	*mock.Call
+}
+
+// EnqueueSoftDeleteAssetsByQueryExprJob is a helper method to define mock.On call
+//   - ctx context.Context
+//   - softDeleteAssets asset.SoftDeleteAssets
+func (_e *Worker_Expecter) EnqueueSoftDeleteAssetsByQueryExprJob(ctx interface{}, softDeleteAssets interface{}) *Worker_EnqueueSoftDeleteAssetsByQueryExprJob_Call {
+	return &Worker_EnqueueSoftDeleteAssetsByQueryExprJob_Call{Call: _e.mock.On("EnqueueSoftDeleteAssetsByQueryExprJob", ctx, softDeleteAssets)}
+}
+
+func (_c *Worker_EnqueueSoftDeleteAssetsByQueryExprJob_Call) Run(run func(ctx context.Context, softDeleteAssets asset.SoftDeleteAssets)) *Worker_EnqueueSoftDeleteAssetsByQueryExprJob_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(asset.SoftDeleteAssets))
+	})
+	return _c
+}
+
+func (_c *Worker_EnqueueSoftDeleteAssetsByQueryExprJob_Call) Return(_a0 error) *Worker_EnqueueSoftDeleteAssetsByQueryExprJob_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *Worker_EnqueueSoftDeleteAssetsByQueryExprJob_Call) RunAndReturn(run func(context.Context, asset.SoftDeleteAssets) error) *Worker_EnqueueSoftDeleteAssetsByQueryExprJob_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // EnqueueSyncAssetJob provides a mock function with given fields: ctx, service
 func (_m *Worker) EnqueueSyncAssetJob(ctx context.Context, service string) error {
 	ret := _m.Called(ctx, service)

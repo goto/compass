@@ -56,18 +56,18 @@ type Asset struct {
 }
 
 type SoftDeleteAsset struct {
-	URN         string
-	UpdatedAt   time.Time
-	RefreshedAt time.Time
-	Version     string
-	UpdatedBy   string
-	IsDeleted   bool
-	Changelog   diff.Changelog
+	URN         string         `json:"urn" diff:"-"`
+	UpdatedAt   time.Time      `json:"updated_at" diff:"-"`
+	RefreshedAt time.Time      `json:"refreshed_at" diff:"-"`
+	Version     string         `json:"version" diff:"-"`
+	UpdatedBy   string         `json:"updated_by" diff:"-"`
+	IsDeleted   bool           `json:"is_deleted" diff:"-"`
+	Changelog   diff.Changelog `json:"changelog,omitempty" diff:"-"`
 }
 
 type SoftDeleteAssets struct {
 	SoftDeleteAsset
-	QueryExpr queryexpr.ExprStr
+	QueryExpr queryexpr.ExprStr `json:"query_expr" diff:"-"`
 }
 
 func NewSoftDeleteAsset(updatedAt, refreshedAt time.Time, updatedBy string) SoftDeleteAsset {
