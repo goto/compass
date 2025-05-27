@@ -474,6 +474,10 @@ func (*AssetRepository) validateAsset(ast asset.Asset) error {
 
 // DeleteByID hard delete asset using its ID
 func (r *AssetRepository) DeleteByID(ctx context.Context, id string) (urn string, err error) {
+	if !isValidUUID(id) {
+		return "", asset.InvalidError{AssetID: id}
+	}
+
 	err = r.client.RunWithinTx(ctx, func(tx *sqlx.Tx) error {
 		fetchedAsset, err := r.GetByIDWithTx(ctx, tx, id)
 		if err != nil {
@@ -513,6 +517,10 @@ func (r *AssetRepository) DeleteByURN(ctx context.Context, urn string) error {
 }
 
 func (r *AssetRepository) SoftDeleteByID(ctx context.Context, id string, softDeleteAsset asset.SoftDeleteAsset) (urn string, err error) {
+	if !isValidUUID(id) {
+		return "", asset.InvalidError{AssetID: id}
+	}
+
 	err = r.client.RunWithinTx(ctx, func(tx *sqlx.Tx) error {
 		fetchedAsset, err := r.GetByIDWithTx(ctx, tx, id)
 		if err != nil {
@@ -536,6 +544,7 @@ func (r *AssetRepository) SoftDeleteByID(ctx context.Context, id string, softDel
 		newAsset.UpdatedAt = softDeleteAsset.UpdatedAt
 		newAsset.RefreshedAt = &softDeleteAsset.RefreshedAt
 		newAsset.IsDeleted = true
+		newAsset.UpdatedBy = user.User{ID: softDeleteAsset.UpdatedBy}
 		newAsset.Changelog = softDeleteAsset.Changelog
 
 		err = r.softDeleteWithPredicate(ctx, tx, sq.Eq{"id": id}, newAsset)
@@ -575,6 +584,7 @@ func (r *AssetRepository) SoftDeleteByURN(ctx context.Context, urn string, softD
 		newAsset.UpdatedAt = softDeleteAsset.UpdatedAt
 		newAsset.RefreshedAt = &softDeleteAsset.RefreshedAt
 		newAsset.IsDeleted = true
+		newAsset.UpdatedBy = user.User{ID: softDeleteAsset.UpdatedBy}
 		newAsset.Changelog = softDeleteAsset.Changelog
 
 		err = r.softDeleteWithPredicate(ctx, tx, sq.Eq{"urn": urn}, newAsset)
@@ -653,6 +663,7 @@ func (r *AssetRepository) softDeleteByQuery(
 		Set("is_deleted", true).
 		Set("updated_at", softDeleteAsset.UpdatedAt).
 		Set("refreshed_at", softDeleteAsset.RefreshedAt).
+		Set("updated_by", softDeleteAsset.UpdatedBy).
 		Set("version", softDeleteAsset.Version).
 		Where(whereCondition).
 		PlaceholderFormat(sq.Dollar).
@@ -787,6 +798,7 @@ func (r *AssetRepository) softDeleteWithPredicate(ctx context.Context, tx *sqlx.
 		Set("is_deleted", true).
 		Set("updated_at", newAsset.UpdatedAt).
 		Set("refreshed_at", newAsset.RefreshedAt).
+		Set("updated_by", newAsset.UpdatedBy.ID).
 		Set("version", newAsset.Version).
 		Where(pred).
 		PlaceholderFormat(sq.Dollar).

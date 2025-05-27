@@ -186,7 +186,7 @@ func (s *Service) DeleteAsset(ctx context.Context, id string) (err error) {
 }
 
 // SoftDeleteAsset is soft-deletion that can accept ID or URN of asset
-func (s *Service) SoftDeleteAsset(ctx context.Context, id, updatedBy string) (urn string, err error) {
+func (s *Service) SoftDeleteAsset(ctx context.Context, id, updatedBy string) (err error) {
 	defer func() {
 		s.instrumentAssetOp(ctx, "SoftDeleteAsset", id, err)
 	}()
@@ -194,20 +194,20 @@ func (s *Service) SoftDeleteAsset(ctx context.Context, id, updatedBy string) (ur
 	currentTime := time.Now()
 	softDeleteAsset := NewSoftDeleteAsset(currentTime, currentTime, updatedBy)
 
-	urn = id
+	urn := id
 	if isValidUUID(id) {
 		urn, err = s.assetRepository.SoftDeleteByID(ctx, id, softDeleteAsset)
 		if err != nil {
-			return urn, err
+			return err
 		}
 	} else {
 		if err := s.assetRepository.SoftDeleteByURN(ctx, urn, softDeleteAsset); err != nil {
-			return urn, err
+			return err
 		}
 	}
 
 	softDeleteAsset.URN = urn
-	return urn, s.worker.EnqueueSoftDeleteAssetJob(ctx, softDeleteAsset)
+	return s.worker.EnqueueSoftDeleteAssetJob(ctx, softDeleteAsset)
 }
 
 func (s *Service) DeleteAssets(ctx context.Context, request DeleteAssetsRequest) (affectedRows uint32, err error) {

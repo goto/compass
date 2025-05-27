@@ -392,6 +392,142 @@ func TestDiscoveryRepositoryDeleteByURN(t *testing.T) {
 	})
 }
 
+func TestDiscoveryRepositorySoftDeleteByURN(t *testing.T) {
+	var (
+		ctx             = context.Background()
+		bigqueryService = "bigquery-test"
+		kafkaService    = "kafka-test"
+	)
+
+	cli, err := esTestServer.NewClient()
+	require.NoError(t, err)
+
+	esClient, err := store.NewClient(
+		log.NewNoop(), store.Config{}, store.WithClient(cli),
+	)
+	require.NoError(t, err)
+
+	repo := store.NewDiscoveryRepository(esClient, log.NewNoop(), time.Second*10, []string{"number", "id"})
+
+	t.Run("should return error if the given urn is empty", func(t *testing.T) {
+		err = repo.SoftDeleteByURN(ctx, asset.SoftDeleteAsset{URN: ""})
+		assert.ErrorIs(t, err, asset.ErrEmptyURN)
+	})
+
+	t.Run("should not return error on success", func(t *testing.T) {
+		ast := asset.Asset{
+			ID:      "delete-id",
+			Type:    asset.Type("table"),
+			Service: bigqueryService,
+			URN:     "some-urn",
+			Version: "0.1",
+		}
+
+		err = repo.Upsert(ctx, ast)
+		require.NoError(t, err)
+
+		// Ensure the asset exists before soft delete
+		version, err := repo.GetCurrentAssetVersion(ctx, ast.URN, 2*time.Second)
+		require.NoError(t, err)
+		assert.Equal(t, "0.1", version)
+
+		err = repo.SoftDeleteByURN(ctx, asset.SoftDeleteAsset{URN: ast.URN})
+		assert.NoError(t, err)
+
+		// Soft delete does not remove the asset, it just marks it as deleted and increase the version
+		newVersion, err := repo.GetCurrentAssetVersion(ctx, ast.URN, 2*time.Second)
+		require.NoError(t, err)
+		assert.Equal(t, "0.2", newVersion)
+	})
+
+	t.Run("should ignore unavailable indices", func(t *testing.T) {
+		ast1 := asset.Asset{
+			ID:      "id1",
+			Type:    asset.Type("table"),
+			Service: bigqueryService,
+			URN:     "test-urn1",
+			Version: "0.1",
+		}
+		ast2 := asset.Asset{
+			ID:      "id2",
+			Type:    asset.Type("topic"),
+			Service: kafkaService,
+			URN:     "test-urn2",
+			Version: "0.1",
+		}
+		cli, err := esTestServer.NewClient()
+		require.NoError(t, err)
+		esClient, err := store.NewClient(
+			log.NewNoop(),
+			store.Config{},
+			store.WithClient(cli),
+		)
+		require.NoError(t, err)
+
+		repo := store.NewDiscoveryRepository(esClient, log.NewNoop(), time.Second*10, []string{"number", "id"})
+
+		err = repo.Upsert(ctx, ast1)
+		require.NoError(t, err)
+
+		err = repo.Upsert(ctx, ast2)
+		require.NoError(t, err)
+
+		_, err = cli.Indices.Close([]string{kafkaService})
+		require.NoError(t, err)
+
+		err = repo.SoftDeleteByURN(ctx, asset.SoftDeleteAsset{URN: ast1.URN})
+		assert.NoError(t, err)
+	})
+}
+
+func TestDiscoveryRepositoryGetCurrentVersionAsset(t *testing.T) {
+	var (
+		ctx             = context.Background()
+		bigqueryService = "bigquery-test"
+	)
+
+	cli, err := esTestServer.NewClient()
+	require.NoError(t, err)
+
+	esClient, err := store.NewClient(
+		log.NewNoop(), store.Config{}, store.WithClient(cli),
+	)
+	require.NoError(t, err)
+
+	repo := store.NewDiscoveryRepository(esClient, log.NewNoop(), time.Second*10, []string{"number", "id"})
+
+	t.Run("should return error not found if the given urn is not exist", func(t *testing.T) {
+		_, err = repo.GetCurrentAssetVersion(ctx, "test-urn", 1*time.Second)
+		assert.ErrorContains(t, err, "asset test-urn not found")
+	})
+
+	t.Run("should not return error on success", func(t *testing.T) {
+		ast := asset.Asset{
+			ID:      "some-id",
+			Type:    asset.Type("table"),
+			Service: bigqueryService,
+			URN:     "some-urn",
+			Version: "0.1",
+		}
+
+		err = repo.Upsert(ctx, ast)
+		require.NoError(t, err)
+
+		// Ensure the asset exists before soft delete
+		version, err := repo.GetCurrentAssetVersion(ctx, ast.URN, 2*time.Second)
+		require.NoError(t, err)
+		assert.Equal(t, "0.1", version)
+
+		err = repo.SoftDeleteByURN(ctx, asset.SoftDeleteAsset{URN: ast.URN})
+		assert.NoError(t, err)
+
+		// Soft delete increase the version
+		newVersion, err := repo.GetCurrentAssetVersion(ctx, ast.URN, 2*time.Second)
+		require.NoError(t, err)
+		assert.Equal(t, "0.2", newVersion)
+	})
+}
+
 func TestDiscoveryRepositoryDeleteByQueryExpr(t *testing.T) {
 	var (
 		ctx             = context.Background()

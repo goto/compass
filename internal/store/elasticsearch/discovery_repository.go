@@ -254,7 +254,7 @@ func (repo *DiscoveryRepository) softDeleteAsset(ctx context.Context, discoveryO
 	}(time.Now())
 
 	// First get the current version
-	currentVersion, err := repo.getCurrentAssetVersion(ctx, softDeleteAsset.URN)
+	currentVersion, err := repo.GetCurrentAssetVersion(ctx, softDeleteAsset.URN, 2*time.Second)
 	if err != nil {
 		return asset.DiscoveryError{
 			Op:  "GetCurrentVersion",
@@ -329,8 +329,15 @@ func (repo *DiscoveryRepository) softDeleteAsset(ctx context.Context, discoveryO
 	return nil
 }
 
-// Helper function to get current version
-func (repo *DiscoveryRepository) getCurrentAssetVersion(ctx context.Context, urn string) (string, error) {
+// GetCurrentAssetVersion is helper function to get current version. Used in soft delete func and tests.
+func (repo *DiscoveryRepository) GetCurrentAssetVersion(
+	ctx context.Context,
+	urn string,
+	timeout time.Duration,
+) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
 	query := map[string]interface{}{
 		"query": map[string]interface{}{
 			"term": map[string]interface{}{
@@ -346,39 +353,50 @@ func (repo *DiscoveryRepository) getCurrentAssetVersion(ctx context.Context, urn
 		return "", fmt.Errorf("failed to encode query: %w", err)
 	}
 
-	res, err := repo.cli.client.Search(
-		repo.cli.client.Search.WithContext(ctx),
-		repo.cli.client.Search.WithIndex(defaultSearchIndex),
-		repo.cli.client.Search.WithBody(&buf),
-	)
-	if err != nil {
-		return "", fmt.Errorf("search failed: %w", err)
-	}
-	defer res.Body.Close()
+	// Retry loop every 500ms
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
 
-	if res.IsError() {
-		return "", fmt.Errorf("search error: %s", res.String())
-	}
+	for {
+		select {
+		case <-ctx.Done():
+			// Timeout reached
+			return "", fmt.Errorf("asset %s not found after %v", urn, timeout)
 
-	var result struct {
-		Hits struct {
-			Hits []struct {
-				Source struct {
-					Version string `json:"version"`
-				} `json:"_source"`
-			} `json:"hits"`
-		} `json:"hits"`
-	}
+		case <-ticker.C:
+			// Execute search
+			res, err := repo.cli.client.Search(
+				repo.cli.client.Search.WithContext(ctx),
+				repo.cli.client.Search.WithIndex(defaultSearchIndex),
+				repo.cli.client.Search.WithBody(&buf),
+				repo.cli.client.Search.WithIgnoreUnavailable(true),
+			)
+			if err != nil {
+				continue // Retry on network errors
+			}
 
-	if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
-		return "", fmt.Errorf("failed to decode response: %w", err)
-	}
+			// Process response if no error
+			var result struct {
+				Hits struct {
+					Hits []struct {
+						Source struct {
+							Version string `json:"version"`
+						} `json:"_source"`
+					} `json:"hits"`
+				} `json:"hits"`
+			}
 
-	if len(result.Hits.Hits) == 0 {
-		return "", fmt.Errorf("asset with URN %s not found", urn)
-	}
+			if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
+				res.Body.Close()
+				continue // Retry on decode errors
+			}
+			res.Body.Close()
 
-	return result.Hits.Hits[0].Source.Version, nil
+			if len(result.Hits.Hits) > 0 {
+				return result.Hits.Hits[0].Source.Version, nil // Found!
+			}
+		}
+	}
 }
 
 func (repo *DiscoveryRepository) indexAsset(ctx context.Context, ast asset.Asset) (err error) {
