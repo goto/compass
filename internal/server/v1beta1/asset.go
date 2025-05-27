@@ -32,7 +32,7 @@ type AssetService interface {
 	UpsertPatchAsset(ctx context.Context, ast *asset.Asset, upstreams, downstreams []string, patchData map[string]interface{}) (string, error)
 	UpsertPatchAssetWithoutLineage(ctx context.Context, ast *asset.Asset, patchData map[string]interface{}) (string, error)
 	DeleteAsset(ctx context.Context, id string) error
-	SoftDeleteAsset(ctx context.Context, id, updatedBy string) error
+	SoftDeleteAsset(ctx context.Context, id, updatedBy string) (string, error)
 	DeleteAssets(ctx context.Context, request asset.DeleteAssetsRequest) (uint32, error)
 	SoftDeleteAssets(ctx context.Context, request asset.DeleteAssetsRequest, updatedBy string) (uint32, error)
 
@@ -300,7 +300,8 @@ func (server *APIServer) DeleteAsset(ctx context.Context, req *compassv1beta1.De
 		return nil, err
 	}
 
-	if err := server.assetService.SoftDeleteAsset(ctx, req.GetId(), userID); err != nil {
+	_, err = server.assetService.SoftDeleteAsset(ctx, req.GetId(), userID)
+	if err != nil {
 		if errors.As(err, new(asset.InvalidError)) {
 			return nil, status.Error(codes.InvalidArgument, err.Error())
 		}
