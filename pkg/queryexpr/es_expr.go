@@ -40,6 +40,16 @@ func (e ESExpr) ToQuery() (string, error) {
 	return string(queryJSON), nil
 }
 
+// QueryStringToMap is used to convert back a query string to a map
+func QueryStringToMap(queryString string) (map[string]interface{}, error) {
+	var queryMap map[string]interface{}
+	err := json.Unmarshal([]byte(queryString), &queryMap)
+	if err != nil {
+		return nil, err
+	}
+	return queryMap, nil
+}
+
 // Validate default: no validation
 func (ESExpr) Validate() error {
 	return nil
