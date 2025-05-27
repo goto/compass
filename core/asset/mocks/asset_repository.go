@@ -70,17 +70,27 @@ func (_c *AssetRepository_AddProbe_Call) RunAndReturn(run func(context.Context, 
 }
 
 // DeleteByID provides a mock function with given fields: ctx, id
-func (_m *AssetRepository) DeleteByID(ctx context.Context, id string) error {
+func (_m *AssetRepository) DeleteByID(ctx context.Context, id string) (string, error) {
 	ret := _m.Called(ctx, id)
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, string) error); ok {
+	var r0 string
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) (string, error)); ok {
+		return rf(ctx, id)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string) string); ok {
 		r0 = rf(ctx, id)
 	} else {
-		r0 = ret.Error(0)
+		r0 = ret.Get(0).(string)
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(context.Context, string) error); ok {
+		r1 = rf(ctx, id)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // AssetRepository_DeleteByID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteByID'
@@ -102,12 +112,12 @@ func (_c *AssetRepository_DeleteByID_Call) Run(run func(ctx context.Context, id 
 	return _c
 }
 
-func (_c *AssetRepository_DeleteByID_Call) Return(_a0 error) *AssetRepository_DeleteByID_Call {
-	_c.Call.Return(_a0)
+func (_c *AssetRepository_DeleteByID_Call) Return(_a0 string, _a1 error) *AssetRepository_DeleteByID_Call {
+	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *AssetRepository_DeleteByID_Call) RunAndReturn(run func(context.Context, string) error) *AssetRepository_DeleteByID_Call {
+func (_c *AssetRepository_DeleteByID_Call) RunAndReturn(run func(context.Context, string) (string, error)) *AssetRepository_DeleteByID_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -802,6 +812,104 @@ func (_c *AssetRepository_GetVersionHistory_Call) Return(_a0 []asset.Asset, _a1 
 }
 
 func (_c *AssetRepository_GetVersionHistory_Call) RunAndReturn(run func(context.Context, asset.Filter, string) ([]asset.Asset, error)) *AssetRepository_GetVersionHistory_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SoftDeleteByID provides a mock function with given fields: ctx, id, softDeleteAsset
+func (_m *AssetRepository) SoftDeleteByID(ctx context.Context, id string, softDeleteAsset asset.SoftDeleteAsset) (string, error) {
+	ret := _m.Called(ctx, id, softDeleteAsset)
+
+	var r0 string
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, asset.SoftDeleteAsset) (string, error)); ok {
+		return rf(ctx, id, softDeleteAsset)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, string, asset.SoftDeleteAsset) string); ok {
+		r0 = rf(ctx, id, softDeleteAsset)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, string, asset.SoftDeleteAsset) error); ok {
+		r1 = rf(ctx, id, softDeleteAsset)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// AssetRepository_SoftDeleteByID_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SoftDeleteByID'
+type AssetRepository_SoftDeleteByID_Call struct {
+	*mock.Call
+}
+
+// SoftDeleteByID is a helper method to define mock.On call
+//   - ctx context.Context
+//   - id string
+//   - softDeleteAsset asset.SoftDeleteAsset
+func (_e *AssetRepository_Expecter) SoftDeleteByID(ctx interface{}, id interface{}, softDeleteAsset interface{}) *AssetRepository_SoftDeleteByID_Call {
+	return &AssetRepository_SoftDeleteByID_Call{Call: _e.mock.On("SoftDeleteByID", ctx, id, softDeleteAsset)}
+}
+
+func (_c *AssetRepository_SoftDeleteByID_Call) Run(run func(ctx context.Context, id string, softDeleteAsset asset.SoftDeleteAsset)) *AssetRepository_SoftDeleteByID_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(asset.SoftDeleteAsset))
+	})
+	return _c
+}
+
+func (_c *AssetRepository_SoftDeleteByID_Call) Return(_a0 string, _a1 error) *AssetRepository_SoftDeleteByID_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *AssetRepository_SoftDeleteByID_Call) RunAndReturn(run func(context.Context, string, asset.SoftDeleteAsset) (string, error)) *AssetRepository_SoftDeleteByID_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// SoftDeleteByURN provides a mock function with given fields: ctx, urn, softDeleteAsset
+func (_m *AssetRepository) SoftDeleteByURN(ctx context.Context, urn string, softDeleteAsset asset.SoftDeleteAsset) error {
+	ret := _m.Called(ctx, urn, softDeleteAsset)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string, asset.SoftDeleteAsset) error); ok {
+		r0 = rf(ctx, urn, softDeleteAsset)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// AssetRepository_SoftDeleteByURN_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SoftDeleteByURN'
+type AssetRepository_SoftDeleteByURN_Call struct {
+	*mock.Call
+}
+
+// SoftDeleteByURN is a helper method to define mock.On call
+//   - ctx context.Context
+//   - urn string
+//   - softDeleteAsset asset.SoftDeleteAsset
+func (_e *AssetRepository_Expecter) SoftDeleteByURN(ctx interface{}, urn interface{}, softDeleteAsset interface{}) *AssetRepository_SoftDeleteByURN_Call {
+	return &AssetRepository_SoftDeleteByURN_Call{Call: _e.mock.On("SoftDeleteByURN", ctx, urn, softDeleteAsset)}
+}
+
+func (_c *AssetRepository_SoftDeleteByURN_Call) Run(run func(ctx context.Context, urn string, softDeleteAsset asset.SoftDeleteAsset)) *AssetRepository_SoftDeleteByURN_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string), args[2].(asset.SoftDeleteAsset))
+	})
+	return _c
+}
+
+func (_c *AssetRepository_SoftDeleteByURN_Call) Return(_a0 error) *AssetRepository_SoftDeleteByURN_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *AssetRepository_SoftDeleteByURN_Call) RunAndReturn(run func(context.Context, string, asset.SoftDeleteAsset) error) *AssetRepository_SoftDeleteByURN_Call {
 	_c.Call.Return(run)
 	return _c
 }

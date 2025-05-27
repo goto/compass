@@ -12,7 +12,8 @@ import (
 	"time"
 
 	"github.com/goto/compass/core/asset"
-	queryexpr "github.com/goto/compass/pkg/queryexpr"
+	"github.com/goto/compass/core/user"
+	"github.com/goto/compass/pkg/queryexpr"
 	"github.com/goto/salt/log"
 )
 
@@ -145,6 +146,14 @@ func (repo *DiscoveryRepository) DeleteByURN(ctx context.Context, assetURN strin
 	return repo.deleteWithQuery(ctx, "DeleteByURN", fmt.Sprintf(`{"query":{"term":{"urn.keyword": %q}}}`, assetURN))
 }
 
+func (repo *DiscoveryRepository) SoftDeleteByURN(ctx context.Context, softDeleteAsset asset.SoftDeleteAsset) error {
+	if softDeleteAsset.URN == "" {
+		return asset.ErrEmptyURN
+	}
+
+	return repo.softDeleteAsset(ctx, "DeleteByURN", softDeleteAsset)
+}
+
 func (repo *DiscoveryRepository) DeleteByQueryExpr(ctx context.Context, queryExpr queryexpr.ExprStr) error {
 	if strings.TrimSpace(queryExpr.String()) == "" {
 		return asset.ErrEmptyQuery
@@ -197,6 +206,163 @@ func (repo *DiscoveryRepository) deleteWithQuery(ctx context.Context, discoveryO
 	return nil
 }
 
+func (repo *DiscoveryRepository) softDeleteAsset(ctx context.Context, discoveryOp string, softDeleteAsset asset.SoftDeleteAsset) (err error) {
+	defer func(start time.Time) {
+		const op = "soft_delete_by_query"
+		repo.cli.instrumentOp(ctx, instrumentParams{
+			op:          op,
+			discoveryOp: discoveryOp,
+			start:       start,
+			err:         err,
+		})
+	}(time.Now())
+
+	// First get the current version
+	currentVersion, err := repo.GetCurrentAssetVersion(ctx, softDeleteAsset.URN, 2*time.Second)
+	if err != nil {
+		return asset.DiscoveryError{
+			Op:  "GetCurrentVersion",
+			Err: fmt.Errorf("failed to get current version for URN %s: %w", softDeleteAsset.URN, err),
+		}
+	}
+	newVersion, err := asset.IncreaseMinorVersion(currentVersion)
+	if err != nil {
+		return err
+	}
+
+	// Create the update request body
+	body := map[string]interface{}{
+		"query": map[string]interface{}{
+			"term": map[string]interface{}{
+				"urn.keyword": softDeleteAsset.URN,
+			},
+		},
+		"script": map[string]interface{}{
+			"source": `
+                ctx._source.is_deleted = true;
+                ctx._source.updated_at = params.updated_at;
+                ctx._source.refreshed_at = params.refreshed_at;
+                ctx._source.updated_by = params.updated_by;
+                ctx._source.version = params.version;
+            `,
+			"lang": "painless",
+			"params": map[string]interface{}{
+				"updated_at":   softDeleteAsset.UpdatedAt,
+				"refreshed_at": softDeleteAsset.RefreshedAt,
+				"updated_by":   user.User{ID: softDeleteAsset.UpdatedBy},
+				"version":      newVersion,
+			},
+		},
+	}
+
+	buf, err := encodeBodyRequest(body)
+	if err != nil {
+		return asset.DiscoveryError{
+			Op:  "SoftDeleteByURN",
+			Err: err,
+		}
+	}
+
+	// Execute UpdateByQuery
+	res, err := repo.cli.client.UpdateByQuery(
+		[]string{defaultSearchIndex},
+		repo.cli.client.UpdateByQuery.WithContext(ctx),
+		repo.cli.client.UpdateByQuery.WithBody(buf),
+		repo.cli.client.UpdateByQuery.WithRefresh(true),
+		repo.cli.client.UpdateByQuery.WithIgnoreUnavailable(true),
+		repo.cli.client.UpdateByQuery.WithWaitForCompletion(true),
+		repo.cli.client.UpdateByQuery.WithConflicts("proceed"),
+	)
+	if err != nil {
+		return asset.DiscoveryError{
+			Op:  "DeleteDoc",
+			Err: fmt.Errorf("urn: %s: %w", softDeleteAsset.URN, err),
+		}
+	}
+
+	defer drainBody(res)
+	if res.IsError() {
+		code, reason := errorCodeAndReason(res)
+		return asset.DiscoveryError{
+			Op:     "DeleteDoc",
+			ESCode: code,
+			Err:    fmt.Errorf("urn: %s: %s", softDeleteAsset.URN, reason),
+		}
+	}
+
+	return nil
+}
+
+// GetCurrentAssetVersion is helper function to get current version. Used in soft delete func and tests.
+func (repo *DiscoveryRepository) GetCurrentAssetVersion(
+	ctx context.Context,
+	urn string,
+	timeout time.Duration,
+) (string, error) {
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	query := map[string]interface{}{
+		"query": map[string]interface{}{
+			"term": map[string]interface{}{
+				"urn.keyword": urn,
+			},
+		},
+		"size":    1,
+		"_source": []string{"version"},
+	}
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(query); err != nil {
+		return "", fmt.Errorf("failed to encode query: %w", err)
+	}
+
+	// Retry loop every 500ms
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			// Timeout reached
+			return "", fmt.Errorf("asset %s not found after %v", urn, timeout)
+
+		case <-ticker.C:
+			// Execute search
+			res, err := repo.cli.client.Search(
+				repo.cli.client.Search.WithContext(ctx),
+				repo.cli.client.Search.WithIndex(defaultSearchIndex),
+				repo.cli.client.Search.WithBody(&buf),
+				repo.cli.client.Search.WithIgnoreUnavailable(true),
+			)
+			if err != nil {
+				continue // Retry on network errors
+			}
+
+			// Process response if no error
+			var result struct {
+				Hits struct {
+					Hits []struct {
+						Source struct {
+							Version string `json:"version"`
+						} `json:"_source"`
+					} `json:"hits"`
+				} `json:"hits"`
+			}
+
+			if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
+				res.Body.Close()
+				continue // Retry on decode errors
+			}
+			res.Body.Close()
+
+			if len(result.Hits.Hits) > 0 {
+				return result.Hits.Hits[0].Source.Version, nil // Found!
+			}
+		}
+	}
+}
+
 func (repo *DiscoveryRepository) indexAsset(ctx context.Context, ast asset.Asset) (err error) {
 	defer func(start time.Time) {
 		const op = "index"
@@ -208,7 +374,7 @@ func (repo *DiscoveryRepository) indexAsset(ctx context.Context, ast asset.Asset
 		})
 	}(time.Now())
 
-	body, err := createUpsertBody(ast)
+	body, err := encodeBodyRequest(ast)
 	if err != nil {
 		return asset.DiscoveryError{
 			Op:  "EncodeAsset",
@@ -248,10 +414,10 @@ func (repo *DiscoveryRepository) indexAsset(ctx context.Context, ast asset.Asset
 	return nil
 }
 
-func createUpsertBody(ast asset.Asset) (io.Reader, error) {
+func encodeBodyRequest(body interface{}) (io.Reader, error) {
 	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(ast); err != nil {
-		return nil, fmt.Errorf("encode asset: %w", err)
+	if err := json.NewEncoder(&buf).Encode(body); err != nil {
+		return nil, fmt.Errorf("encode request body: %w", err)
 	}
 
 	return &buf, nil

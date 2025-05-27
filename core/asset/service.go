@@ -31,6 +31,7 @@ type Service struct {
 type Worker interface {
 	EnqueueIndexAssetJob(ctx context.Context, ast Asset) error
 	EnqueueDeleteAssetJob(ctx context.Context, urn string) error
+	EnqueueSoftDeleteAssetJob(ctx context.Context, softDeleteAsset SoftDeleteAsset) error
 	EnqueueDeleteAssetsByQueryExprJob(ctx context.Context, queryExpr string) error
 	EnqueueSyncAssetJob(ctx context.Context, service string) error
 	Close() error
@@ -158,6 +159,7 @@ func (s *Service) UpsertPatchAssetWithoutLineage(ctx context.Context, ast *Asset
 	return assetID, nil
 }
 
+// DeleteAsset is hard-deletion that can accept ID or URN of asset
 func (s *Service) DeleteAsset(ctx context.Context, id string) (err error) {
 	defer func() {
 		s.instrumentAssetOp(ctx, "DeleteAsset", id, err)
@@ -165,16 +167,14 @@ func (s *Service) DeleteAsset(ctx context.Context, id string) (err error) {
 
 	urn := id
 	if isValidUUID(id) {
-		asset, err := s.assetRepository.GetByID(ctx, id)
+		urn, err = s.assetRepository.DeleteByID(ctx, id)
 		if err != nil {
 			return err
 		}
-
-		urn = asset.URN
-	}
-
-	if err := s.assetRepository.DeleteByURN(ctx, urn); err != nil {
-		return err
+	} else {
+		if err := s.assetRepository.DeleteByURN(ctx, urn); err != nil {
+			return err
+		}
 	}
 
 	if err := s.worker.EnqueueDeleteAssetJob(ctx, urn); err != nil {
@@ -182,6 +182,31 @@ func (s *Service) DeleteAsset(ctx context.Context, id string) (err error) {
 	}
 
 	return s.lineageRepository.DeleteByURN(ctx, urn)
+}
+
+// SoftDeleteAsset is soft-deletion that can accept ID or URN of asset
+func (s *Service) SoftDeleteAsset(ctx context.Context, id, updatedBy string) (err error) {
+	defer func() {
+		s.instrumentAssetOp(ctx, "SoftDeleteAsset", id, err)
+	}()
+
+	currentTime := time.Now()
+	softDeleteAsset := NewSoftDeleteAsset(currentTime, currentTime, updatedBy)
+
+	urn := id
+	if isValidUUID(id) {
+		urn, err = s.assetRepository.SoftDeleteByID(ctx, id, softDeleteAsset)
+		if err != nil {
+			return err
+		}
+	} else {
+		if err := s.assetRepository.SoftDeleteByURN(ctx, urn, softDeleteAsset); err != nil {
+			return err
+		}
+	}
+
+	softDeleteAsset.URN = urn
+	return s.worker.EnqueueSoftDeleteAssetJob(ctx, softDeleteAsset)
 }
 
 func (s *Service) DeleteAssets(ctx context.Context, request DeleteAssetsRequest) (affectedRows uint32, err error) {

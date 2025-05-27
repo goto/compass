@@ -3,6 +3,7 @@ package asset
 //go:generate mockery --name=DiscoveryRepository -r --case underscore --with-expecter --structname DiscoveryRepository --filename discovery_repository.go --output=./mocks
 import (
 	"context"
+
 	"github.com/goto/compass/pkg/queryexpr"
 )
 
@@ -10,6 +11,7 @@ type DiscoveryRepository interface {
 	Upsert(context.Context, Asset) error
 	DeleteByID(ctx context.Context, assetID string) error
 	DeleteByURN(ctx context.Context, assetURN string) error
+	SoftDeleteByURN(ctx context.Context, softDeleteAsset SoftDeleteAsset) error
 	DeleteByQueryExpr(ctx context.Context, queryExpr queryexpr.ExprStr) error
 	Search(ctx context.Context, cfg SearchConfig) (results []SearchResult, err error)
 	Suggest(ctx context.Context, cfg SearchConfig) (suggestions []string, err error)

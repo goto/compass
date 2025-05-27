@@ -82,6 +82,44 @@ func TestInSituWorker_EnqueueDeleteAssetJob(t *testing.T) {
 	}
 }
 
+func TestInSituWorker_EnqueueSoftDeleteAssetJob(t *testing.T) {
+	currentTime := time.Now().UTC()
+	softDeleteAsset := asset.NewSoftDeleteAsset(currentTime, currentTime, "some-user")
+
+	cases := []struct {
+		name         string
+		discoveryErr error
+		expectedErr  bool
+	}{
+		{name: "Success"},
+		{
+			name:         "Failure",
+			discoveryErr: errors.New("fail"),
+			expectedErr:  true,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			discoveryRepo := mocks.NewDiscoveryRepository(t)
+			softDeleteAsset.URN = "some-urn"
+			discoveryRepo.EXPECT().
+				SoftDeleteByURN(ctx, softDeleteAsset).
+				Return(tc.discoveryErr)
+
+			wrkr := workermanager.NewInSituWorker(workermanager.Deps{
+				DiscoveryRepo: discoveryRepo,
+			})
+			err := wrkr.EnqueueSoftDeleteAssetJob(ctx, softDeleteAsset)
+			if tc.expectedErr {
+				assert.Error(t, err)
+				assert.ErrorIs(t, err, tc.discoveryErr)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
 func TestInSituWorker_EnqueueDeleteAssetsByQueryExprJob(t *testing.T) {
 	cases := []struct {
 		name         string
