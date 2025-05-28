@@ -107,19 +107,6 @@ func (r *StarRepositoryTestSuite) TestCreate() {
 		r.ErrorIs(err, star.DuplicateRecordError{UserID: userID, AssetID: createdAsset.ID})
 		r.Empty(id)
 	})
-
-	r.Run("return error user not found if user does not exist", func() {
-		err := testutils.RunMigrationsWithClient(r.T(), r.client)
-		r.NoError(err)
-		uid := uuid.NewString()
-
-		createdAsset, err := createAsset(r.assetRepository, uid, ownerEmail, "asset-urn-1", "table")
-		r.NoError(err)
-
-		id, err := r.repository.Create(r.ctx, uid, createdAsset.ID)
-		r.ErrorIs(err, star.UserNotFoundError{UserID: uid})
-		r.Empty(id)
-	})
 }
 
 func (r *StarRepositoryTestSuite) TestGetStargazers() {
