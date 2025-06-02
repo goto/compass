@@ -160,3 +160,48 @@ func TestInSituWorker_EnqueueDeleteAssetsByQueryExprJob(t *testing.T) {
 		})
 	}
 }
+
+func TestInSituWorker_EnqueueSoftDeleteAssetsByQueryExprJob(t *testing.T) {
+	currentTime := time.Now().UTC()
+	cases := []struct {
+		name         string
+		discoveryErr error
+		expectedErr  bool
+	}{
+		{name: "Success"},
+		{
+			name:         "Failure",
+			discoveryErr: errors.New("fail"),
+			expectedErr:  true,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			queryExpr := "refreshed_at <= '" + time.Now().Format("2006-01-02T15:04:05Z") +
+				"' && service == 'test-service'" +
+				"' && type == 'table'" +
+				"' && urn == 'some-urn'"
+			deleteESExpr := asset.DeleteAssetExpr{
+				ExprStr: queryexpr.ESExpr(queryExpr),
+			}
+			softDeleteAssetsByQueryExpr := asset.NewSoftDeleteAssetsByQueryExpr(
+				currentTime, currentTime, "some-user", queryExpr, deleteESExpr)
+
+			discoveryRepo := mocks.NewDiscoveryRepository(t)
+			discoveryRepo.EXPECT().
+				SoftDeleteByQueryExpr(ctx, softDeleteAssetsByQueryExpr).
+				Return(tc.discoveryErr)
+
+			wrkr := workermanager.NewInSituWorker(workermanager.Deps{
+				DiscoveryRepo: discoveryRepo,
+			})
+			err := wrkr.EnqueueSoftDeleteAssetsByQueryExprJob(ctx, softDeleteAssetsByQueryExpr)
+			if tc.expectedErr {
+				assert.Error(t, err)
+				assert.ErrorIs(t, err, tc.discoveryErr)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}

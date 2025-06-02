@@ -490,12 +490,12 @@ func (repo *DiscoveryRepository) GetCurrentAssetVersion(
 			return "", fmt.Errorf("asset %s not found after %v", urn, timeout)
 
 		case <-ticker.C:
-			// Execute search
-			res, err := repo.cli.client.Search(
-				repo.cli.client.Search.WithContext(ctx),
-				repo.cli.client.Search.WithIndex(defaultSearchIndex),
-				repo.cli.client.Search.WithBody(&buf),
-				repo.cli.client.Search.WithIgnoreUnavailable(true),
+			search := repo.cli.client.Search
+			res, err := search(
+				search.WithContext(ctx),
+				search.WithIndex(defaultSearchIndex),
+				search.WithBody(&buf),
+				search.WithIgnoreUnavailable(true),
 			)
 			if err != nil {
 				continue // Retry on network errors

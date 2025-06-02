@@ -286,6 +286,51 @@ func TestManager_EnqueueDeleteAssetsByQueryExprJob(t *testing.T) {
 	}
 }
 
+func TestManager_EnqueueSoftDeleteAssetsByQueryExprJob(t *testing.T) {
+	currentTime := time.Now().UTC()
+	cases := []struct {
+		name        string
+		enqueueErr  error
+		expectedErr string
+	}{
+		{name: "Success"},
+		{
+			name:        "Failure",
+			enqueueErr:  errors.New("fail"),
+			expectedErr: "enqueue soft delete assets job: fail: query expr:",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			queryExpr := "refreshed_at <= '" + time.Now().Format("2006-01-02T15:04:05Z") +
+				"' && service == 'test-service'" +
+				"' && type == 'table'" +
+				"' && urn == 'some-urn'"
+			wrkr := mocks.NewWorker(t)
+
+			softDeleteAssetsByQueryExpr := asset.NewSoftDeleteAssetsByQueryExpr(
+				currentTime, currentTime, "some-user", queryExpr, nil)
+			payload, err := json.Marshal(softDeleteAssetsByQueryExpr)
+			assert.NoError(t, err, "failed to marshal soft delete assets by query expr")
+
+			wrkr.EXPECT().
+				Enqueue(ctx, worker.JobSpec{
+					Type:    "soft-delete-assets-by-query",
+					Payload: payload,
+				}).
+				Return(tc.enqueueErr)
+
+			mgr := workermanager.NewWithWorker(wrkr, workermanager.Deps{})
+			err = mgr.EnqueueSoftDeleteAssetsByQueryExprJob(ctx, softDeleteAssetsByQueryExpr)
+			if tc.expectedErr != "" {
+				assert.ErrorContains(t, err, tc.expectedErr)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
 func TestManager_DeleteAssets(t *testing.T) {
 	cases := []struct {
 		name         string
@@ -319,6 +364,57 @@ func TestManager_DeleteAssets(t *testing.T) {
 			err := mgr.DeleteAssetsByQueryExpr(ctx, worker.JobSpec{
 				Type:    "delete-assets-by-query",
 				Payload: []byte(queryExpr),
+			})
+			if tc.expectedErr {
+				var re *worker.RetryableError
+				assert.ErrorAs(t, err, &re)
+				assert.ErrorIs(t, err, tc.discoveryErr)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestManager_SoftDeleteAssets(t *testing.T) {
+	currentTime := time.Now().UTC()
+	cases := []struct {
+		name         string
+		discoveryErr error
+		expectedErr  bool
+	}{
+		{name: "Success"},
+		{
+			name:         "failure",
+			discoveryErr: errors.New("fail"),
+			expectedErr:  true,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			queryExpr := "refreshed_at <= '" + time.Now().Format("2006-01-02T15:04:05Z") +
+				"' && service == 'test-service'" +
+				"' && type == 'table'" +
+				"' && urn == 'some-urn'"
+			deleteESExpr := asset.DeleteAssetExpr{
+				ExprStr: queryexpr.ESExpr(queryExpr),
+			}
+			softDeleteAssetsByQueryExpr := asset.NewSoftDeleteAssetsByQueryExpr(
+				currentTime, currentTime, "some-user", queryExpr, deleteESExpr)
+			payload, err := json.Marshal(softDeleteAssetsByQueryExpr)
+			assert.NoError(t, err, "failed to marshal soft delete assets by query expr")
+
+			discoveryRepo := mocks.NewDiscoveryRepository(t)
+			discoveryRepo.EXPECT().
+				SoftDeleteByQueryExpr(ctx, softDeleteAssetsByQueryExpr).
+				Return(tc.discoveryErr)
+
+			mgr := workermanager.NewWithWorker(mocks.NewWorker(t), workermanager.Deps{
+				DiscoveryRepo: discoveryRepo,
+			})
+			err = mgr.SoftDeleteAssetsByQueryExpr(ctx, worker.JobSpec{
+				Type:    "soft-delete-assets-by-query",
+				Payload: payload,
 			})
 			if tc.expectedErr {
 				var re *worker.RetryableError

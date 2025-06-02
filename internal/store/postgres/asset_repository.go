@@ -619,20 +619,20 @@ func (r *AssetRepository) DeleteByQueryExpr(ctx context.Context, queryExpr query
 
 func (r *AssetRepository) SoftDeleteByQueryExpr(
 	ctx context.Context,
-	softDeleteAssets asset.SoftDeleteAssetsByQueryExpr,
+	softDeleteAssetsByQueryExpr asset.SoftDeleteAssetsByQueryExpr,
 ) (err error) {
 	err = r.client.RunWithinTx(ctx, func(tx *sqlx.Tx) error {
-		query, err := queryexpr.ValidateAndGetQueryFromExpr(softDeleteAssets.QueryExpr)
+		query, err := queryexpr.ValidateAndGetQueryFromExpr(softDeleteAssetsByQueryExpr.QueryExpr)
 		if err != nil {
 			return err
 		}
 
-		newAssets, err := r.softDeleteByQuery(ctx, tx, query, softDeleteAssets)
+		newAssets, err := r.softDeleteByQuery(ctx, tx, query, softDeleteAssetsByQueryExpr)
 		if err != nil {
 			return fmt.Errorf("error soft deleting assets by query: %w", err)
 		}
 
-		return r.insertAssetVersions(ctx, tx, newAssets, softDeleteAssets.Changelog)
+		return r.insertAssetVersions(ctx, tx, newAssets, softDeleteAssetsByQueryExpr.Changelog)
 	})
 
 	return err
