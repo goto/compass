@@ -30,11 +30,11 @@ type AssetRepository struct {
 
 // GetAll retrieves list of assets with filters
 func (r *AssetRepository) GetAll(ctx context.Context, flt asset.Filter) ([]asset.Asset, error) {
-	builder := r.getAssetSQL().Offset(uint64(flt.Offset))
+	builder := r.getAssetSQL(&flt.IsDeleted).Offset(uint64(flt.Offset))
 	size := flt.Size
 
 	if size > 0 {
-		builder = r.getAssetSQL().Limit(uint64(size)).Offset(uint64(flt.Offset))
+		builder = r.getAssetSQL(&flt.IsDeleted).Limit(uint64(size)).Offset(uint64(flt.Offset))
 	}
 	builder = r.BuildFilterQuery(builder, flt)
 	builder = r.buildOrderQuery(builder, flt)
@@ -60,7 +60,7 @@ func (r *AssetRepository) GetAll(ctx context.Context, flt asset.Filter) ([]asset
 // GetTypes fetches types with assets count for all available types
 // and returns them as a map[typeName]count
 func (r *AssetRepository) GetTypes(ctx context.Context, flt asset.Filter) (map[asset.Type]int, error) {
-	builder := r.getAssetsGroupByCountSQL("type")
+	builder := r.getAssetsGroupByCountSQL("type", false)
 	builder = r.BuildFilterQuery(builder, flt)
 	query, args, err := builder.PlaceholderFormat(sq.Dollar).ToSql()
 	if err != nil {
@@ -101,7 +101,9 @@ func (r *AssetRepository) GetTypes(ctx context.Context, flt asset.Filter) (map[a
 
 // GetCount retrieves number of assets for every type
 func (r *AssetRepository) GetCount(ctx context.Context, flt asset.Filter) (int, error) {
-	builder := sq.Select("count(1)").From("assets")
+	builder := sq.Select("count(1)").
+		Where(sq.Eq{"is_deleted": flt.IsDeleted}).
+		From("assets")
 	builder = r.BuildFilterQuery(builder, flt)
 	query, args, err := builder.PlaceholderFormat(sq.Dollar).ToSql()
 	if err != nil {
@@ -135,7 +137,8 @@ func (r *AssetRepository) GetCountByQueryExpr(ctx context.Context, queryExpr que
 func (r *AssetRepository) getCountByQuery(ctx context.Context, sqlQuery string) (int, error) {
 	builder := sq.Select("count(1)").
 		From("assets").
-		Where(sqlQuery)
+		Where(sqlQuery).
+		Where(sq.Eq{"is_deleted": false})
 	query, args, err := builder.PlaceholderFormat(sq.Dollar).ToSql()
 	if err != nil {
 		return 0, fmt.Errorf("build count query: %w", err)
@@ -212,7 +215,7 @@ func (r *AssetRepository) getWithPredicate(ctx context.Context, pred sq.Eq) (ass
 }
 
 func (r *AssetRepository) getWithPredicateWithTx(ctx context.Context, tx *sqlx.Tx, pred sq.Eq) (asset.Asset, error) {
-	query, args, err := r.getAssetSQL().
+	query, args, err := r.getAssetSQL(nil).
 		Where(pred).
 		Limit(1).
 		PlaceholderFormat(sq.Dollar).
@@ -1133,14 +1136,15 @@ func (r *AssetRepository) execContext(ctx context.Context, execer sqlx.ExecerCon
 	return nil
 }
 
-func (r *AssetRepository) getAssetsGroupByCountSQL(columnName string) sq.SelectBuilder {
+func (r *AssetRepository) getAssetsGroupByCountSQL(columnName string, isDeleted bool) sq.SelectBuilder {
 	return sq.Select(columnName, "count(1)").
 		From("assets").
+		Where(sq.Eq{"is_deleted": isDeleted}).
 		GroupBy(columnName)
 }
 
-func (r *AssetRepository) getAssetSQL() sq.SelectBuilder {
-	return sq.Select(`
+func (r *AssetRepository) getAssetSQL(isDeleted *bool) sq.SelectBuilder {
+	selectAssetQuery := sq.Select(`
 		a.id as id,
 		a.urn as urn,
 		a.type as type,
@@ -1164,6 +1168,13 @@ func (r *AssetRepository) getAssetSQL() sq.SelectBuilder {
 		From("assets a").
 		LeftJoin("users u ON a.updated_by = u.id").
 		Suffix("FOR UPDATE OF a")
+
+	if isDeleted != nil {
+		return selectAssetQuery.
+			Where(sq.Eq{"a.is_deleted": isDeleted})
+	}
+
+	return selectAssetQuery
 }
 
 func (r *AssetRepository) getAssetVersionSQL() sq.SelectBuilder {
