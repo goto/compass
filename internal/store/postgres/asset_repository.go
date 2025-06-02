@@ -19,6 +19,8 @@ import (
 )
 
 var errAssetAlreadyDeleted = errors.New("asset already deleted")
+var errOffsetCannotBeNegative = errors.New("offset cannot be negative")
+var errSizeCannotBeNegative = errors.New("size cannot be negative")
 
 // AssetRepository is a type that manages user operation to the primary database
 type AssetRepository struct {
@@ -30,6 +32,13 @@ type AssetRepository struct {
 
 // GetAll retrieves list of assets with filters
 func (r *AssetRepository) GetAll(ctx context.Context, flt asset.Filter) ([]asset.Asset, error) {
+	if flt.Offset < 0 {
+		return nil, errOffsetCannotBeNegative
+	}
+	if flt.Size < 0 {
+		return nil, errSizeCannotBeNegative
+	}
+
 	builder := r.getAssetSQL(&flt.IsDeleted).Offset(uint64(flt.Offset))
 	size := flt.Size
 
@@ -49,7 +58,7 @@ func (r *AssetRepository) GetAll(ctx context.Context, flt asset.Filter) ([]asset
 		return nil, fmt.Errorf("error getting asset list: %w", err)
 	}
 
-	assets := []asset.Asset{}
+	var assets []asset.Asset
 	for _, am := range ams {
 		assets = append(assets, am.toAsset(nil))
 	}
@@ -1119,7 +1128,7 @@ func (r *AssetRepository) createOrFetchUsers(ctx context.Context, tx *sqlx.Tx, u
 	return results, nil
 }
 
-func (r *AssetRepository) execContext(ctx context.Context, execer sqlx.ExecerContext, query string, args ...interface{}) error {
+func (*AssetRepository) execContext(ctx context.Context, execer sqlx.ExecerContext, query string, args ...interface{}) error {
 	res, err := execer.ExecContext(ctx, query, args...)
 	if err != nil {
 		return fmt.Errorf("error running query: %w", err)
@@ -1136,14 +1145,14 @@ func (r *AssetRepository) execContext(ctx context.Context, execer sqlx.ExecerCon
 	return nil
 }
 
-func (r *AssetRepository) getAssetsGroupByCountSQL(columnName string, isDeleted bool) sq.SelectBuilder {
+func (*AssetRepository) getAssetsGroupByCountSQL(columnName string, isDeleted bool) sq.SelectBuilder {
 	return sq.Select(columnName, "count(1)").
 		From("assets").
 		Where(sq.Eq{"is_deleted": isDeleted}).
 		GroupBy(columnName)
 }
 
-func (r *AssetRepository) getAssetSQL(isDeleted *bool) sq.SelectBuilder {
+func (*AssetRepository) getAssetSQL(isDeleted *bool) sq.SelectBuilder {
 	selectAssetQuery := sq.Select(`
 		a.id as id,
 		a.urn as urn,
@@ -1177,7 +1186,7 @@ func (r *AssetRepository) getAssetSQL(isDeleted *bool) sq.SelectBuilder {
 	return selectAssetQuery
 }
 
-func (r *AssetRepository) getAssetVersionSQL() sq.SelectBuilder {
+func (*AssetRepository) getAssetVersionSQL() sq.SelectBuilder {
 	return sq.Select(`
 		a.asset_id as id,
 		a.urn as urn,
