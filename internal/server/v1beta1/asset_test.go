@@ -963,7 +963,7 @@ func TestDeleteAssetAPI(t *testing.T) {
 	}
 }
 
-func TestDeleteAssets(t *testing.T) {
+func TestSoftDeleteAssets(t *testing.T) {
 	var (
 		userID       = uuid.NewString()
 		userEmail    = uuid.NewString()
@@ -990,7 +990,7 @@ func TestDeleteAssets(t *testing.T) {
 			ExpectStatus: codes.InvalidArgument,
 			ExpectResult: nil,
 			Setup: func(ctx context.Context, as *mocks.AssetService) {
-				as.EXPECT().DeleteAssets(ctx, dummyRequest).Return(0, errors.New("something wrong"))
+				as.EXPECT().SoftDeleteAssets(ctx, dummyRequest, userID).Return(0, errors.New("something wrong"))
 			},
 		},
 		{
@@ -1000,7 +1000,7 @@ func TestDeleteAssets(t *testing.T) {
 			ExpectStatus: codes.OK,
 			ExpectResult: &compassv1beta1.DeleteAssetsResponse{AffectedRows: 11},
 			Setup: func(ctx context.Context, as *mocks.AssetService) {
-				as.EXPECT().DeleteAssets(ctx, dummyRequest).Return(11, nil)
+				as.EXPECT().SoftDeleteAssets(ctx, dummyRequest, userID).Return(11, nil)
 			},
 		},
 	}
