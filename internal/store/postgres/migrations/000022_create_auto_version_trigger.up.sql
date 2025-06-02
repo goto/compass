@@ -20,11 +20,17 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION auto_version_trigger()
     RETURNS TRIGGER AS $$
 BEGIN
-    IF TG_OP = 'UPDATE' THEN
-        IF NEW IS DISTINCT FROM OLD THEN
-            NEW.version := bump_minor_version(OLD.version);
-        END IF;
+    -- Check if any field other than refreshed_at has changed
+    IF (
+        NEW IS DISTINCT FROM OLD AND
+        (
+            (NEW.* IS DISTINCT FROM OLD.*) AND
+            NOT (NEW.refreshed_at IS DISTINCT FROM OLD.refreshed_at)
+            )
+        ) THEN
+        NEW.version := bump_minor_version(OLD.version);
     END IF;
+
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
