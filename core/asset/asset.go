@@ -65,7 +65,10 @@ type SoftDeleteAsset struct {
 	Changelog   diff.Changelog `json:"changelog,omitempty"`
 }
 
-func NewSoftDeleteAsset(updatedAt, refreshedAt time.Time, updatedBy string) SoftDeleteAsset {
+func NewSoftDeleteAsset(
+	updatedAt, refreshedAt time.Time,
+	updatedBy string,
+) SoftDeleteAsset {
 	return SoftDeleteAsset{
 		UpdatedAt:   updatedAt,
 		RefreshedAt: refreshedAt,
@@ -92,7 +95,11 @@ type SoftDeleteAssetsByQueryExpr struct {
 	QueryExpr    queryexpr.ExprStr `json:"-"`
 }
 
-func NewSoftDeleteAssetsByQueryExpr(updatedAt, refreshedAt time.Time, updatedBy string, queryExprStr string, queryExpr queryexpr.ExprStr) SoftDeleteAssetsByQueryExpr {
+func NewSoftDeleteAssetsByQueryExpr(
+	updatedAt, refreshedAt time.Time,
+	updatedBy, queryExprStr string,
+	queryExpr queryexpr.ExprStr,
+) SoftDeleteAssetsByQueryExpr {
 	return SoftDeleteAssetsByQueryExpr{
 		UpdatedAt:    updatedAt,
 		RefreshedAt:  refreshedAt,

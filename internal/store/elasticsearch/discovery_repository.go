@@ -222,9 +222,9 @@ func (repo *DiscoveryRepository) processScroll(
 	}(time.Now())
 
 	type hitVersion struct {
-		ID     string                 `json:"_id"`
-		Index  string                 `json:"_index"`
-		Source map[string]interface{} `json:"_source"`
+		ID     string            `json:"_id"`
+		Index  string            `json:"_index"`
+		Source map[string]string `json:"_source"`
 	}
 	type searchVersionResponse struct {
 		ScrollID string `json:"_scroll_id"`
@@ -257,7 +257,7 @@ func (repo *DiscoveryRepository) processScroll(
 		bulkOps := make([]string, 0, len(hits)*2)
 		for _, hit := range hits {
 			version := "0.0"
-			if v, ok := hit.Source["version"].(string); ok && v != "" {
+			if v := hit.Source["version"]; v != "" {
 				version = v
 			}
 			newVersion, err := asset.IncreaseMinorVersion(version)
