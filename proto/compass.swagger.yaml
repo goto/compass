@@ -2664,6 +2664,8 @@ definitions:
         items:
           type: object
           $ref: '#/definitions/v1beta1.Probe'
+      is_deleted:
+        type: boolean
     title: Asset
   v1beta1.Probe:
     type: object

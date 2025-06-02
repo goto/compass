@@ -146,8 +146,7 @@ func (r *AssetRepository) GetCountByQueryExpr(ctx context.Context, queryExpr que
 func (r *AssetRepository) getCountByQuery(ctx context.Context, sqlQuery string) (int, error) {
 	builder := sq.Select("count(1)").
 		From("assets").
-		Where(sqlQuery).
-		Where(sq.Eq{"is_deleted": false})
+		Where(sqlQuery)
 	query, args, err := builder.PlaceholderFormat(sq.Dollar).ToSql()
 	if err != nil {
 		return 0, fmt.Errorf("build count query: %w", err)
