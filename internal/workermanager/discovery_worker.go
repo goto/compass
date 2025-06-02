@@ -4,11 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	"github.com/goto/compass/core/asset"
 	"github.com/goto/compass/pkg/queryexpr"
 	"github.com/goto/compass/pkg/worker"
+	"strings"
 )
 
 //go:generate mockery --name=DiscoveryRepository -r --case underscore --with-expecter --structname DiscoveryRepository --filename discovery_repository_mock.go --output=./mocks
@@ -18,7 +18,7 @@ type DiscoveryRepository interface {
 	DeleteByURN(ctx context.Context, assetURN string) error
 	SoftDeleteByURN(ctx context.Context, softDeleteAsset asset.SoftDeleteAsset) error
 	DeleteByQueryExpr(ctx context.Context, queryExpr queryexpr.ExprStr) error
-	SoftDeleteByQueryExpr(ctx context.Context, softDeleteAssets asset.SoftDeleteAssets) error
+	SoftDeleteByQueryExpr(ctx context.Context, softDeleteAssetsByQueryExpr asset.SoftDeleteAssetsByQueryExpr) error
 	SyncAssets(ctx context.Context, indexName string) (cleanupFn func() error, err error)
 }
 
@@ -216,8 +216,8 @@ func (m *Manager) EnqueueDeleteAssetsByQueryExprJob(ctx context.Context, queryEx
 	return nil
 }
 
-func (m *Manager) EnqueueSoftDeleteAssetsByQueryExprJob(ctx context.Context, softDeleteAssets asset.SoftDeleteAssets) error {
-	payload, err := json.Marshal(softDeleteAssets)
+func (m *Manager) EnqueueSoftDeleteAssetsByQueryExprJob(ctx context.Context, softDeleteAssetsByQueryExpr asset.SoftDeleteAssetsByQueryExpr) error {
+	payload, err := json.Marshal(softDeleteAssetsByQueryExpr)
 	if err != nil {
 		return fmt.Errorf("enqueue soft delete assets job: serialize payload: %w", err)
 	}
@@ -227,7 +227,7 @@ func (m *Manager) EnqueueSoftDeleteAssetsByQueryExprJob(ctx context.Context, sof
 		Payload: payload,
 	})
 	if err != nil {
-		return fmt.Errorf("enqueue soft delete assets job: %w: query expr: '%s'", err, softDeleteAssets.QueryExpr.String())
+		return fmt.Errorf("enqueue soft delete assets job: %w: query expr: '%s'", err, softDeleteAssetsByQueryExpr.QueryExpr)
 	}
 
 	return nil
@@ -269,17 +269,17 @@ func (m *Manager) softDeleteAssetsByQueryHandler() worker.JobHandler {
 }
 
 func (m *Manager) SoftDeleteAssetsByQueryExpr(ctx context.Context, job worker.JobSpec) error {
-	var softDeleteAssets asset.SoftDeleteAssets
-	if err := json.Unmarshal(job.Payload, &softDeleteAssets); err != nil {
+	var softDeleteAssetsByQueryExpr asset.SoftDeleteAssetsByQueryExpr
+	if err := json.Unmarshal(job.Payload, &softDeleteAssetsByQueryExpr); err != nil {
 		return fmt.Errorf("soft delete assets: deserialize payload: %w", err)
 	}
 
 	queryExpr := asset.DeleteAssetExpr{
-		ExprStr: queryexpr.ESExpr(softDeleteAssets.QueryExpr.String()),
+		ExprStr: queryexpr.ESExpr(softDeleteAssetsByQueryExpr.QueryExprStr),
 	}
-	softDeleteAssets.QueryExpr = queryExpr
+	softDeleteAssetsByQueryExpr.QueryExpr = queryExpr
 
-	if err := m.discoveryRepo.SoftDeleteByQueryExpr(ctx, softDeleteAssets); err != nil {
+	if err := m.discoveryRepo.SoftDeleteByQueryExpr(ctx, softDeleteAssetsByQueryExpr); err != nil {
 		return &worker.RetryableError{
 			Cause: fmt.Errorf("delete asset from discovery repo: %w: query expr: '%s'", err, queryExpr),
 		}

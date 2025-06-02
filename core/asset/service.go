@@ -33,7 +33,7 @@ type Worker interface {
 	EnqueueDeleteAssetJob(ctx context.Context, urn string) error
 	EnqueueSoftDeleteAssetJob(ctx context.Context, softDeleteAsset SoftDeleteAsset) error
 	EnqueueDeleteAssetsByQueryExprJob(ctx context.Context, queryExpr string) error
-	EnqueueSoftDeleteAssetsByQueryExprJob(ctx context.Context, softDeleteAssets SoftDeleteAssets) error
+	EnqueueSoftDeleteAssetsByQueryExprJob(ctx context.Context, softDeleteAssetsByQueryExpr SoftDeleteAssetsByQueryExpr) error
 	EnqueueSyncAssetJob(ctx context.Context, service string) error
 	Close() error
 }
@@ -250,8 +250,9 @@ func (s *Service) executeDeleteAssets(ctx context.Context, deleteSQLExpr queryex
 }
 
 func (s *Service) SoftDeleteAssets(ctx context.Context, request DeleteAssetsRequest, updatedBy string) (affectedRows uint32, err error) {
+	queryExprStr := request.QueryExpr + " && is_deleted == false"
 	deleteSQLExpr := DeleteAssetExpr{
-		ExprStr: queryexpr.SQLExpr(request.QueryExpr),
+		ExprStr: queryexpr.SQLExpr(queryExprStr),
 	}
 	total, err := s.assetRepository.GetCountByQueryExpr(ctx, deleteSQLExpr)
 	if err != nil {
@@ -260,16 +261,12 @@ func (s *Service) SoftDeleteAssets(ctx context.Context, request DeleteAssetsRequ
 
 	if !request.DryRun && total > 0 {
 		currentTime := time.Now()
-		softDeleteAsset := NewSoftDeleteAsset(currentTime, currentTime, updatedBy)
-		softDeleteAssets := SoftDeleteAssets{
-			SoftDeleteAsset: softDeleteAsset,
-			QueryExpr:       deleteSQLExpr,
-		}
+		softDeleteAssetsByQueryExpr := NewSoftDeleteAssetsByQueryExpr(currentTime, currentTime, updatedBy, queryExprStr, deleteSQLExpr)
 		newCtx, cancel := context.WithTimeout(context.Background(), s.config.DeleteAssetsTimeout)
 		cancelID := uuid.New().String()
 		s.cancelFnMap.Store(cancelID, cancel)
 		go func(id string) {
-			s.executeSoftDeleteAssets(newCtx, softDeleteAssets)
+			s.executeSoftDeleteAssets(newCtx, softDeleteAssetsByQueryExpr)
 			cancel()
 			s.cancelFnMap.Delete(id)
 		}(cancelID)
@@ -278,13 +275,13 @@ func (s *Service) SoftDeleteAssets(ctx context.Context, request DeleteAssetsRequ
 	return uint32(total), nil
 }
 
-func (s *Service) executeSoftDeleteAssets(ctx context.Context, softDeleteAssets SoftDeleteAssets) {
-	if err := s.assetRepository.SoftDeleteByQueryExpr(ctx, softDeleteAssets); err != nil {
+func (s *Service) executeSoftDeleteAssets(ctx context.Context, softDeleteAssetsByQueryExpr SoftDeleteAssetsByQueryExpr) {
+	if err := s.assetRepository.SoftDeleteByQueryExpr(ctx, softDeleteAssetsByQueryExpr); err != nil {
 		s.logger.Error("asset deletion failed, skipping elasticsearch and lineage deletions", "err:", err)
 		return
 	}
 
-	if err := s.worker.EnqueueSoftDeleteAssetsByQueryExprJob(ctx, softDeleteAssets); err != nil {
+	if err := s.worker.EnqueueSoftDeleteAssetsByQueryExprJob(ctx, softDeleteAssetsByQueryExpr); err != nil {
 		s.logger.Error("error occurred during elasticsearch deletion", "err:", err)
 	}
 }

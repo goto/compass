@@ -236,13 +236,13 @@ func (_c *Worker_EnqueueSoftDeleteAssetJob_Call) RunAndReturn(run func(context.C
 	return _c
 }
 
-// EnqueueSoftDeleteAssetsByQueryExprJob provides a mock function with given fields: ctx, softDeleteAssets
-func (_m *Worker) EnqueueSoftDeleteAssetsByQueryExprJob(ctx context.Context, softDeleteAssets asset.SoftDeleteAssets) error {
-	ret := _m.Called(ctx, softDeleteAssets)
+// EnqueueSoftDeleteAssetsByQueryExprJob provides a mock function with given fields: ctx, softDeleteAssetsByQueryExpr
+func (_m *Worker) EnqueueSoftDeleteAssetsByQueryExprJob(ctx context.Context, softDeleteAssetsByQueryExpr asset.SoftDeleteAssetsByQueryExpr) error {
+	ret := _m.Called(ctx, softDeleteAssetsByQueryExpr)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, asset.SoftDeleteAssets) error); ok {
-		r0 = rf(ctx, softDeleteAssets)
+	if rf, ok := ret.Get(0).(func(context.Context, asset.SoftDeleteAssetsByQueryExpr) error); ok {
+		r0 = rf(ctx, softDeleteAssetsByQueryExpr)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -257,14 +257,14 @@ type Worker_EnqueueSoftDeleteAssetsByQueryExprJob_Call struct {
 
 // EnqueueSoftDeleteAssetsByQueryExprJob is a helper method to define mock.On call
 //   - ctx context.Context
-//   - softDeleteAssets asset.SoftDeleteAssets
-func (_e *Worker_Expecter) EnqueueSoftDeleteAssetsByQueryExprJob(ctx interface{}, softDeleteAssets interface{}) *Worker_EnqueueSoftDeleteAssetsByQueryExprJob_Call {
-	return &Worker_EnqueueSoftDeleteAssetsByQueryExprJob_Call{Call: _e.mock.On("EnqueueSoftDeleteAssetsByQueryExprJob", ctx, softDeleteAssets)}
+//   - softDeleteAssetsByQueryExpr asset.SoftDeleteAssetsByQueryExpr
+func (_e *Worker_Expecter) EnqueueSoftDeleteAssetsByQueryExprJob(ctx interface{}, softDeleteAssetsByQueryExpr interface{}) *Worker_EnqueueSoftDeleteAssetsByQueryExprJob_Call {
+	return &Worker_EnqueueSoftDeleteAssetsByQueryExprJob_Call{Call: _e.mock.On("EnqueueSoftDeleteAssetsByQueryExprJob", ctx, softDeleteAssetsByQueryExpr)}
 }
 
-func (_c *Worker_EnqueueSoftDeleteAssetsByQueryExprJob_Call) Run(run func(ctx context.Context, softDeleteAssets asset.SoftDeleteAssets)) *Worker_EnqueueSoftDeleteAssetsByQueryExprJob_Call {
+func (_c *Worker_EnqueueSoftDeleteAssetsByQueryExprJob_Call) Run(run func(ctx context.Context, softDeleteAssetsByQueryExpr asset.SoftDeleteAssetsByQueryExpr)) *Worker_EnqueueSoftDeleteAssetsByQueryExprJob_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(asset.SoftDeleteAssets))
+		run(args[0].(context.Context), args[1].(asset.SoftDeleteAssetsByQueryExpr))
 	})
 	return _c
 }
@@ -274,7 +274,7 @@ func (_c *Worker_EnqueueSoftDeleteAssetsByQueryExprJob_Call) Return(_a0 error) *
 	return _c
 }
 
-func (_c *Worker_EnqueueSoftDeleteAssetsByQueryExprJob_Call) RunAndReturn(run func(context.Context, asset.SoftDeleteAssets) error) *Worker_EnqueueSoftDeleteAssetsByQueryExprJob_Call {
+func (_c *Worker_EnqueueSoftDeleteAssetsByQueryExprJob_Call) RunAndReturn(run func(context.Context, asset.SoftDeleteAssetsByQueryExpr) error) *Worker_EnqueueSoftDeleteAssetsByQueryExprJob_Call {
 	_c.Call.Return(run)
 	return _c
 }

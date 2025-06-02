@@ -30,11 +30,11 @@ type AssetRepository struct {
 
 // GetAll retrieves list of assets with filters
 func (r *AssetRepository) GetAll(ctx context.Context, flt asset.Filter) ([]asset.Asset, error) {
-	builder := r.getAssetSQL().Offset(uint64(flt.Offset))
+	builder := r.getAssetSQLWithForUpdate().Offset(uint64(flt.Offset))
 	size := flt.Size
 
 	if size > 0 {
-		builder = r.getAssetSQL().Limit(uint64(size)).Offset(uint64(flt.Offset))
+		builder = r.getAssetSQLWithForUpdate().Limit(uint64(size)).Offset(uint64(flt.Offset))
 	}
 	builder = r.BuildFilterQuery(builder, flt)
 	builder = r.buildOrderQuery(builder, flt)
@@ -212,7 +212,7 @@ func (r *AssetRepository) getWithPredicate(ctx context.Context, pred sq.Eq) (ass
 }
 
 func (r *AssetRepository) getWithPredicateWithTx(ctx context.Context, tx *sqlx.Tx, pred sq.Eq) (asset.Asset, error) {
-	query, args, err := r.getAssetSQL().
+	query, args, err := r.getAssetSQLWithForUpdate().
 		Where(pred).
 		Limit(1).
 		PlaceholderFormat(sq.Dollar).
@@ -619,15 +619,20 @@ func (r *AssetRepository) DeleteByQueryExpr(ctx context.Context, queryExpr query
 
 func (r *AssetRepository) SoftDeleteByQueryExpr(
 	ctx context.Context,
-	softDeleteAssets asset.SoftDeleteAssets,
-) error {
-	err := r.client.RunWithinTx(ctx, func(tx *sqlx.Tx) error {
+	softDeleteAssets asset.SoftDeleteAssetsByQueryExpr,
+) (err error) {
+	err = r.client.RunWithinTx(ctx, func(tx *sqlx.Tx) error {
 		query, err := queryexpr.ValidateAndGetQueryFromExpr(softDeleteAssets.QueryExpr)
 		if err != nil {
 			return err
 		}
 
-		return r.softDeleteByQuery(ctx, tx, query, softDeleteAssets.SoftDeleteAsset)
+		newAssets, err := r.softDeleteByQuery(ctx, tx, query, softDeleteAssets)
+		if err != nil {
+			return fmt.Errorf("error soft deleting assets by query: %w", err)
+		}
+
+		return r.insertAssetVersions(ctx, tx, newAssets, softDeleteAssets.Changelog)
 	})
 
 	return err
@@ -657,21 +662,42 @@ func (r *AssetRepository) softDeleteByQuery(
 	ctx context.Context,
 	tx *sqlx.Tx,
 	whereCondition string,
-	softDeleteAsset asset.SoftDeleteAsset,
-) error {
-	query, args, err := sq.Update("assets").
+	softDeleteAssetsByQueryExpr asset.SoftDeleteAssetsByQueryExpr,
+) ([]asset.Asset, error) {
+	updateCTE := sq.Update("assets").
 		Set("is_deleted", true).
-		Set("updated_at", softDeleteAsset.UpdatedAt).
-		Set("refreshed_at", softDeleteAsset.RefreshedAt).
-		Set("version", softDeleteAsset.Version).
+		Set("updated_at", softDeleteAssetsByQueryExpr.UpdatedAt).
+		Set("refreshed_at", softDeleteAssetsByQueryExpr.RefreshedAt).
 		Where(whereCondition).
-		PlaceholderFormat(sq.Dollar).
-		ToSql()
+		Suffix("RETURNING *").
+		Prefix("WITH assets AS (").
+		Suffix(")")
+
+	returnQuery := r.getAssetSQL()
+
+	fullQuery := returnQuery.PrefixExpr(updateCTE)
+	query, args, err := fullQuery.PlaceholderFormat(sq.Dollar).ToSql()
 	if err != nil {
-		return fmt.Errorf("error building query: %w", err)
+		return nil, fmt.Errorf("build query: %w", err)
 	}
 
-	return r.execContext(ctx, tx, query, args...)
+	var ams []AssetModel
+	err = sqlx.SelectContext(ctx, tx, &ams, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("error executing query: %w", err)
+	}
+
+	var assets []asset.Asset
+	for _, am := range ams {
+		owners, err := r.getOwnersWithTx(ctx, tx, am.ID)
+		if err != nil {
+			return nil, fmt.Errorf("get owners with ID: %s, %w", am.ID, err)
+		}
+
+		assets = append(assets, am.toAsset(owners))
+	}
+
+	return assets, nil
 }
 
 func (r *AssetRepository) AddProbe(ctx context.Context, assetURN string, probe *asset.Probe) error {
@@ -990,6 +1016,57 @@ func (r *AssetRepository) insertAssetVersion(ctx context.Context, execer sqlx.Ex
 	return nil
 }
 
+// insertAssetVersions run same as insertAssetVersion, but for bulk insert with same changelogs
+func (r *AssetRepository) insertAssetVersions(
+	ctx context.Context,
+	execer sqlx.ExecerContext,
+	newAssets []asset.Asset,
+	clog diff.Changelog,
+) error {
+	if len(newAssets) == 0 {
+		return nil // nothing to insert
+	}
+
+	builder := sq.Insert("assets_versions").
+		Columns("asset_id", "urn", "type", "service", "name", "description", "data", "labels",
+			"created_at", "updated_at", "updated_by", "version", "owners", "changelog").
+		PlaceholderFormat(sq.Dollar)
+
+	for _, newAsset := range newAssets {
+		if newAsset.ID == "" {
+			return asset.ErrNilAsset
+		}
+
+		builder = builder.Values(
+			newAsset.ID,
+			newAsset.URN,
+			newAsset.Type,
+			newAsset.Service,
+			newAsset.Name,
+			newAsset.Description,
+			newAsset.Data,
+			newAsset.Labels,
+			newAsset.CreatedAt,
+			newAsset.UpdatedAt,
+			newAsset.UpdatedBy.ID,
+			newAsset.Version,
+			newAsset.Owners,
+			clog,
+		)
+	}
+
+	query, args, err := builder.ToSql()
+	if err != nil {
+		return fmt.Errorf("build bulk insert query: %w", err)
+	}
+
+	if err := r.execContext(ctx, execer, query, args...); err != nil {
+		return fmt.Errorf("bulk insert asset versions: %w", err)
+	}
+
+	return nil
+}
+
 func (r *AssetRepository) getOwners(ctx context.Context, assetID string) ([]user.User, error) {
 	return r.getOwnersWithTx(ctx, nil, assetID)
 }
@@ -1200,7 +1277,11 @@ func (r *AssetRepository) getAssetSQL() sq.SelectBuilder {
 		u.updated_at as "updated_by.updated_at"
 		`).
 		From("assets a").
-		LeftJoin("users u ON a.updated_by = u.id").
+		LeftJoin("users u ON a.updated_by = u.id")
+}
+
+func (r *AssetRepository) getAssetSQLWithForUpdate() sq.SelectBuilder {
+	return r.getAssetSQL().
 		Suffix("FOR UPDATE OF a")
 }
 

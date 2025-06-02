@@ -58,13 +58,13 @@ func (m *InSituWorker) EnqueueDeleteAssetsByQueryExprJob(ctx context.Context, qu
 	return nil
 }
 
-func (m *InSituWorker) EnqueueSoftDeleteAssetsByQueryExprJob(ctx context.Context, softDeleteAssets asset.SoftDeleteAssets) error {
+func (m *InSituWorker) EnqueueSoftDeleteAssetsByQueryExprJob(ctx context.Context, softDeleteAssetsByQueryExpr asset.SoftDeleteAssetsByQueryExpr) error {
 	queryExpr := asset.DeleteAssetExpr{
-		ExprStr: queryexpr.ESExpr(softDeleteAssets.QueryExpr.String()),
+		ExprStr: queryexpr.ESExpr(softDeleteAssetsByQueryExpr.QueryExprStr),
 	}
-	softDeleteAssets.QueryExpr = queryExpr
+	softDeleteAssetsByQueryExpr.QueryExpr = queryExpr
 
-	if err := m.discoveryRepo.SoftDeleteByQueryExpr(ctx, softDeleteAssets); err != nil {
+	if err := m.discoveryRepo.SoftDeleteByQueryExpr(ctx, softDeleteAssetsByQueryExpr); err != nil {
 		return fmt.Errorf("delete asset from discovery repo: %w: query expr: '%s'", err, queryExpr)
 	}
 	return nil

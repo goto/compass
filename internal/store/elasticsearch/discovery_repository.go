@@ -151,30 +151,7 @@ func (repo *DiscoveryRepository) SoftDeleteByURN(ctx context.Context, softDelete
 		return asset.ErrEmptyURN
 	}
 
-	// Create the update request body
-	bodyRequest := map[string]interface{}{
-		"query": map[string]interface{}{
-			"term": map[string]interface{}{
-				"urn.keyword": softDeleteAsset.URN,
-			},
-		},
-		"script": map[string]interface{}{
-			"source": `
-                ctx._source.is_deleted = true;
-                ctx._source.updated_at = params.updated_at;
-                ctx._source.refreshed_at = params.refreshed_at;
-                ctx._source.updated_by = params.updated_by
-            `,
-			"lang": "painless",
-			"params": map[string]interface{}{
-				"updated_at":   softDeleteAsset.UpdatedAt,
-				"refreshed_at": softDeleteAsset.RefreshedAt,
-				"updated_by":   softDeleteAsset.UpdatedBy,
-			},
-		},
-	}
-
-	return repo.softDeleteAsset(ctx, "DeleteByURN", bodyRequest)
+	return repo.softDeleteAsset(ctx, "DeleteByURN", softDeleteAsset)
 }
 
 func (repo *DiscoveryRepository) DeleteByQueryExpr(ctx context.Context, queryExpr queryexpr.ExprStr) error {
@@ -190,40 +167,165 @@ func (repo *DiscoveryRepository) DeleteByQueryExpr(ctx context.Context, queryExp
 	return repo.deleteWithQuery(ctx, "DeleteByQueryExpr", esQuery)
 }
 
-func (repo *DiscoveryRepository) SoftDeleteByQueryExpr(ctx context.Context, softDeleteAssets asset.SoftDeleteAssets) error {
-	if strings.TrimSpace(softDeleteAssets.QueryExpr.String()) == "" {
+func (repo *DiscoveryRepository) SoftDeleteByQueryExpr(ctx context.Context, softDeleteAssetsByQueryExpr asset.SoftDeleteAssetsByQueryExpr) error {
+	if strings.TrimSpace(softDeleteAssetsByQueryExpr.QueryExprStr) == "" {
 		return asset.ErrEmptyQuery
 	}
 
-	esQuery, err := queryexpr.ValidateAndGetQueryFromExpr(softDeleteAssets.QueryExpr)
+	buf, err := repo.buildSearchVersionRequest(softDeleteAssetsByQueryExpr.QueryExpr)
 	if err != nil {
 		return err
 	}
+
+	return repo.processScroll(ctx, "DeleteByQueryExpr", buf, softDeleteAssetsByQueryExpr)
+}
+
+func (*DiscoveryRepository) buildSearchVersionRequest(expr queryexpr.ExprStr) (*bytes.Buffer, error) {
+	esQuery, err := queryexpr.ValidateAndGetQueryFromExpr(expr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to validate query expression: %w", err)
+	}
+
 	queryMap, err := queryexpr.QueryStringToMap(esQuery)
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("failed to parse query map: %w", err)
 	}
 
-	// Create the update request body
-	bodyRequest := map[string]interface{}{
-		"query": queryMap["query"],
-		"script": map[string]interface{}{
-			"source": `
-                ctx._source.is_deleted = true;
-                ctx._source.updated_at = params.updated_at;
-                ctx._source.refreshed_at = params.refreshed_at;
-                ctx._source.updated_by = params.updated_by
-            `,
-			"lang": "painless",
-			"params": map[string]interface{}{
-				"updated_at":   softDeleteAssets.UpdatedAt,
-				"refreshed_at": softDeleteAssets.RefreshedAt,
-				"updated_by":   softDeleteAssets.UpdatedBy,
-			},
-		},
+	// Build final query with version only in _source
+	request := map[string]interface{}{
+		"query":   queryMap["query"],
+		"_source": []string{"version"},
+		"size":    1000,
 	}
 
-	return repo.softDeleteAsset(ctx, "DeleteByQueryExpr", bodyRequest)
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(request); err != nil {
+		return nil, fmt.Errorf("failed to encode search request: %w", err)
+	}
+	return &buf, nil
+}
+
+func (repo *DiscoveryRepository) processScroll(
+	ctx context.Context,
+	discoveryOp string,
+	buf *bytes.Buffer,
+	softDeleteAssetsByQuery asset.SoftDeleteAssetsByQueryExpr,
+) error {
+	defer func(start time.Time) {
+		const op = "soft_delete_by_query"
+		repo.cli.instrumentOp(ctx, instrumentParams{
+			op:          op,
+			discoveryOp: discoveryOp,
+			start:       start,
+			err:         nil,
+		})
+	}(time.Now())
+
+	type hitVersion struct {
+		ID     string                 `json:"_id"`
+		Index  string                 `json:"_index"`
+		Source map[string]interface{} `json:"_source"`
+	}
+	type searchVersionResponse struct {
+		ScrollID string `json:"_scroll_id"`
+		Hits     struct {
+			Hits []hitVersion `json:"hits"`
+		} `json:"hits"`
+	}
+
+	search := repo.cli.client.Search
+	res, err := search(
+		search.WithContext(ctx),
+		search.WithIndex(defaultSearchIndex),
+		search.WithBody(buf),
+		search.WithScroll(1*time.Minute),
+	)
+	if err != nil {
+		return fmt.Errorf("initial search error: %w", err)
+	}
+	defer res.Body.Close()
+
+	var sr searchVersionResponse
+	if err := json.NewDecoder(res.Body).Decode(&sr); err != nil {
+		return fmt.Errorf("initial response decode error: %w", err)
+	}
+
+	scrollID := sr.ScrollID
+	hits := sr.Hits.Hits
+
+	for len(hits) > 0 {
+		bulkOps := make([]string, 0, len(hits)*2)
+		for _, hit := range hits {
+			version := "0.0"
+			if v, ok := hit.Source["version"].(string); ok && v != "" {
+				version = v
+			}
+			newVersion, err := asset.IncreaseMinorVersion(version)
+			if err != nil {
+				return fmt.Errorf("increase version error for ID %s: %w", hit.ID, err)
+			}
+
+			meta := fmt.Sprintf(`{ "update": { "_index": %q, "_id": %q } }`, hit.Index, hit.ID)
+			update := map[string]interface{}{
+				"doc": map[string]interface{}{
+					"is_deleted":   true,
+					"updated_at":   softDeleteAssetsByQuery.UpdatedAt,
+					"refreshed_at": softDeleteAssetsByQuery.RefreshedAt,
+					"updated_by":   user.User{ID: softDeleteAssetsByQuery.UpdatedBy},
+					"version":      newVersion,
+				},
+			}
+			updateJSON, err := json.Marshal(update)
+			if err != nil {
+				return fmt.Errorf("marshal update doc for ID %s: %w", hit.ID, err)
+			}
+			bulkOps = append(bulkOps, meta, string(updateJSON))
+		}
+
+		if err := repo.sendBulkUpdate(ctx, bulkOps); err != nil {
+			return err
+		}
+
+		scroll := repo.cli.client.Scroll
+		scrollRes, err := scroll(
+			scroll.WithScrollID(scrollID),
+			scroll.WithScroll(1*time.Minute),
+		)
+		if err != nil {
+			return fmt.Errorf("scroll error: %w", err)
+		}
+
+		if err := json.NewDecoder(scrollRes.Body).Decode(&sr); err != nil {
+			scrollRes.Body.Close()
+			return fmt.Errorf("scroll decode error: %w", err)
+		}
+		scrollRes.Body.Close()
+
+		scrollID = sr.ScrollID
+		hits = sr.Hits.Hits
+	}
+
+	return nil
+}
+
+func (repo *DiscoveryRepository) sendBulkUpdate(ctx context.Context, bulkOps []string) error {
+	if len(bulkOps) == 0 {
+		return nil
+	}
+
+	payload := strings.Join(bulkOps, "\n") + "\n"
+	bulk := repo.cli.client.Bulk
+	res, err := bulk(
+		bytes.NewReader([]byte(payload)),
+		bulk.WithContext(ctx),
+		bulk.WithIndex(defaultSearchIndex),
+	)
+	if err != nil {
+		return fmt.Errorf("bulk update error: %w", err)
+	}
+	defer res.Body.Close()
+
+	return nil
 }
 
 func (repo *DiscoveryRepository) deleteWithQuery(ctx context.Context, discoveryOp, qry string) (err error) {
@@ -267,7 +369,7 @@ func (repo *DiscoveryRepository) deleteWithQuery(ctx context.Context, discoveryO
 
 func (repo *DiscoveryRepository) softDeleteAsset(ctx context.Context, discoveryOp string, softDeleteAsset asset.SoftDeleteAsset) (err error) {
 	defer func(start time.Time) {
-		const op = "soft_delete_by_query"
+		const op = "soft_delete_by_urn"
 		repo.cli.instrumentOp(ctx, instrumentParams{
 			op:          op,
 			discoveryOp: discoveryOp,
@@ -323,14 +425,15 @@ func (repo *DiscoveryRepository) softDeleteAsset(ctx context.Context, discoveryO
 	}
 
 	// Execute UpdateByQuery
-	res, err := repo.cli.client.UpdateByQuery(
+	updateByQuery := repo.cli.client.UpdateByQuery
+	res, err := updateByQuery(
 		[]string{defaultSearchIndex},
-		repo.cli.client.UpdateByQuery.WithContext(ctx),
-		repo.cli.client.UpdateByQuery.WithBody(buf),
-		repo.cli.client.UpdateByQuery.WithRefresh(true),
-		repo.cli.client.UpdateByQuery.WithIgnoreUnavailable(true),
-		repo.cli.client.UpdateByQuery.WithWaitForCompletion(true),
-		repo.cli.client.UpdateByQuery.WithConflicts("proceed"),
+		updateByQuery.WithContext(ctx),
+		updateByQuery.WithBody(buf),
+		updateByQuery.WithRefresh(true),
+		updateByQuery.WithIgnoreUnavailable(true),
+		updateByQuery.WithWaitForCompletion(true),
+		updateByQuery.WithConflicts("proceed"),
 	)
 	if err != nil {
 		return asset.DiscoveryError{

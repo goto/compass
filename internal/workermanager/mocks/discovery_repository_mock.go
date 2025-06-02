@@ -111,13 +111,13 @@ func (_c *DiscoveryRepository_DeleteByURN_Call) RunAndReturn(run func(context.Co
 	return _c
 }
 
-// SoftDeleteByQueryExpr provides a mock function with given fields: ctx, softDeleteAssets
-func (_m *DiscoveryRepository) SoftDeleteByQueryExpr(ctx context.Context, softDeleteAssets asset.SoftDeleteAssets) error {
-	ret := _m.Called(ctx, softDeleteAssets)
+// SoftDeleteByQueryExpr provides a mock function with given fields: ctx, softDeleteAssetsByQueryExpr
+func (_m *DiscoveryRepository) SoftDeleteByQueryExpr(ctx context.Context, softDeleteAssetsByQueryExpr asset.SoftDeleteAssetsByQueryExpr) error {
+	ret := _m.Called(ctx, softDeleteAssetsByQueryExpr)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, asset.SoftDeleteAssets) error); ok {
-		r0 = rf(ctx, softDeleteAssets)
+	if rf, ok := ret.Get(0).(func(context.Context, asset.SoftDeleteAssetsByQueryExpr) error); ok {
+		r0 = rf(ctx, softDeleteAssetsByQueryExpr)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -132,14 +132,14 @@ type DiscoveryRepository_SoftDeleteByQueryExpr_Call struct {
 
 // SoftDeleteByQueryExpr is a helper method to define mock.On call
 //   - ctx context.Context
-//   - softDeleteAssets asset.SoftDeleteAssets
-func (_e *DiscoveryRepository_Expecter) SoftDeleteByQueryExpr(ctx interface{}, softDeleteAssets interface{}) *DiscoveryRepository_SoftDeleteByQueryExpr_Call {
-	return &DiscoveryRepository_SoftDeleteByQueryExpr_Call{Call: _e.mock.On("SoftDeleteByQueryExpr", ctx, softDeleteAssets)}
+//   - softDeleteAssetsByQueryExpr asset.SoftDeleteAssetsByQueryExpr
+func (_e *DiscoveryRepository_Expecter) SoftDeleteByQueryExpr(ctx interface{}, softDeleteAssetsByQueryExpr interface{}) *DiscoveryRepository_SoftDeleteByQueryExpr_Call {
+	return &DiscoveryRepository_SoftDeleteByQueryExpr_Call{Call: _e.mock.On("SoftDeleteByQueryExpr", ctx, softDeleteAssetsByQueryExpr)}
 }
 
-func (_c *DiscoveryRepository_SoftDeleteByQueryExpr_Call) Run(run func(ctx context.Context, softDeleteAssets asset.SoftDeleteAssets)) *DiscoveryRepository_SoftDeleteByQueryExpr_Call {
+func (_c *DiscoveryRepository_SoftDeleteByQueryExpr_Call) Run(run func(ctx context.Context, softDeleteAssetsByQueryExpr asset.SoftDeleteAssetsByQueryExpr)) *DiscoveryRepository_SoftDeleteByQueryExpr_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(asset.SoftDeleteAssets))
+		run(args[0].(context.Context), args[1].(asset.SoftDeleteAssetsByQueryExpr))
 	})
 	return _c
 }
@@ -149,7 +149,7 @@ func (_c *DiscoveryRepository_SoftDeleteByQueryExpr_Call) Return(_a0 error) *Dis
 	return _c
 }
 
-func (_c *DiscoveryRepository_SoftDeleteByQueryExpr_Call) RunAndReturn(run func(context.Context, asset.SoftDeleteAssets) error) *DiscoveryRepository_SoftDeleteByQueryExpr_Call {
+func (_c *DiscoveryRepository_SoftDeleteByQueryExpr_Call) RunAndReturn(run func(context.Context, asset.SoftDeleteAssetsByQueryExpr) error) *DiscoveryRepository_SoftDeleteByQueryExpr_Call {
 	_c.Call.Return(run)
 	return _c
 }

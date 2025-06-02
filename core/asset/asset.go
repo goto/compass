@@ -27,7 +27,7 @@ type Repository interface {
 	SoftDeleteByID(ctx context.Context, id string, softDeleteAsset SoftDeleteAsset) (string, error)
 	SoftDeleteByURN(ctx context.Context, urn string, softDeleteAsset SoftDeleteAsset) error
 	DeleteByQueryExpr(ctx context.Context, queryExpr queryexpr.ExprStr) ([]string, error)
-	SoftDeleteByQueryExpr(ctx context.Context, softDeleteAssets SoftDeleteAssets) error
+	SoftDeleteByQueryExpr(ctx context.Context, softDeleteAssetsByQueryExpr SoftDeleteAssetsByQueryExpr) error
 	AddProbe(ctx context.Context, assetURN string, probe *Probe) error
 	GetProbes(ctx context.Context, assetURN string) ([]Probe, error)
 	GetProbesWithFilter(ctx context.Context, flt ProbesFilter) (map[string][]Probe, error)
@@ -65,17 +65,41 @@ type SoftDeleteAsset struct {
 	Changelog   diff.Changelog `json:"changelog,omitempty"`
 }
 
-type SoftDeleteAssets struct {
-	SoftDeleteAsset
-	QueryExpr queryexpr.ExprStr `json:"query_expr"`
-}
-
 func NewSoftDeleteAsset(updatedAt, refreshedAt time.Time, updatedBy string) SoftDeleteAsset {
 	return SoftDeleteAsset{
 		UpdatedAt:   updatedAt,
 		RefreshedAt: refreshedAt,
 		UpdatedBy:   updatedBy,
 		IsDeleted:   true,
+		Changelog: diff.Changelog{
+			{
+				Type: "delete",
+				Path: []string{"is_deleted"},
+				From: false,
+				To:   true,
+			},
+		},
+	}
+}
+
+type SoftDeleteAssetsByQueryExpr struct {
+	UpdatedAt    time.Time         `json:"updated_at"`
+	RefreshedAt  time.Time         `json:"refreshed_at"`
+	UpdatedBy    string            `json:"updated_by"`
+	IsDeleted    bool              `json:"is_deleted"`
+	Changelog    diff.Changelog    `json:"changelog,omitempty"`
+	QueryExprStr string            `json:"query_expr"`
+	QueryExpr    queryexpr.ExprStr `json:"-"`
+}
+
+func NewSoftDeleteAssetsByQueryExpr(updatedAt, refreshedAt time.Time, updatedBy string, queryExprStr string, queryExpr queryexpr.ExprStr) SoftDeleteAssetsByQueryExpr {
+	return SoftDeleteAssetsByQueryExpr{
+		UpdatedAt:    updatedAt,
+		RefreshedAt:  refreshedAt,
+		UpdatedBy:    updatedBy,
+		QueryExprStr: queryExprStr,
+		QueryExpr:    queryExpr,
+		IsDeleted:    true,
 		Changelog: diff.Changelog{
 			{
 				Type: "delete",
