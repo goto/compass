@@ -37,7 +37,7 @@ func (repo *DiscoveryRepository) Search(ctx context.Context, cfg asset.SearchCon
 	if len(cfg.IncludeFields) == 0 {
 		returnedAssetFieldsResult = []string{
 			"id", "urn", "type", "service", "name", "description", "data", "labels",
-			"created_at", "updated_at",
+			"created_at", "updated_at", "is_deleted",
 		}
 	} else {
 		returnedAssetFieldsResult = cfg.IncludeFields
@@ -358,13 +358,26 @@ func buildMustMatchQueries(q *elastic.BoolQuery, cfg asset.SearchConfig) {
 	}
 
 	for field, value := range cfg.Queries {
+		var v interface{}
+		switch value {
+		case "true":
+			v = true
+		case "false":
+			v = false
+		default:
+			v = value
+		}
+
 		if cfg.Flags.DisableFuzzy {
-			q.Must(elastic.NewMatchQuery(field, value))
+			q.Must(elastic.NewMatchQuery(field, v))
 			continue
 		}
 
-		q.Must(elastic.NewMatchQuery(field, value).
-			Fuzziness("AUTO"))
+		if _, ok := v.(string); ok {
+			q.Must(elastic.NewMatchQuery(field, v).Fuzziness("AUTO"))
+		} else {
+			q.Must(elastic.NewMatchQuery(field, v))
+		}
 	}
 }
 
@@ -460,6 +473,7 @@ func toSearchResults(hits []searchHit) []asset.SearchResult {
 			Service:     r.Service,
 			Labels:      r.Labels,
 			Data:        data,
+			IsDeleted:   r.IsDeleted,
 		}
 	}
 	return results
