@@ -108,21 +108,20 @@ func (s *Service) UpsertAssetWithoutLineage(ctx context.Context, ast *Asset) (st
 	currentTime := time.Now()
 	ast.RefreshedAt = &currentTime
 
-	assetID, err := s.assetRepository.Upsert(ctx, ast)
+	asset, err := s.assetRepository.Upsert(ctx, ast)
 	// retry due to race condition possibility on insert
 	if errors.Is(err, ErrURNExist) {
-		assetID, err = s.assetRepository.Upsert(ctx, ast)
+		asset, err = s.assetRepository.Upsert(ctx, ast)
 	}
 	if err != nil {
 		return "", err
 	}
 
-	ast.ID = assetID
-	if err := s.worker.EnqueueIndexAssetJob(ctx, *ast); err != nil {
+	if err := s.worker.EnqueueIndexAssetJob(ctx, *asset); err != nil {
 		return "", err
 	}
 
-	return assetID, nil
+	return asset.ID, nil
 }
 
 func (s *Service) UpsertPatchAsset(ctx context.Context, ast *Asset, upstreams, downstreams []string, patchData map[string]interface{}) (string, error) {
@@ -142,21 +141,20 @@ func (s *Service) UpsertPatchAssetWithoutLineage(ctx context.Context, ast *Asset
 	currentTime := time.Now()
 	ast.RefreshedAt = &currentTime
 
-	assetID, err := s.assetRepository.UpsertPatch(ctx, ast, patchData)
+	asset, err := s.assetRepository.UpsertPatch(ctx, ast, patchData)
 	// retry due to race condition possibility on insert
 	if errors.Is(err, ErrURNExist) {
-		assetID, err = s.assetRepository.UpsertPatch(ctx, ast, patchData)
+		asset, err = s.assetRepository.UpsertPatch(ctx, ast, patchData)
 	}
 	if err != nil {
 		return "", err
 	}
 
-	ast.ID = assetID
-	if err := s.worker.EnqueueIndexAssetJob(ctx, *ast); err != nil {
+	if err := s.worker.EnqueueIndexAssetJob(ctx, *asset); err != nil {
 		return "", err
 	}
 
-	return assetID, nil
+	return asset.ID, nil
 }
 
 // DeleteAsset is hard-deletion that can accept ID or URN of asset
