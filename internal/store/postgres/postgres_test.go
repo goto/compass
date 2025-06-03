@@ -64,12 +64,11 @@ func createUser(userRepo user.Repository, email string) (string, error) {
 func createAsset(assetRepo asset.Repository, updaterID, ownerEmail, assetURN, assetType string) (*asset.Asset, error) {
 	ast := getAsset(ownerEmail, assetURN, assetType)
 	ast.UpdatedBy.ID = updaterID
-	id, err := assetRepo.Upsert(context.Background(), ast)
+	insertedAsset, err := assetRepo.Upsert(context.Background(), ast)
 	if err != nil {
 		return nil, err
 	}
-	ast.ID = id
-	return ast, nil
+	return insertedAsset, nil
 }
 
 func getAsset(ownerEmail, assetURN, assetType string) *asset.Asset {
