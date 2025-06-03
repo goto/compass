@@ -116,7 +116,7 @@ func (s *Service) UpsertAssetWithoutLineage(ctx context.Context, ast *Asset) (st
 		return "", err
 	}
 
-	if err := s.worker.EnqueueIndexAssetJob(ctx, asset); err != nil {
+	if err := s.worker.EnqueueIndexAssetJob(ctx, *asset); err != nil {
 		return "", err
 	}
 
@@ -149,7 +149,7 @@ func (s *Service) UpsertPatchAssetWithoutLineage(ctx context.Context, ast *Asset
 		return "", err
 	}
 
-	if err := s.worker.EnqueueIndexAssetJob(ctx, asset); err != nil {
+	if err := s.worker.EnqueueIndexAssetJob(ctx, *asset); err != nil {
 		return "", err
 	}
 

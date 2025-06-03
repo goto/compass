@@ -333,7 +333,7 @@ func (r *AssetRepository) getByVersion(
 // Upsert creates a new asset if it does not exist yet.
 // It updates if asset does exist.
 // Checking existence is done using "urn", "type", "name", "data", and "service" fields.
-func (r *AssetRepository) Upsert(ctx context.Context, ast *asset.Asset) (upsertedAsset asset.Asset, err error) {
+func (r *AssetRepository) Upsert(ctx context.Context, ast *asset.Asset) (upsertedAsset *asset.Asset, err error) {
 	err = r.client.RunWithinTx(ctx, func(tx *sqlx.Tx) (err error) {
 		fetchedAsset, err := r.GetByURNWithTx(ctx, tx, ast.URN)
 		if errors.As(err, new(asset.NotFoundError)) {
@@ -377,7 +377,7 @@ func (r *AssetRepository) UpsertPatch( //nolint:gocognit
 	ctx context.Context,
 	ast *asset.Asset,
 	patchData map[string]interface{},
-) (upsertedAsset asset.Asset, err error) {
+) (upsertedAsset *asset.Asset, err error) {
 	err = r.client.RunWithinTx(ctx, func(tx *sqlx.Tx) (err error) {
 		fetchedAsset, err := r.GetByURNWithTx(ctx, tx, ast.URN)
 		if errors.As(err, new(asset.NotFoundError)) {
@@ -639,7 +639,7 @@ func (r *AssetRepository) deleteWithPredicate(ctx context.Context, pred sq.Eq) (
 	return affectedRows, nil
 }
 
-func (r *AssetRepository) insert(ctx context.Context, tx *sqlx.Tx, ast *asset.Asset) (asset.Asset, error) {
+func (r *AssetRepository) insert(ctx context.Context, tx *sqlx.Tx, ast *asset.Asset) (*asset.Asset, error) {
 	currentTime := time.Now()
 	if ast.RefreshedAt != nil {
 		currentTime = *ast.RefreshedAt
@@ -661,40 +661,40 @@ func (r *AssetRepository) insert(ctx context.Context, tx *sqlx.Tx, ast *asset.As
 
 	query, args, err := fullQuery.PlaceholderFormat(sq.Dollar).ToSql()
 	if err != nil {
-		return asset.Asset{}, fmt.Errorf("build insert query: %w", err)
+		return nil, fmt.Errorf("build insert query: %w", err)
 	}
 
 	var am AssetModel
 	err = sqlx.GetContext(ctx, tx, &am, query, args...)
 	if err != nil {
 		if strings.Contains(err.Error(), "assets_idx_urn") {
-			return asset.Asset{}, asset.ErrURNExist
+			return nil, asset.ErrURNExist
 		}
-		return asset.Asset{}, fmt.Errorf("error executing query: %w", err)
+		return nil, fmt.Errorf("error executing query: %w", err)
 	}
 
 	users, err := r.createOrFetchUsers(ctx, tx, ast.Owners)
 	if err != nil {
-		return asset.Asset{}, fmt.Errorf("create and fetch owners: %w", err)
+		return nil, fmt.Errorf("create and fetch owners: %w", err)
 	}
 	err = r.insertOwners(ctx, tx, am.ID, users)
 	if err != nil {
-		return asset.Asset{}, fmt.Errorf("run insert owners query: %w", err)
+		return nil, fmt.Errorf("run insert owners query: %w", err)
 	}
 
 	insertedAsset := am.toAsset(users)
 
 	if err := r.insertAssetVersion(ctx, tx, &insertedAsset, diff.Changelog{}); err != nil {
-		return asset.Asset{}, err
+		return nil, err
 	}
 
-	return insertedAsset, nil
+	return &insertedAsset, nil
 }
 
-func (r *AssetRepository) update(ctx context.Context, tx *sqlx.Tx, newAsset, oldAsset *asset.Asset, clog diff.Changelog) (asset.Asset, error) {
+func (r *AssetRepository) update(ctx context.Context, tx *sqlx.Tx, newAsset, oldAsset *asset.Asset, clog diff.Changelog) (*asset.Asset, error) {
 	assetID := oldAsset.ID
 	if !isValidUUID(assetID) {
-		return asset.Asset{}, asset.InvalidError{AssetID: assetID}
+		return nil, asset.InvalidError{AssetID: assetID}
 	}
 
 	currentTime := time.Now()
@@ -706,29 +706,33 @@ func (r *AssetRepository) update(ctx context.Context, tx *sqlx.Tx, newAsset, old
 
 	if len(clog) == 0 {
 		if newAsset.RefreshedAt == nil || newAsset.RefreshedAt == oldAsset.RefreshedAt {
-			return *newAsset, nil
+			return newAsset, nil
 		}
 
-		return r.updateAssetRefreshedAt(ctx, tx, assetID, currentTime)
+		updatedAsset, err := r.updateAssetRefreshedAt(ctx, tx, assetID, currentTime)
+		if err != nil {
+			return nil, fmt.Errorf("error updating asset's refreshed_at: %w", err)
+		}
+		return &updatedAsset, err
 	}
 
 	// managing owners
 	newAssetOwners, err := r.createOrFetchUsers(ctx, tx, newAsset.Owners)
 	if err != nil {
-		return asset.Asset{}, fmt.Errorf("error creating and fetching owners: %w", err)
+		return nil, fmt.Errorf("error creating and fetching owners: %w", err)
 	}
 	toInserts, toRemoves := r.compareOwners(oldAsset.Owners, newAssetOwners)
 	if err := r.insertOwners(ctx, tx, assetID, toInserts); err != nil {
-		return asset.Asset{}, fmt.Errorf("error inserting asset's new owners: %w", err)
+		return nil, fmt.Errorf("error inserting asset's new owners: %w", err)
 	}
 	if err := r.removeOwners(ctx, tx, assetID, toRemoves); err != nil {
-		return asset.Asset{}, fmt.Errorf("error removing asset's old owners: %w", err)
+		return nil, fmt.Errorf("error removing asset's old owners: %w", err)
 	}
 
 	// update assets
 	newVersion, err := asset.IncreaseMinorVersion(oldAsset.Version)
 	if err != nil {
-		return asset.Asset{}, err
+		return nil, err
 	}
 	newAsset.Version = newVersion
 	newAsset.ID = assetID
@@ -737,15 +741,15 @@ func (r *AssetRepository) update(ctx context.Context, tx *sqlx.Tx, newAsset, old
 
 	updatedAsset, err := r.updateAsset(ctx, tx, assetID, newAsset)
 	if err != nil {
-		return asset.Asset{}, err
+		return nil, err
 	}
 
 	// insert versions
 	if err := r.insertAssetVersion(ctx, tx, newAsset, clog); err != nil {
-		return asset.Asset{}, err
+		return nil, err
 	}
 
-	return updatedAsset, nil
+	return &updatedAsset, nil
 }
 
 func (r *AssetRepository) updateAsset(ctx context.Context, tx *sqlx.Tx, assetID string, newAsset *asset.Asset) (asset.Asset, error) {

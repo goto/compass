@@ -68,7 +68,7 @@ func createAsset(assetRepo asset.Repository, updaterID, ownerEmail, assetURN, as
 	if err != nil {
 		return nil, err
 	}
-	return &insertedAsset, nil
+	return insertedAsset, nil
 }
 
 func getAsset(ownerEmail, assetURN, assetType string) *asset.Asset {

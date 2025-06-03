@@ -122,7 +122,7 @@ func (r *AssetRepositoryTestSuite) insertRecord() (assets []asset.Asset) {
 		insertedAsset, err := r.repository.Upsert(r.ctx, &ast)
 		r.Require().NoError(err)
 		r.Require().NotEmpty(insertedAsset.ID)
-		assets = append(assets, insertedAsset)
+		assets = append(assets, *insertedAsset)
 	}
 
 	return assets
@@ -618,7 +618,7 @@ func (r *AssetRepositoryTestSuite) TestGetByID() {
 		result, err := r.repository.GetByID(r.ctx, insertedAsset2.ID)
 		r.NoError(err)
 		asset2.UpdatedBy = r.users[1]
-		r.assertAsset(&insertedAsset2, &result)
+		r.assertAsset(insertedAsset2, &result)
 	})
 
 	r.Run("return owners if any", func() {
@@ -679,7 +679,7 @@ func (r *AssetRepositoryTestSuite) TestGetByURN() {
 
 		result, err := r.repository.GetByURN(r.ctx, "urn-gbi-2")
 		r.NoError(err)
-		r.assertAsset(&insertedAsset2, &result)
+		r.assertAsset(insertedAsset2, &result)
 	})
 
 	r.Run("return owners if any", func() {
@@ -1003,7 +1003,7 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 
 			ast.ID = insertedAsset.ID
 			ast.Version = asset.BaseVersion
-			r.assertAsset(&ast, &insertedAsset)
+			r.assertAsset(&ast, insertedAsset)
 
 			ast2 := ast
 			ast2.RefreshedAt = nil
@@ -1330,7 +1330,7 @@ func (r *AssetRepositoryTestSuite) TestUpsertPatch() {
 
 			ast.ID = insertedAsset.ID
 			ast.Version = asset.BaseVersion
-			r.assertAsset(&ast, &insertedAsset)
+			r.assertAsset(&ast, insertedAsset)
 
 			// Same with ast1
 			ast2 := asset.Asset{
@@ -2484,6 +2484,16 @@ func (r *AssetRepositoryTestSuite) insertProbes(t *testing.T) {
 }
 
 func (r *AssetRepositoryTestSuite) assertAsset(expectedAsset, actualAsset *asset.Asset) bool {
+	if expectedAsset == nil && actualAsset == nil {
+		return true
+	}
+	if expectedAsset == nil {
+		return false
+	}
+	if actualAsset == nil {
+		return false
+	}
+
 	// sanitize time to make the assets comparable
 	expectedAsset.CreatedAt = time.Time{}
 	expectedAsset.UpdatedAt = time.Time{}
