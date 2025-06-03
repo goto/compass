@@ -934,7 +934,7 @@ func (r *AssetRepository) updateAsset(ctx context.Context, tx *sqlx.Tx, assetID 
 		Suffix("RETURNING *").
 		Prefix("WITH assets AS (").
 		Suffix(")")
-	returnQuery := r.getAssetSQL()
+	returnQuery := r.getAssetSQL(nil)
 
 	fullQuery := returnQuery.PrefixExpr(updateCTE)
 	query, args, err := fullQuery.PlaceholderFormat(sq.Dollar).ToSql()
@@ -963,7 +963,7 @@ func (r *AssetRepository) updateAssetRefreshedAt(ctx context.Context, tx *sqlx.T
 		Suffix("RETURNING *").
 		Prefix("WITH assets AS (").
 		Suffix(")")
-	returnQuery := r.getAssetSQL()
+	returnQuery := r.getAssetSQL(nil)
 
 	fullQuery := returnQuery.PrefixExpr(updateCTE)
 	query, args, err := fullQuery.PlaceholderFormat(sq.Dollar).ToSql()
