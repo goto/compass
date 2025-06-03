@@ -1866,11 +1866,11 @@ func (r *AssetRepositoryTestSuite) TestDeleteByID() {
 
 func (r *AssetRepositoryTestSuite) TestSoftDeleteByID() {
 	currentTime := time.Now().UTC()
-	softDeleteAsset := asset.NewSoftDeleteAsset(currentTime, currentTime, r.users[0].ID)
+	userID := r.users[0].ID
 
 	r.Run("return NotFoundError if asset does not exist", func() {
 		uuidTest := "2aabb450-f986-44e2-a6db-7996861d5004"
-		_, err := r.repository.SoftDeleteByID(r.ctx, uuidTest, softDeleteAsset)
+		_, _, err := r.repository.SoftDeleteByID(r.ctx, currentTime, uuidTest, userID)
 		r.ErrorAs(err, &asset.NotFoundError{AssetID: uuidTest})
 	})
 
@@ -1879,14 +1879,14 @@ func (r *AssetRepositoryTestSuite) TestSoftDeleteByID() {
 			URN:       "urn-del-1",
 			Type:      "table",
 			Service:   "bigquery",
-			UpdatedBy: user.User{ID: defaultAssetUpdaterUserID},
+			UpdatedBy: user.User{ID: userID},
 		}
 		asset2 := asset.Asset{
 			URN:       "urn-del-2",
 			Type:      "topic",
 			Service:   "kafka",
 			Version:   asset.BaseVersion,
-			UpdatedBy: user.User{ID: defaultAssetUpdaterUserID},
+			UpdatedBy: user.User{ID: userID},
 		}
 
 		var err error
@@ -1900,7 +1900,7 @@ func (r *AssetRepositoryTestSuite) TestSoftDeleteByID() {
 		r.Require().NotEmpty(id)
 		asset2.ID = id
 
-		_, err = r.repository.SoftDeleteByID(r.ctx, asset1.ID, softDeleteAsset)
+		_, _, err = r.repository.SoftDeleteByID(r.ctx, currentTime, asset1.ID, userID)
 		r.NoError(err)
 
 		asset1FromDB, err := r.repository.GetByID(r.ctx, asset1.ID)
@@ -1965,11 +1965,11 @@ func (r *AssetRepositoryTestSuite) TestDeleteByURN() {
 
 func (r *AssetRepositoryTestSuite) TestSoftDeleteByURN() {
 	currentTime := time.Now().UTC()
-	softDeleteAsset := asset.NewSoftDeleteAsset(currentTime, currentTime, r.users[0].ID)
+	userID := r.users[0].ID
 
 	r.Run("return NotFoundError if asset does not exist", func() {
 		urn := "urn-test-1"
-		err := r.repository.SoftDeleteByURN(r.ctx, urn, softDeleteAsset)
+		_, err := r.repository.SoftDeleteByURN(r.ctx, currentTime, urn, userID)
 		r.ErrorContainsf(err, "could not find asset", "urn = %s", urn)
 	})
 
@@ -1978,14 +1978,14 @@ func (r *AssetRepositoryTestSuite) TestSoftDeleteByURN() {
 			URN:       "urn-del-1",
 			Type:      "table",
 			Service:   "bigquery",
-			UpdatedBy: user.User{ID: defaultAssetUpdaterUserID},
+			UpdatedBy: user.User{ID: userID},
 		}
 		asset2 := asset.Asset{
 			URN:       "urn-del-2",
 			Type:      "topic",
 			Service:   "kafka",
 			Version:   asset.BaseVersion,
-			UpdatedBy: user.User{ID: defaultAssetUpdaterUserID},
+			UpdatedBy: user.User{ID: userID},
 		}
 
 		_, err := r.repository.Upsert(r.ctx, &asset1)
@@ -1994,7 +1994,7 @@ func (r *AssetRepositoryTestSuite) TestSoftDeleteByURN() {
 		_, err = r.repository.Upsert(r.ctx, &asset2)
 		r.Require().NoError(err)
 
-		err = r.repository.SoftDeleteByURN(r.ctx, asset1.URN, softDeleteAsset)
+		_, err = r.repository.SoftDeleteByURN(r.ctx, currentTime, asset1.URN, userID)
 		r.NoError(err)
 
 		asset1FromDB, err := r.repository.GetByURN(r.ctx, asset1.URN)

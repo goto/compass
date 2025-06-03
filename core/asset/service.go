@@ -31,7 +31,7 @@ type Service struct {
 type Worker interface {
 	EnqueueIndexAssetJob(ctx context.Context, ast Asset) error
 	EnqueueDeleteAssetJob(ctx context.Context, urn string) error
-	EnqueueSoftDeleteAssetJob(ctx context.Context, softDeleteAsset SoftDeleteAsset) error
+	EnqueueSoftDeleteAssetJob(ctx context.Context, params SoftDeleteAssetParams) error
 	EnqueueDeleteAssetsByQueryExprJob(ctx context.Context, queryExpr string) error
 	EnqueueSyncAssetJob(ctx context.Context, service string) error
 	Close() error
@@ -190,23 +190,26 @@ func (s *Service) SoftDeleteAsset(ctx context.Context, id, updatedBy string) (er
 		s.instrumentAssetOp(ctx, "SoftDeleteAsset", id, err)
 	}()
 
-	currentTime := time.Now()
-	softDeleteAsset := NewSoftDeleteAsset(currentTime, currentTime, updatedBy)
-
 	urn := id
+	currentTime := time.Now()
+	var newVersion string
 	if isValidUUID(id) {
-		urn, err = s.assetRepository.SoftDeleteByID(ctx, id, softDeleteAsset)
-		if err != nil {
-			return err
-		}
+		urn, newVersion, err = s.assetRepository.SoftDeleteByID(ctx, currentTime, id, updatedBy)
 	} else {
-		if err := s.assetRepository.SoftDeleteByURN(ctx, urn, softDeleteAsset); err != nil {
-			return err
-		}
+		newVersion, err = s.assetRepository.SoftDeleteByURN(ctx, currentTime, urn, updatedBy)
+	}
+	if err != nil {
+		return err
 	}
 
-	softDeleteAsset.URN = urn
-	return s.worker.EnqueueSoftDeleteAssetJob(ctx, softDeleteAsset)
+	params := SoftDeleteAssetParams{
+		URN:         urn,
+		UpdatedAt:   currentTime,
+		RefreshedAt: currentTime,
+		UpdatedBy:   updatedBy,
+		NewVersion:  newVersion,
+	}
+	return s.worker.EnqueueSoftDeleteAssetJob(ctx, params)
 }
 
 func (s *Service) DeleteAssets(ctx context.Context, request DeleteAssetsRequest) (affectedRows uint32, err error) {

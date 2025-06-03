@@ -146,12 +146,12 @@ func (repo *DiscoveryRepository) DeleteByURN(ctx context.Context, assetURN strin
 	return repo.deleteWithQuery(ctx, "DeleteByURN", fmt.Sprintf(`{"query":{"term":{"urn.keyword": %q}}}`, assetURN))
 }
 
-func (repo *DiscoveryRepository) SoftDeleteByURN(ctx context.Context, softDeleteAsset asset.SoftDeleteAsset) error {
-	if softDeleteAsset.URN == "" {
+func (repo *DiscoveryRepository) SoftDeleteByURN(ctx context.Context, params asset.SoftDeleteAssetParams) error {
+	if params.URN == "" {
 		return asset.ErrEmptyURN
 	}
 
-	return repo.softDeleteAsset(ctx, "DeleteByURN", softDeleteAsset)
+	return repo.softDeleteAssetByURN(ctx, "SoftDeleteByURN", params)
 }
 
 func (repo *DiscoveryRepository) DeleteByQueryExpr(ctx context.Context, queryExpr queryexpr.ExprStr) error {
@@ -206,9 +206,9 @@ func (repo *DiscoveryRepository) deleteWithQuery(ctx context.Context, discoveryO
 	return nil
 }
 
-func (repo *DiscoveryRepository) softDeleteAsset(ctx context.Context, discoveryOp string, softDeleteAsset asset.SoftDeleteAsset) (err error) {
+func (repo *DiscoveryRepository) softDeleteAssetByURN(ctx context.Context, discoveryOp string, softDeleteAsset asset.SoftDeleteAssetParams) (err error) {
 	defer func(start time.Time) {
-		const op = "soft_delete_by_query"
+		const op = "soft_delete_by_urn"
 		repo.cli.instrumentOp(ctx, instrumentParams{
 			op:          op,
 			discoveryOp: discoveryOp,
@@ -216,19 +216,6 @@ func (repo *DiscoveryRepository) softDeleteAsset(ctx context.Context, discoveryO
 			err:         err,
 		})
 	}(time.Now())
-
-	// First get the current version
-	currentVersion, err := repo.GetCurrentAssetVersion(ctx, softDeleteAsset.URN, 2*time.Second)
-	if err != nil {
-		return asset.DiscoveryError{
-			Op:  "GetCurrentVersion",
-			Err: fmt.Errorf("failed to get current version for URN %s: %w", softDeleteAsset.URN, err),
-		}
-	}
-	newVersion, err := asset.IncreaseMinorVersion(currentVersion)
-	if err != nil {
-		return err
-	}
 
 	// Create the update request body
 	body := map[string]interface{}{
@@ -250,7 +237,7 @@ func (repo *DiscoveryRepository) softDeleteAsset(ctx context.Context, discoveryO
 				"updated_at":   softDeleteAsset.UpdatedAt,
 				"refreshed_at": softDeleteAsset.RefreshedAt,
 				"updated_by":   user.User{ID: softDeleteAsset.UpdatedBy},
-				"version":      newVersion,
+				"version":      softDeleteAsset.NewVersion,
 			},
 		},
 	}
@@ -263,19 +250,19 @@ func (repo *DiscoveryRepository) softDeleteAsset(ctx context.Context, discoveryO
 		}
 	}
 
-	// Execute UpdateByQuery
-	res, err := repo.cli.client.UpdateByQuery(
+	updateByQuery := repo.cli.client.UpdateByQuery
+	res, err := updateByQuery(
 		[]string{defaultSearchIndex},
-		repo.cli.client.UpdateByQuery.WithContext(ctx),
-		repo.cli.client.UpdateByQuery.WithBody(buf),
-		repo.cli.client.UpdateByQuery.WithRefresh(true),
-		repo.cli.client.UpdateByQuery.WithIgnoreUnavailable(true),
-		repo.cli.client.UpdateByQuery.WithWaitForCompletion(true),
-		repo.cli.client.UpdateByQuery.WithConflicts("proceed"),
+		updateByQuery.WithContext(ctx),
+		updateByQuery.WithBody(buf),
+		updateByQuery.WithRefresh(true),
+		updateByQuery.WithIgnoreUnavailable(true),
+		updateByQuery.WithWaitForCompletion(true),
+		updateByQuery.WithConflicts("proceed"),
 	)
 	if err != nil {
 		return asset.DiscoveryError{
-			Op:  "DeleteDoc",
+			Op:  "SoftDeleteDoc",
 			Err: fmt.Errorf("urn: %s: %w", softDeleteAsset.URN, err),
 		}
 	}
@@ -284,83 +271,13 @@ func (repo *DiscoveryRepository) softDeleteAsset(ctx context.Context, discoveryO
 	if res.IsError() {
 		code, reason := errorCodeAndReason(res)
 		return asset.DiscoveryError{
-			Op:     "DeleteDoc",
+			Op:     "SoftDeleteDoc",
 			ESCode: code,
 			Err:    fmt.Errorf("urn: %s: %s", softDeleteAsset.URN, reason),
 		}
 	}
 
 	return nil
-}
-
-// GetCurrentAssetVersion is helper function to get current version. Used in soft delete func and tests.
-func (repo *DiscoveryRepository) GetCurrentAssetVersion(
-	ctx context.Context,
-	urn string,
-	timeout time.Duration,
-) (string, error) {
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-
-	query := map[string]interface{}{
-		"query": map[string]interface{}{
-			"term": map[string]interface{}{
-				"urn.keyword": urn,
-			},
-		},
-		"size":    1,
-		"_source": []string{"version"},
-	}
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(query); err != nil {
-		return "", fmt.Errorf("failed to encode query: %w", err)
-	}
-
-	// Retry loop every 500ms
-	ticker := time.NewTicker(500 * time.Millisecond)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			// Timeout reached
-			return "", fmt.Errorf("asset %s not found after %v", urn, timeout)
-
-		case <-ticker.C:
-			// Execute search
-			res, err := repo.cli.client.Search(
-				repo.cli.client.Search.WithContext(ctx),
-				repo.cli.client.Search.WithIndex(defaultSearchIndex),
-				repo.cli.client.Search.WithBody(&buf),
-				repo.cli.client.Search.WithIgnoreUnavailable(true),
-			)
-			if err != nil {
-				continue // Retry on network errors
-			}
-
-			// Process response if no error
-			var result struct {
-				Hits struct {
-					Hits []struct {
-						Source struct {
-							Version string `json:"version"`
-						} `json:"_source"`
-					} `json:"hits"`
-				} `json:"hits"`
-			}
-
-			if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
-				res.Body.Close()
-				continue // Retry on decode errors
-			}
-			res.Body.Close()
-
-			if len(result.Hits.Hits) > 0 {
-				return result.Hits.Hits[0].Source.Version, nil // Found!
-			}
-		}
-	}
 }
 
 func (repo *DiscoveryRepository) indexAsset(ctx context.Context, ast asset.Asset) (err error) {
