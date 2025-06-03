@@ -3,10 +3,12 @@ package elasticsearch_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/elastic/go-elasticsearch/v7"
 	"github.com/goto/compass/core/asset"
 	store "github.com/goto/compass/internal/store/elasticsearch"
 	"github.com/goto/compass/pkg/queryexpr"
@@ -16,7 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestDiscoveryRepositoryUpsert(t *testing.T) {
+func TestDiscoveryRepository_Upsert(t *testing.T) {
 	var (
 		ctx             = context.Background()
 		bigqueryService = "bigquery-test"
@@ -200,7 +202,7 @@ func TestDiscoveryRepositoryUpsert(t *testing.T) {
 	})
 }
 
-func TestDiscoveryRepositoryDeleteByID(t *testing.T) {
+func TestDiscoveryRepository_DeleteByID(t *testing.T) {
 	var (
 		ctx             = context.Background()
 		bigqueryService = "bigquery-test"
@@ -302,7 +304,7 @@ func TestDiscoveryRepositoryDeleteByID(t *testing.T) {
 	})
 }
 
-func TestDiscoveryRepositoryDeleteByURN(t *testing.T) {
+func TestDiscoveryRepository_DeleteByURN(t *testing.T) {
 	var (
 		ctx             = context.Background()
 		bigqueryService = "bigquery-test"
@@ -392,11 +394,12 @@ func TestDiscoveryRepositoryDeleteByURN(t *testing.T) {
 	})
 }
 
-func TestDiscoveryRepositorySoftDeleteByURN(t *testing.T) {
+func TestDiscoveryRepository_SoftDeleteByURN(t *testing.T) {
 	var (
 		ctx             = context.Background()
 		bigqueryService = "bigquery-test"
 		kafkaService    = "kafka-test"
+		currentTime     = time.Now().UTC()
 	)
 
 	cli, err := esTestServer.NewClient()
@@ -410,34 +413,51 @@ func TestDiscoveryRepositorySoftDeleteByURN(t *testing.T) {
 	repo := store.NewDiscoveryRepository(esClient, log.NewNoop(), time.Second*10, []string{"number", "id"})
 
 	t.Run("should return error if the given urn is empty", func(t *testing.T) {
-		err = repo.SoftDeleteByURN(ctx, asset.SoftDeleteAsset{URN: ""})
+		params := asset.SoftDeleteAssetParams{
+			URN:         "",
+			UpdatedAt:   currentTime,
+			RefreshedAt: currentTime,
+			NewVersion:  asset.BaseVersion,
+		}
+		err = repo.SoftDeleteByURN(ctx, params)
 		assert.ErrorIs(t, err, asset.ErrEmptyURN)
 	})
 
 	t.Run("should not return error on success", func(t *testing.T) {
 		ast := asset.Asset{
 			ID:      "delete-id",
+			URN:     "some-urn",
 			Type:    asset.Type("table"),
 			Service: bigqueryService,
-			URN:     "some-urn",
-			Version: "0.1",
+			Version: asset.BaseVersion,
 		}
 
 		err = repo.Upsert(ctx, ast)
+		time.Sleep(1 * time.Second)
 		require.NoError(t, err)
 
 		// Ensure the asset exists before soft delete
-		version, err := repo.GetCurrentAssetVersion(ctx, ast.URN, 2*time.Second)
-		require.NoError(t, err)
-		assert.Equal(t, "0.1", version)
+		hits, total := searchByURN(t, cli, ast.URN)
+		assert.Equal(t, int64(1), total)
+		assert.Equal(t, false, hits[0].IsDeleted)
+		assert.Equal(t, asset.BaseVersion, hits[0].Version)
 
-		err = repo.SoftDeleteByURN(ctx, asset.SoftDeleteAsset{URN: ast.URN})
+		params := asset.SoftDeleteAssetParams{
+			URN:         ast.URN,
+			UpdatedAt:   currentTime,
+			RefreshedAt: currentTime,
+			NewVersion:  "0.2",
+		}
+		err = repo.SoftDeleteByURN(ctx, params)
 		assert.NoError(t, err)
 
-		// Soft delete does not remove the asset, it just marks it as deleted and increase the version
-		newVersion, err := repo.GetCurrentAssetVersion(ctx, ast.URN, 2*time.Second)
-		require.NoError(t, err)
-		assert.Equal(t, "0.2", newVersion)
+		// Soft delete does not remove the asset, but marks it as deleted
+		hits, total = searchByURN(t, cli, ast.URN)
+		assert.Equal(t, int64(1), total)
+		assert.Equal(t, true, hits[0].IsDeleted)
+		assert.Equal(t, "0.2", hits[0].Version)
+		assert.Equal(t, currentTime, hits[0].UpdatedAt)
+		assert.Equal(t, currentTime, hits[0].RefreshedAt)
 	})
 
 	t.Run("should ignore unavailable indices", func(t *testing.T) {
@@ -475,60 +495,18 @@ func TestDiscoveryRepositorySoftDeleteByURN(t *testing.T) {
 		_, err = cli.Indices.Close([]string{kafkaService})
 		require.NoError(t, err)
 
-		err = repo.SoftDeleteByURN(ctx, asset.SoftDeleteAsset{URN: ast1.URN})
-		assert.NoError(t, err)
-	})
-}
-
-func TestDiscoveryRepositoryGetCurrentVersionAsset(t *testing.T) {
-	var (
-		ctx             = context.Background()
-		bigqueryService = "bigquery-test"
-	)
-
-	cli, err := esTestServer.NewClient()
-	require.NoError(t, err)
-
-	esClient, err := store.NewClient(
-		log.NewNoop(), store.Config{}, store.WithClient(cli),
-	)
-	require.NoError(t, err)
-
-	repo := store.NewDiscoveryRepository(esClient, log.NewNoop(), time.Second*10, []string{"number", "id"})
-
-	t.Run("should return error not found if the given urn is not exist", func(t *testing.T) {
-		_, err = repo.GetCurrentAssetVersion(ctx, "test-urn", 1*time.Second)
-		assert.ErrorContains(t, err, "asset test-urn not found")
-	})
-
-	t.Run("should not return error on success", func(t *testing.T) {
-		ast := asset.Asset{
-			ID:      "some-id",
-			Type:    asset.Type("table"),
-			Service: bigqueryService,
-			URN:     "some-urn",
-			Version: "0.1",
+		params := asset.SoftDeleteAssetParams{
+			URN:         ast1.URN,
+			UpdatedAt:   currentTime,
+			RefreshedAt: currentTime,
+			NewVersion:  "0.2",
 		}
-
-		err = repo.Upsert(ctx, ast)
-		require.NoError(t, err)
-
-		// Ensure the asset exists before soft delete
-		version, err := repo.GetCurrentAssetVersion(ctx, ast.URN, 2*time.Second)
-		require.NoError(t, err)
-		assert.Equal(t, "0.1", version)
-
-		err = repo.SoftDeleteByURN(ctx, asset.SoftDeleteAsset{URN: ast.URN})
+		err = repo.SoftDeleteByURN(ctx, params)
 		assert.NoError(t, err)
-
-		// Soft delete increase the version
-		newVersion, err := repo.GetCurrentAssetVersion(ctx, ast.URN, 2*time.Second)
-		require.NoError(t, err)
-		assert.Equal(t, "0.2", newVersion)
 	})
 }
 
-func TestDiscoveryRepositoryDeleteByQueryExpr(t *testing.T) {
+func TestDiscoveryRepository_DeleteByQueryExpr(t *testing.T) {
 	var (
 		ctx             = context.Background()
 		bigqueryService = "bigquery-test"
@@ -680,4 +658,43 @@ func TestDiscoveryRepository_SyncAssets(t *testing.T) {
 		require.Equal(t, res.StatusCode, 404)
 		require.NoError(t, err)
 	})
+}
+
+type searchByUrnFields struct {
+	IsDeleted   bool      `json:"is_deleted"`
+	Version     string    `json:"version"`
+	UpdatedAt   time.Time `json:"updated_at"`
+	RefreshedAt time.Time `json:"refreshed_at"`
+}
+
+func searchByURN(t *testing.T, cli *elasticsearch.Client, urn string) ([]searchByUrnFields, int64) {
+	t.Helper()
+
+	res, err := cli.Search(
+		cli.Search.WithBody(strings.NewReader(fmt.Sprintf(`{"query":{"term":{"urn.keyword": %q}}}`, urn))),
+		cli.Search.WithIndex("_all"),
+	)
+	require.NoError(t, err)
+	assert.False(t, res.IsError())
+
+	var result struct {
+		Hits struct {
+			Total struct {
+				Value int64 `json:"value"`
+			} `json:"total"`
+			Hits []struct {
+				searchByUrnFields `json:"_source"`
+			} `json:"hits"`
+		} `json:"hits"`
+	}
+
+	require.NoError(t, json.NewDecoder(res.Body).Decode(&result))
+
+	// Extract just the _source fields for easier assertion
+	var sources []searchByUrnFields
+	for _, hit := range result.Hits.Hits {
+		sources = append(sources, hit.searchByUrnFields)
+	}
+
+	return sources, result.Hits.Total.Value
 }

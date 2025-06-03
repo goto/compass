@@ -111,13 +111,13 @@ func (_c *DiscoveryRepository_DeleteByURN_Call) RunAndReturn(run func(context.Co
 	return _c
 }
 
-// SoftDeleteByURN provides a mock function with given fields: ctx, softDeleteAsset
-func (_m *DiscoveryRepository) SoftDeleteByURN(ctx context.Context, softDeleteAsset asset.SoftDeleteAsset) error {
-	ret := _m.Called(ctx, softDeleteAsset)
+// SoftDeleteByURN provides a mock function with given fields: ctx, params
+func (_m *DiscoveryRepository) SoftDeleteByURN(ctx context.Context, params asset.SoftDeleteAssetParams) error {
+	ret := _m.Called(ctx, params)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, asset.SoftDeleteAsset) error); ok {
-		r0 = rf(ctx, softDeleteAsset)
+	if rf, ok := ret.Get(0).(func(context.Context, asset.SoftDeleteAssetParams) error); ok {
+		r0 = rf(ctx, params)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -132,14 +132,14 @@ type DiscoveryRepository_SoftDeleteByURN_Call struct {
 
 // SoftDeleteByURN is a helper method to define mock.On call
 //   - ctx context.Context
-//   - softDeleteAsset asset.SoftDeleteAsset
-func (_e *DiscoveryRepository_Expecter) SoftDeleteByURN(ctx interface{}, softDeleteAsset interface{}) *DiscoveryRepository_SoftDeleteByURN_Call {
-	return &DiscoveryRepository_SoftDeleteByURN_Call{Call: _e.mock.On("SoftDeleteByURN", ctx, softDeleteAsset)}
+//   - params asset.SoftDeleteAssetParams
+func (_e *DiscoveryRepository_Expecter) SoftDeleteByURN(ctx interface{}, params interface{}) *DiscoveryRepository_SoftDeleteByURN_Call {
+	return &DiscoveryRepository_SoftDeleteByURN_Call{Call: _e.mock.On("SoftDeleteByURN", ctx, params)}
 }
 
-func (_c *DiscoveryRepository_SoftDeleteByURN_Call) Run(run func(ctx context.Context, softDeleteAsset asset.SoftDeleteAsset)) *DiscoveryRepository_SoftDeleteByURN_Call {
+func (_c *DiscoveryRepository_SoftDeleteByURN_Call) Run(run func(ctx context.Context, params asset.SoftDeleteAssetParams)) *DiscoveryRepository_SoftDeleteByURN_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(asset.SoftDeleteAsset))
+		run(args[0].(context.Context), args[1].(asset.SoftDeleteAssetParams))
 	})
 	return _c
 }
@@ -149,7 +149,7 @@ func (_c *DiscoveryRepository_SoftDeleteByURN_Call) Return(_a0 error) *Discovery
 	return _c
 }
 
-func (_c *DiscoveryRepository_SoftDeleteByURN_Call) RunAndReturn(run func(context.Context, asset.SoftDeleteAsset) error) *DiscoveryRepository_SoftDeleteByURN_Call {
+func (_c *DiscoveryRepository_SoftDeleteByURN_Call) RunAndReturn(run func(context.Context, asset.SoftDeleteAssetParams) error) *DiscoveryRepository_SoftDeleteByURN_Call {
 	_c.Call.Return(run)
 	return _c
 }

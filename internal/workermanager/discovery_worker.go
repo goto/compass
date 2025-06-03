@@ -16,7 +16,7 @@ import (
 type DiscoveryRepository interface {
 	Upsert(context.Context, asset.Asset) error
 	DeleteByURN(ctx context.Context, assetURN string) error
-	SoftDeleteByURN(ctx context.Context, softDeleteAsset asset.SoftDeleteAsset) error
+	SoftDeleteByURN(ctx context.Context, params asset.SoftDeleteAssetParams) error
 	DeleteByQueryExpr(ctx context.Context, queryExpr queryexpr.ExprStr) error
 	SyncAssets(ctx context.Context, indexName string) (cleanupFn func() error, err error)
 }
@@ -161,7 +161,7 @@ func (m *Manager) DeleteAsset(ctx context.Context, job worker.JobSpec) error {
 	return nil
 }
 
-func (m *Manager) EnqueueSoftDeleteAssetJob(ctx context.Context, softDeleteAsset asset.SoftDeleteAsset) error {
+func (m *Manager) EnqueueSoftDeleteAssetJob(ctx context.Context, softDeleteAsset asset.SoftDeleteAssetParams) error {
 	payload, err := json.Marshal(softDeleteAsset)
 	if err != nil {
 		return fmt.Errorf("enqueue soft delete asset job: serialize payload: %w", err)
@@ -190,14 +190,14 @@ func (m *Manager) softDeleteAssetHandler() worker.JobHandler {
 }
 
 func (m *Manager) SoftDeleteAsset(ctx context.Context, job worker.JobSpec) error {
-	var softDeleteAsset asset.SoftDeleteAsset
-	if err := json.Unmarshal(job.Payload, &softDeleteAsset); err != nil {
+	var params asset.SoftDeleteAssetParams
+	if err := json.Unmarshal(job.Payload, &params); err != nil {
 		return fmt.Errorf("soft delete asset: deserialize payload: %w", err)
 	}
 
-	if err := m.discoveryRepo.SoftDeleteByURN(ctx, softDeleteAsset); err != nil {
+	if err := m.discoveryRepo.SoftDeleteByURN(ctx, params); err != nil {
 		return &worker.RetryableError{
-			Cause: fmt.Errorf("soft delete asset from discovery repo: %w: urn '%s'", err, softDeleteAsset.URN),
+			Cause: fmt.Errorf("soft delete asset from discovery repo: %w: urn '%s'", err, params.URN),
 		}
 	}
 	return nil

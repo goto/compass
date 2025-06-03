@@ -20,12 +20,12 @@ type Repository interface {
 	GetByVersionWithID(ctx context.Context, id, version string) (Asset, error)
 	GetByVersionWithURN(ctx context.Context, urn, version string) (Asset, error)
 	GetTypes(ctx context.Context, flt Filter) (map[Type]int, error)
-	Upsert(ctx context.Context, ast *Asset) (string, error)
-	UpsertPatch(ctx context.Context, ast *Asset, patchData map[string]interface{}) (string, error)
+	Upsert(ctx context.Context, ast *Asset) (*Asset, error)
+	UpsertPatch(ctx context.Context, ast *Asset, patchData map[string]interface{}) (*Asset, error)
 	DeleteByID(ctx context.Context, id string) (string, error)
 	DeleteByURN(ctx context.Context, urn string) error
-	SoftDeleteByID(ctx context.Context, id string, softDeleteAsset SoftDeleteAsset) (string, error)
-	SoftDeleteByURN(ctx context.Context, urn string, softDeleteAsset SoftDeleteAsset) error
+	SoftDeleteByID(ctx context.Context, refreshedAt time.Time, id, updatedBy string) (string, string, error)
+	SoftDeleteByURN(ctx context.Context, refreshedAt time.Time, urn, updatedBy string) (string, error)
 	DeleteByQueryExpr(ctx context.Context, queryExpr queryexpr.ExprStr) ([]string, error)
 	AddProbe(ctx context.Context, assetURN string, probe *Probe) error
 	GetProbes(ctx context.Context, assetURN string) ([]Probe, error)
@@ -54,31 +54,12 @@ type Asset struct {
 	Probes      []Probe                `json:"probes,omitempty"`
 }
 
-type SoftDeleteAsset struct {
-	URN         string         `json:"urn"`
-	UpdatedAt   time.Time      `json:"updated_at"`
-	RefreshedAt time.Time      `json:"refreshed_at"`
-	Version     string         `json:"version"`
-	UpdatedBy   string         `json:"updated_by"`
-	IsDeleted   bool           `json:"is_deleted"`
-	Changelog   diff.Changelog `json:"changelog,omitempty"`
-}
-
-func NewSoftDeleteAsset(updatedAt, refreshedAt time.Time, updatedBy string) SoftDeleteAsset {
-	return SoftDeleteAsset{
-		UpdatedAt:   updatedAt,
-		RefreshedAt: refreshedAt,
-		UpdatedBy:   updatedBy,
-		IsDeleted:   true,
-		Changelog: diff.Changelog{
-			{
-				Type: "delete",
-				Path: []string{"is_deleted"},
-				From: false,
-				To:   true,
-			},
-		},
-	}
+type SoftDeleteAssetParams struct {
+	URN         string    `json:"urn"`
+	UpdatedAt   time.Time `json:"updated_at"`
+	RefreshedAt time.Time `json:"refreshed_at"`
+	NewVersion  string    `json:"version"`
+	UpdatedBy   string    `json:"updated_by"`
 }
 
 // Diff returns nil changelog with nil error if equal
