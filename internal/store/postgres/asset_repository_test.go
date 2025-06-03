@@ -1735,6 +1735,12 @@ func (r *AssetRepositoryTestSuite) TestUpsertPatchRaceCondition() {
 }
 
 func (r *AssetRepositoryTestSuite) TestDeleteByID() {
+	r.Run("return error from client if any", func() {
+		_, err := r.repository.DeleteByID(r.ctx, "invalid-uuid")
+		r.Error(err)
+		r.Contains(err.Error(), "invalid asset id: \"invalid-uuid\"")
+	})
+
 	r.Run("return NotFoundError if asset does not exist", func() {
 		uuidTest := "2aabb450-f986-44e2-a6db-7996861d5004"
 		_, err := r.repository.DeleteByID(r.ctx, uuidTest)
