@@ -31,7 +31,7 @@ type Service struct {
 type Worker interface {
 	EnqueueIndexAssetJob(ctx context.Context, ast Asset) error
 	EnqueueDeleteAssetJob(ctx context.Context, urn string) error
-	EnqueueSoftDeleteAssetJob(ctx context.Context, softDeleteAsset SoftDeleteAsset) error
+	EnqueueSoftDeleteAssetJob(ctx context.Context, params SoftDeleteAssetParams) error
 	EnqueueDeleteAssetsByQueryExprJob(ctx context.Context, queryExpr string) error
 	EnqueueSyncAssetJob(ctx context.Context, service string) error
 	Close() error
@@ -108,21 +108,20 @@ func (s *Service) UpsertAssetWithoutLineage(ctx context.Context, ast *Asset) (st
 	currentTime := time.Now()
 	ast.RefreshedAt = &currentTime
 
-	assetID, err := s.assetRepository.Upsert(ctx, ast)
+	asset, err := s.assetRepository.Upsert(ctx, ast)
 	// retry due to race condition possibility on insert
 	if errors.Is(err, ErrURNExist) {
-		assetID, err = s.assetRepository.Upsert(ctx, ast)
+		asset, err = s.assetRepository.Upsert(ctx, ast)
 	}
 	if err != nil {
 		return "", err
 	}
 
-	ast.ID = assetID
-	if err := s.worker.EnqueueIndexAssetJob(ctx, *ast); err != nil {
+	if err := s.worker.EnqueueIndexAssetJob(ctx, *asset); err != nil {
 		return "", err
 	}
 
-	return assetID, nil
+	return asset.ID, nil
 }
 
 func (s *Service) UpsertPatchAsset(ctx context.Context, ast *Asset, upstreams, downstreams []string, patchData map[string]interface{}) (string, error) {
@@ -142,21 +141,20 @@ func (s *Service) UpsertPatchAssetWithoutLineage(ctx context.Context, ast *Asset
 	currentTime := time.Now()
 	ast.RefreshedAt = &currentTime
 
-	assetID, err := s.assetRepository.UpsertPatch(ctx, ast, patchData)
+	asset, err := s.assetRepository.UpsertPatch(ctx, ast, patchData)
 	// retry due to race condition possibility on insert
 	if errors.Is(err, ErrURNExist) {
-		assetID, err = s.assetRepository.UpsertPatch(ctx, ast, patchData)
+		asset, err = s.assetRepository.UpsertPatch(ctx, ast, patchData)
 	}
 	if err != nil {
 		return "", err
 	}
 
-	ast.ID = assetID
-	if err := s.worker.EnqueueIndexAssetJob(ctx, *ast); err != nil {
+	if err := s.worker.EnqueueIndexAssetJob(ctx, *asset); err != nil {
 		return "", err
 	}
 
-	return assetID, nil
+	return asset.ID, nil
 }
 
 // DeleteAsset is hard-deletion that can accept ID or URN of asset
@@ -190,23 +188,26 @@ func (s *Service) SoftDeleteAsset(ctx context.Context, id, updatedBy string) (er
 		s.instrumentAssetOp(ctx, "SoftDeleteAsset", id, err)
 	}()
 
-	currentTime := time.Now()
-	softDeleteAsset := NewSoftDeleteAsset(currentTime, currentTime, updatedBy)
-
 	urn := id
+	currentTime := time.Now()
+	var newVersion string
 	if isValidUUID(id) {
-		urn, err = s.assetRepository.SoftDeleteByID(ctx, id, softDeleteAsset)
-		if err != nil {
-			return err
-		}
+		urn, newVersion, err = s.assetRepository.SoftDeleteByID(ctx, currentTime, id, updatedBy)
 	} else {
-		if err := s.assetRepository.SoftDeleteByURN(ctx, urn, softDeleteAsset); err != nil {
-			return err
-		}
+		newVersion, err = s.assetRepository.SoftDeleteByURN(ctx, currentTime, urn, updatedBy)
+	}
+	if err != nil {
+		return err
 	}
 
-	softDeleteAsset.URN = urn
-	return s.worker.EnqueueSoftDeleteAssetJob(ctx, softDeleteAsset)
+	params := SoftDeleteAssetParams{
+		URN:         urn,
+		UpdatedAt:   currentTime,
+		RefreshedAt: currentTime,
+		UpdatedBy:   updatedBy,
+		NewVersion:  newVersion,
+	}
+	return s.worker.EnqueueSoftDeleteAssetJob(ctx, params)
 }
 
 func (s *Service) DeleteAssets(ctx context.Context, request DeleteAssetsRequest) (affectedRows uint32, err error) {

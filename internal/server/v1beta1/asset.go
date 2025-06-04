@@ -664,7 +664,7 @@ func assetToProto(a asset.Asset, withChangelog bool) (*compassv1beta1.Asset, err
 		CreatedAt:   createdAt,
 		UpdatedAt:   updatedAt,
 		Probes:      probes,
-		//IsDeleted:   a.IsDeleted, // TODO: uncomment after IsDeleted field exist in proto
+		IsDeleted:   a.IsDeleted,
 	}, nil
 }
 
@@ -782,7 +782,7 @@ func assetFromProto(pb *compassv1beta1.Asset) asset.Asset {
 		Version:     pb.GetVersion(),
 		Changelog:   clog,
 		UpdatedBy:   updatedBy,
-		//IsDeleted:   pb.GetIsDeleted(), // TODO: uncomment after IsDeleted field exist in proto
+		IsDeleted:   pb.GetIsDeleted(),
 	}
 }
 

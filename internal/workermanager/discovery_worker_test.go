@@ -165,7 +165,13 @@ func TestManager_DeleteAsset(t *testing.T) {
 
 func TestManager_EnqueueSoftDeleteAssetJob(t *testing.T) {
 	currentTime := time.Now().UTC()
-	softDeleteAsset := asset.NewSoftDeleteAsset(currentTime, currentTime, "some-user")
+	params := asset.SoftDeleteAssetParams{
+		URN:         "some-urn",
+		UpdatedAt:   currentTime,
+		RefreshedAt: currentTime,
+		NewVersion:  "0.1",
+		UpdatedBy:   "some-user",
+	}
 
 	cases := []struct {
 		name        string
@@ -182,8 +188,7 @@ func TestManager_EnqueueSoftDeleteAssetJob(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			wrkr := mocks.NewWorker(t)
-			softDeleteAsset.URN = "some-urn"
-			payload, err := json.Marshal(softDeleteAsset)
+			payload, err := json.Marshal(params)
 			assert.NoError(t, err, "failed to marshal soft delete asset")
 			wrkr.EXPECT().
 				Enqueue(ctx, worker.JobSpec{
@@ -193,7 +198,7 @@ func TestManager_EnqueueSoftDeleteAssetJob(t *testing.T) {
 				Return(tc.enqueueErr)
 
 			mgr := workermanager.NewWithWorker(wrkr, workermanager.Deps{})
-			err = mgr.EnqueueSoftDeleteAssetJob(ctx, softDeleteAsset)
+			err = mgr.EnqueueSoftDeleteAssetJob(ctx, params)
 			if tc.expectedErr != "" {
 				assert.ErrorContains(t, err, tc.expectedErr)
 			} else {
@@ -205,7 +210,13 @@ func TestManager_EnqueueSoftDeleteAssetJob(t *testing.T) {
 
 func TestManager_SoftDeleteAsset(t *testing.T) {
 	currentTime := time.Now().UTC()
-	softDeleteAsset := asset.NewSoftDeleteAsset(currentTime, currentTime, "some-user")
+	params := asset.SoftDeleteAssetParams{
+		URN:         "some-urn",
+		UpdatedAt:   currentTime,
+		RefreshedAt: currentTime,
+		NewVersion:  "0.1",
+		UpdatedBy:   "some-user",
+	}
 
 	cases := []struct {
 		name         string
@@ -222,16 +233,15 @@ func TestManager_SoftDeleteAsset(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			discoveryRepo := mocks.NewDiscoveryRepository(t)
-			softDeleteAsset.URN = "some-urn"
 			discoveryRepo.EXPECT().
-				SoftDeleteByURN(ctx, softDeleteAsset).
+				SoftDeleteByURN(ctx, params).
 				Return(tc.discoveryErr)
 
 			mgr := workermanager.NewWithWorker(mocks.NewWorker(t), workermanager.Deps{
 				DiscoveryRepo: discoveryRepo,
 			})
 
-			payload, err := json.Marshal(softDeleteAsset)
+			payload, err := json.Marshal(params)
 			assert.NoError(t, err, "failed to marshal soft delete asset")
 			err = mgr.SoftDeleteAsset(ctx, worker.JobSpec{
 				Type:    "soft-delete-asset",

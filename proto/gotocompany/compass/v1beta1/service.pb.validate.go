@@ -11441,6 +11441,8 @@ func (m *Asset) validate(all bool) error {
 
 	}
 
+	// no validation rules for IsDeleted
+
 	if len(errors) > 0 {
 		return AssetMultiError(errors)
 	}
