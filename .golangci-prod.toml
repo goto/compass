@@ -304,4 +304,4 @@ allow = ["Err.*"]                                # Allow error globals
 keywords = ["TODO", "FIXME", "NOTE"]             # Comment keywords to check
 
 [linters-settings.ireturn]
-allow = ["io.Closer", "context.Context"]         # Allowed interface returns
+allow = ["io.Closer", "context.Context", "error"]         # Allowed interface returns
