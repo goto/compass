@@ -92,6 +92,7 @@ type SearchResult struct {
 	Description string                 `json:"description"`
 	Labels      map[string]string      `json:"labels"`
 	Data        map[string]interface{} `json:"data"`
+	IsDeleted   bool                   `json:"is_deleted"`
 }
 
 type GroupResult struct {
