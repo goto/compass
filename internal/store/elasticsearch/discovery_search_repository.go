@@ -358,15 +358,7 @@ func buildMustMatchQueries(q *elastic.BoolQuery, cfg asset.SearchConfig) {
 	}
 
 	for field, value := range cfg.Queries {
-		var v interface{}
-		switch value {
-		case "true":
-			v = true
-		case "false":
-			v = false
-		default:
-			v = value
-		}
+		v := convertQueryValue(value)
 
 		if cfg.Flags.DisableFuzzy {
 			q.Must(elastic.NewMatchQuery(field, v))
@@ -379,6 +371,19 @@ func buildMustMatchQueries(q *elastic.BoolQuery, cfg asset.SearchConfig) {
 			q.Must(elastic.NewMatchQuery(field, v))
 		}
 	}
+}
+
+func convertQueryValue(value string) interface{} {
+	var v interface{}
+	switch value {
+	case "true":
+		v = true
+	case "false":
+		v = false
+	default:
+		v = value
+	}
+	return v
 }
 
 func buildFilterTermQueries(q *elastic.BoolQuery, filters map[string][]string) {
