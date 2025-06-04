@@ -519,8 +519,8 @@ func (r *AssetRepository) DeleteByURN(ctx context.Context, urn string) error {
 
 func (r *AssetRepository) SoftDeleteByID(
 	ctx context.Context,
-	refreshedAt time.Time,
-	id, updatedBy string,
+	executedAt time.Time,
+	id, updatedByID string,
 ) (urn, newVersion string, err error) {
 	if !isValidUUID(id) {
 		return "", "", asset.InvalidError{AssetID: id}
@@ -545,10 +545,10 @@ func (r *AssetRepository) SoftDeleteByID(
 		// just need soft copy since fetchedAsset is not used anymore
 		newAsset := fetchedAsset
 		newAsset.Version = newVersion
-		newAsset.UpdatedAt = refreshedAt
-		newAsset.RefreshedAt = &refreshedAt
+		newAsset.UpdatedAt = executedAt
+		newAsset.RefreshedAt = &executedAt
 		newAsset.IsDeleted = true
-		newAsset.UpdatedBy = user.User{ID: updatedBy}
+		newAsset.UpdatedBy = user.User{ID: updatedByID}
 		newAsset.Changelog = diff.Changelog{
 			{
 				Type: "delete",
@@ -572,7 +572,7 @@ func (r *AssetRepository) SoftDeleteByID(
 	return urn, newVersion, nil
 }
 
-func (r *AssetRepository) SoftDeleteByURN(ctx context.Context, refreshedAt time.Time, urn, updatedBy string) (newVersion string, err error) {
+func (r *AssetRepository) SoftDeleteByURN(ctx context.Context, executedAt time.Time, urn, updatedByID string) (newVersion string, err error) {
 	err = r.client.RunWithinTx(ctx, func(tx *sqlx.Tx) (err error) {
 		fetchedAsset, err := r.GetByURNWithTx(ctx, tx, urn)
 		if err != nil {
@@ -591,10 +591,10 @@ func (r *AssetRepository) SoftDeleteByURN(ctx context.Context, refreshedAt time.
 		// just need soft copy since fetchedAsset is not used anymore
 		newAsset := fetchedAsset
 		newAsset.Version = newVersion
-		newAsset.UpdatedAt = refreshedAt
-		newAsset.RefreshedAt = &refreshedAt
+		newAsset.UpdatedAt = executedAt
+		newAsset.RefreshedAt = &executedAt
 		newAsset.IsDeleted = true
-		newAsset.UpdatedBy = user.User{ID: updatedBy}
+		newAsset.UpdatedBy = user.User{ID: updatedByID}
 		newAsset.Changelog = diff.Changelog{
 			{
 				Type: "delete",

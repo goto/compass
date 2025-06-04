@@ -24,8 +24,8 @@ type Repository interface {
 	UpsertPatch(ctx context.Context, ast *Asset, patchData map[string]interface{}) (*Asset, error)
 	DeleteByID(ctx context.Context, id string) (string, error)
 	DeleteByURN(ctx context.Context, urn string) error
-	SoftDeleteByID(ctx context.Context, refreshedAt time.Time, id, updatedBy string) (string, string, error)
-	SoftDeleteByURN(ctx context.Context, refreshedAt time.Time, urn, updatedBy string) (string, error)
+	SoftDeleteByID(ctx context.Context, executedAt time.Time, id, updatedByID string) (string, string, error)
+	SoftDeleteByURN(ctx context.Context, executedAt time.Time, urn, updatedByID string) (string, error)
 	DeleteByQueryExpr(ctx context.Context, queryExpr queryexpr.ExprStr) ([]string, error)
 	AddProbe(ctx context.Context, assetURN string, probe *Probe) error
 	GetProbes(ctx context.Context, assetURN string) ([]Probe, error)
