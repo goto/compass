@@ -818,30 +818,30 @@ func (_c *AssetRepository_GetVersionHistory_Call) RunAndReturn(run func(context.
 	return _c
 }
 
-// SoftDeleteByID provides a mock function with given fields: ctx, refreshedAt, id, updatedBy
-func (_m *AssetRepository) SoftDeleteByID(ctx context.Context, refreshedAt time.Time, id string, updatedBy string) (string, string, error) {
-	ret := _m.Called(ctx, refreshedAt, id, updatedBy)
+// SoftDeleteByID provides a mock function with given fields: ctx, executedAt, id, updatedByID
+func (_m *AssetRepository) SoftDeleteByID(ctx context.Context, executedAt time.Time, id string, updatedByID string) (string, string, error) {
+	ret := _m.Called(ctx, executedAt, id, updatedByID)
 
 	var r0 string
 	var r1 string
 	var r2 error
 	if rf, ok := ret.Get(0).(func(context.Context, time.Time, string, string) (string, string, error)); ok {
-		return rf(ctx, refreshedAt, id, updatedBy)
+		return rf(ctx, executedAt, id, updatedByID)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, time.Time, string, string) string); ok {
-		r0 = rf(ctx, refreshedAt, id, updatedBy)
+		r0 = rf(ctx, executedAt, id, updatedByID)
 	} else {
 		r0 = ret.Get(0).(string)
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, time.Time, string, string) string); ok {
-		r1 = rf(ctx, refreshedAt, id, updatedBy)
+		r1 = rf(ctx, executedAt, id, updatedByID)
 	} else {
 		r1 = ret.Get(1).(string)
 	}
 
 	if rf, ok := ret.Get(2).(func(context.Context, time.Time, string, string) error); ok {
-		r2 = rf(ctx, refreshedAt, id, updatedBy)
+		r2 = rf(ctx, executedAt, id, updatedByID)
 	} else {
 		r2 = ret.Error(2)
 	}
@@ -856,14 +856,14 @@ type AssetRepository_SoftDeleteByID_Call struct {
 
 // SoftDeleteByID is a helper method to define mock.On call
 //   - ctx context.Context
-//   - refreshedAt time.Time
+//   - executedAt time.Time
 //   - id string
-//   - updatedBy string
-func (_e *AssetRepository_Expecter) SoftDeleteByID(ctx interface{}, refreshedAt interface{}, id interface{}, updatedBy interface{}) *AssetRepository_SoftDeleteByID_Call {
-	return &AssetRepository_SoftDeleteByID_Call{Call: _e.mock.On("SoftDeleteByID", ctx, refreshedAt, id, updatedBy)}
+//   - updatedByID string
+func (_e *AssetRepository_Expecter) SoftDeleteByID(ctx interface{}, executedAt interface{}, id interface{}, updatedByID interface{}) *AssetRepository_SoftDeleteByID_Call {
+	return &AssetRepository_SoftDeleteByID_Call{Call: _e.mock.On("SoftDeleteByID", ctx, executedAt, id, updatedByID)}
 }
 
-func (_c *AssetRepository_SoftDeleteByID_Call) Run(run func(ctx context.Context, refreshedAt time.Time, id string, updatedBy string)) *AssetRepository_SoftDeleteByID_Call {
+func (_c *AssetRepository_SoftDeleteByID_Call) Run(run func(ctx context.Context, executedAt time.Time, id string, updatedByID string)) *AssetRepository_SoftDeleteByID_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(context.Context), args[1].(time.Time), args[2].(string), args[3].(string))
 	})
@@ -880,23 +880,23 @@ func (_c *AssetRepository_SoftDeleteByID_Call) RunAndReturn(run func(context.Con
 	return _c
 }
 
-// SoftDeleteByURN provides a mock function with given fields: ctx, refreshedAt, urn, updatedBy
-func (_m *AssetRepository) SoftDeleteByURN(ctx context.Context, refreshedAt time.Time, urn string, updatedBy string) (string, error) {
-	ret := _m.Called(ctx, refreshedAt, urn, updatedBy)
+// SoftDeleteByURN provides a mock function with given fields: ctx, executedAt, urn, updatedByID
+func (_m *AssetRepository) SoftDeleteByURN(ctx context.Context, executedAt time.Time, urn string, updatedByID string) (string, error) {
+	ret := _m.Called(ctx, executedAt, urn, updatedByID)
 
 	var r0 string
 	var r1 error
 	if rf, ok := ret.Get(0).(func(context.Context, time.Time, string, string) (string, error)); ok {
-		return rf(ctx, refreshedAt, urn, updatedBy)
+		return rf(ctx, executedAt, urn, updatedByID)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, time.Time, string, string) string); ok {
-		r0 = rf(ctx, refreshedAt, urn, updatedBy)
+		r0 = rf(ctx, executedAt, urn, updatedByID)
 	} else {
 		r0 = ret.Get(0).(string)
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, time.Time, string, string) error); ok {
-		r1 = rf(ctx, refreshedAt, urn, updatedBy)
+		r1 = rf(ctx, executedAt, urn, updatedByID)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -911,14 +911,14 @@ type AssetRepository_SoftDeleteByURN_Call struct {
 
 // SoftDeleteByURN is a helper method to define mock.On call
 //   - ctx context.Context
-//   - refreshedAt time.Time
+//   - executedAt time.Time
 //   - urn string
-//   - updatedBy string
-func (_e *AssetRepository_Expecter) SoftDeleteByURN(ctx interface{}, refreshedAt interface{}, urn interface{}, updatedBy interface{}) *AssetRepository_SoftDeleteByURN_Call {
-	return &AssetRepository_SoftDeleteByURN_Call{Call: _e.mock.On("SoftDeleteByURN", ctx, refreshedAt, urn, updatedBy)}
+//   - updatedByID string
+func (_e *AssetRepository_Expecter) SoftDeleteByURN(ctx interface{}, executedAt interface{}, urn interface{}, updatedByID interface{}) *AssetRepository_SoftDeleteByURN_Call {
+	return &AssetRepository_SoftDeleteByURN_Call{Call: _e.mock.On("SoftDeleteByURN", ctx, executedAt, urn, updatedByID)}
 }
 
-func (_c *AssetRepository_SoftDeleteByURN_Call) Run(run func(ctx context.Context, refreshedAt time.Time, urn string, updatedBy string)) *AssetRepository_SoftDeleteByURN_Call {
+func (_c *AssetRepository_SoftDeleteByURN_Call) Run(run func(ctx context.Context, executedAt time.Time, urn string, updatedByID string)) *AssetRepository_SoftDeleteByURN_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(context.Context), args[1].(time.Time), args[2].(string), args[3].(string))
 	})
