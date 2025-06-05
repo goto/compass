@@ -16,6 +16,7 @@ import (
 type DiscoveryRepository interface {
 	Upsert(context.Context, asset.Asset) error
 	DeleteByURN(ctx context.Context, assetURN string) error
+	SoftDeleteByURN(ctx context.Context, params asset.SoftDeleteAssetParams) error
 	DeleteByQueryExpr(ctx context.Context, queryExpr queryexpr.ExprStr) error
 	SyncAssets(ctx context.Context, indexName string) (cleanupFn func() error, err error)
 }
@@ -155,6 +156,48 @@ func (m *Manager) DeleteAsset(ctx context.Context, job worker.JobSpec) error {
 	if err := m.discoveryRepo.DeleteByURN(ctx, urn); err != nil {
 		return &worker.RetryableError{
 			Cause: fmt.Errorf("delete asset from discovery repo: %w: urn '%s'", err, urn),
+		}
+	}
+	return nil
+}
+
+func (m *Manager) EnqueueSoftDeleteAssetJob(ctx context.Context, softDeleteAsset asset.SoftDeleteAssetParams) error {
+	payload, err := json.Marshal(softDeleteAsset)
+	if err != nil {
+		return fmt.Errorf("enqueue soft delete asset job: serialize payload: %w", err)
+	}
+
+	err = m.worker.Enqueue(ctx, worker.JobSpec{
+		Type:    jobSoftDeleteAsset,
+		Payload: payload,
+	})
+	if err != nil {
+		return fmt.Errorf("enqueue soft delete asset job: %w: urn '%s'", err, softDeleteAsset.URN)
+	}
+
+	return nil
+}
+
+func (m *Manager) softDeleteAssetHandler() worker.JobHandler {
+	return worker.JobHandler{
+		Handle: m.SoftDeleteAsset,
+		JobOpts: worker.JobOptions{
+			MaxAttempts:     m.maxAttemptsRetry,
+			Timeout:         m.deleteTimeout,
+			BackoffStrategy: worker.DefaultExponentialBackoff,
+		},
+	}
+}
+
+func (m *Manager) SoftDeleteAsset(ctx context.Context, job worker.JobSpec) error {
+	var params asset.SoftDeleteAssetParams
+	if err := json.Unmarshal(job.Payload, &params); err != nil {
+		return fmt.Errorf("soft delete asset: deserialize payload: %w", err)
+	}
+
+	if err := m.discoveryRepo.SoftDeleteByURN(ctx, params); err != nil {
+		return &worker.RetryableError{
+			Cause: fmt.Errorf("soft delete asset from discovery repo: %w: urn '%s'", err, params.URN),
 		}
 	}
 	return nil
