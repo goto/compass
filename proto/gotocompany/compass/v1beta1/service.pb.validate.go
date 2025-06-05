@@ -4196,6 +4196,8 @@ func (m *GetAllAssetsRequest) validate(all bool) error {
 
 	// no validation rules for WithTotal
 
+	// no validation rules for IsDeleted
+
 	if len(errors) > 0 {
 		return GetAllAssetsRequestMultiError(errors)
 	}
@@ -11438,6 +11440,8 @@ func (m *Asset) validate(all bool) error {
 		}
 
 	}
+
+	// no validation rules for IsDeleted
 
 	if len(errors) > 0 {
 		return AssetMultiError(errors)
