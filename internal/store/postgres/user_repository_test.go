@@ -47,7 +47,7 @@ func (r *UserRepositoryTestSuite) insertEmail(email string) error {
 }
 
 func (r *UserRepositoryTestSuite) TestCreate() {
-	r.Run("return no error if succesfully create user", func() {
+	r.Run("return no error if successfully create user", func() {
 		user := getUser("user@gotocompany.com")
 		id, err := r.repository.Create(r.ctx, user)
 		r.NotEmpty(id)

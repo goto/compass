@@ -49,7 +49,7 @@ func (r *StarRepositoryTestSuite) SetupSuite() {
 func (r *StarRepositoryTestSuite) TestCreate() {
 	ownerEmail := "test-create@gotocompany.com"
 
-	r.Run("return no error if succesfully create star", func() {
+	r.Run("return no error if successfully create star", func() {
 		err := testutils.RunMigrationsWithClient(r.T(), r.client)
 		r.NoError(err)
 

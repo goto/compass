@@ -63,7 +63,7 @@ func TestElasticsearch(t *testing.T) {
 				Validate: func(esClient *store.Client, cli *elasticsearch.Client, indexName string) error {
 					searchIndex := "universe"
 					//nolint:noctx
-					req, err := http.NewRequest("GET", "/_alias/"+searchIndex, nil)
+					req, err := http.NewRequest(http.MethodGet, "/_alias/"+searchIndex, nil)
 					if err != nil {
 						return fmt.Errorf("error creating request: %w", err)
 					}
@@ -93,7 +93,7 @@ func TestElasticsearch(t *testing.T) {
 					analyzerPayload := fmt.Sprintf(`{"analyzer": "my_analyzer", "text": %q}`, textToAnalyze)
 
 					//nolint:noctx
-					req, err := http.NewRequest("POST", analyzerPath, strings.NewReader(analyzerPayload))
+					req, err := http.NewRequest(http.MethodPost, analyzerPath, strings.NewReader(analyzerPayload))
 					if err != nil {
 						return fmt.Errorf("error creating analyzer request: %w", err)
 					}

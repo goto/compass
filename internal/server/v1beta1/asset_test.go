@@ -890,7 +890,7 @@ func TestUpsertPatchAsset(t *testing.T) {
 	}
 }
 
-func TestDeleteAsset(t *testing.T) {
+func TestDeleteAssetAPI(t *testing.T) {
 	var (
 		userID    = uuid.NewString()
 		userEmail = uuid.NewString()
@@ -908,7 +908,7 @@ func TestDeleteAsset(t *testing.T) {
 			AssetID:      "not-uuid",
 			ExpectStatus: codes.InvalidArgument,
 			Setup: func(ctx context.Context, as *mocks.AssetService, astID string) {
-				as.EXPECT().DeleteAsset(ctx, "not-uuid").Return(asset.InvalidError{AssetID: astID})
+				as.EXPECT().SoftDeleteAsset(ctx, "not-uuid", userID).Return(asset.InvalidError{AssetID: astID})
 			},
 		},
 		{
@@ -916,7 +916,7 @@ func TestDeleteAsset(t *testing.T) {
 			AssetID:      assetID,
 			ExpectStatus: codes.NotFound,
 			Setup: func(ctx context.Context, as *mocks.AssetService, astID string) {
-				as.EXPECT().DeleteAsset(ctx, astID).Return(asset.NotFoundError{AssetID: astID})
+				as.EXPECT().SoftDeleteAsset(ctx, astID, userID).Return(asset.NotFoundError{AssetID: astID})
 			},
 		},
 		{
@@ -924,7 +924,7 @@ func TestDeleteAsset(t *testing.T) {
 			AssetID:      assetID,
 			ExpectStatus: codes.Internal,
 			Setup: func(ctx context.Context, as *mocks.AssetService, astID string) {
-				as.EXPECT().DeleteAsset(ctx, astID).Return(errors.New("error deleting asset"))
+				as.EXPECT().SoftDeleteAsset(ctx, astID, userID).Return(errors.New("error deleting asset"))
 			},
 		},
 		{
@@ -932,7 +932,7 @@ func TestDeleteAsset(t *testing.T) {
 			AssetID:      assetID,
 			ExpectStatus: codes.OK,
 			Setup: func(ctx context.Context, as *mocks.AssetService, astID string) {
-				as.EXPECT().DeleteAsset(ctx, astID).Return(nil)
+				as.EXPECT().SoftDeleteAsset(ctx, astID, userID).Return(nil)
 			},
 		},
 	}
