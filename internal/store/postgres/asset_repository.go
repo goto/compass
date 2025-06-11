@@ -993,9 +993,14 @@ func (r *AssetRepository) insertAssetVersion(ctx context.Context, execer sqlx.Ex
 		return err
 	}
 	query, args, err := sq.Insert("assets_versions").
-		Columns("asset_id", "urn", "type", "service", "name", "description", "data", "labels", "created_at", "updated_at", "updated_by", "version", "owners", "is_deleted", "changelog").
-		Values(newAsset.ID, newAsset.URN, newAsset.Type, newAsset.Service, newAsset.Name, newAsset.Description, newAsset.Data, newAsset.Labels,
-			newAsset.CreatedAt, newAsset.UpdatedAt, newAsset.UpdatedBy.ID, newAsset.Version, newAsset.Owners, newAsset.IsDeleted, jsonChangelog).
+		Columns("asset_id", "urn", "type", "service",
+			"name", "description", "data", "labels",
+			"created_at", "updated_at", "updated_by", "version",
+			"owners", "is_deleted", "changelog").
+		Values(newAsset.ID, newAsset.URN, newAsset.Type, newAsset.Service,
+			newAsset.Name, newAsset.Description, newAsset.Data, newAsset.Labels,
+			newAsset.CreatedAt, newAsset.UpdatedAt, newAsset.UpdatedBy.ID, newAsset.Version,
+			newAsset.Owners, newAsset.IsDeleted, jsonChangelog).
 		PlaceholderFormat(sq.Dollar).
 		ToSql()
 	if err != nil {
