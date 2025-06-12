@@ -67,6 +67,7 @@ func (server *APIServer) GetAllAssets(ctx context.Context, req *compassv1beta1.G
 		SortBy(req.GetSort()).
 		SortDirection(req.GetDirection()).
 		Data(req.GetData()).
+		IsDeleted(req.GetIsDeleted()).
 		Build()
 	if err != nil {
 		return nil, status.Error(codes.InvalidArgument, bodyParserErrorMsg(err))
@@ -77,7 +78,7 @@ func (server *APIServer) GetAllAssets(ctx context.Context, req *compassv1beta1.G
 		return nil, internalServerError(server.logger, err.Error())
 	}
 
-	assetsProto := []*compassv1beta1.Asset{}
+	var assetsProto []*compassv1beta1.Asset
 	for _, a := range assets {
 		ap, err := assetToProto(a, false)
 		if err != nil {
@@ -663,6 +664,7 @@ func assetToProto(a asset.Asset, withChangelog bool) (*compassv1beta1.Asset, err
 		CreatedAt:   createdAt,
 		UpdatedAt:   updatedAt,
 		Probes:      probes,
+		IsDeleted:   a.IsDeleted,
 	}, nil
 }
 
@@ -780,6 +782,7 @@ func assetFromProto(pb *compassv1beta1.Asset) asset.Asset {
 		Version:     pb.GetVersion(),
 		Changelog:   clog,
 		UpdatedBy:   updatedBy,
+		IsDeleted:   pb.GetIsDeleted(),
 	}
 }
 
