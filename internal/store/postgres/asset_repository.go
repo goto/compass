@@ -18,8 +18,6 @@ import (
 	"github.com/r3labs/diff/v2"
 )
 
-var errAssetAlreadyDeleted = errors.New("asset already deleted")
-
 // AssetRepository is a type that manages user operation to the primary database
 type AssetRepository struct {
 	client              *Client
@@ -534,7 +532,7 @@ func (r *AssetRepository) SoftDeleteByID(
 		urn = fetchedAsset.URN
 
 		if fetchedAsset.IsDeleted {
-			return errAssetAlreadyDeleted
+			return asset.ErrAssetAlreadyDeleted
 		}
 
 		newVersion, err = asset.IncreaseMinorVersion(fetchedAsset.Version)
@@ -580,7 +578,7 @@ func (r *AssetRepository) SoftDeleteByURN(ctx context.Context, executedAt time.T
 		}
 
 		if fetchedAsset.IsDeleted {
-			return errAssetAlreadyDeleted
+			return asset.ErrAssetAlreadyDeleted
 		}
 
 		newVersion, err = asset.IncreaseMinorVersion(fetchedAsset.Version)

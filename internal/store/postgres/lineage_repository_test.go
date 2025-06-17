@@ -119,6 +119,40 @@ func (r *LineageRepositoryTestSuite) TestDeleteByURN() {
 	})
 }
 
+func (r *LineageRepositoryTestSuite) TestSoftDeleteByURN() {
+	r.Run("should soft delete asset from lineage", func() {
+		nodeURN := "table-1"
+
+		// create initial
+		err := r.repository.Upsert(r.ctx, nodeURN, []string{"table-2"}, []string{"table-3"})
+		r.NoError(err)
+
+		err = r.repository.SoftDeleteByURN(r.ctx, nodeURN)
+		r.NoError(err)
+
+		graph, err := r.repository.GetGraph(r.ctx, nodeURN, asset.LineageQuery{})
+		r.Require().NoError(err)
+		r.compareGraphsWithProp(asset.LineageGraph{
+			{Source: "table-2", Target: nodeURN, Prop: map[string]interface{}{
+				"root":              nodeURN,
+				"source_is_deleted": false,
+				"target_is_deleted": true,
+			}},
+			{Source: nodeURN, Target: "table-3", Prop: map[string]interface{}{
+				"root":              nodeURN,
+				"source_is_deleted": true,
+				"target_is_deleted": false,
+			}},
+		}, graph)
+	})
+
+	r.Run("delete when URN has no lineage", func() {
+		nodeURN := "table-1"
+		err := r.repository.SoftDeleteByURN(r.ctx, nodeURN)
+		r.NoError(err)
+	})
+}
+
 func (r *LineageRepositoryTestSuite) TestDeleteByURNs() {
 	r.Run("should delete assets from lineage", func() {
 		nodeURN1a := "table-1a"
@@ -189,6 +223,64 @@ func (r *LineageRepositoryTestSuite) TestUpsert() {
 			{Source: nodeURN, Target: "dashboard-93"},
 		}, graph)
 	})
+
+	r.Run("should restore soft deleted edge when re-sync graph", func() {
+		nodeURN := "restore-table"
+
+		// create initial
+		err := r.repository.Upsert(r.ctx, nodeURN, []string{"job-restore"}, []string{"dashboard-restore"})
+		r.NoError(err)
+		graph, err := r.repository.GetGraph(r.ctx, nodeURN, asset.LineageQuery{})
+		r.Require().NoError(err)
+		r.compareGraphsWithProp(asset.LineageGraph{
+			{Source: "job-restore", Target: nodeURN, Prop: map[string]interface{}{
+				"root":              nodeURN,
+				"source_is_deleted": false,
+				"target_is_deleted": false,
+			}},
+			{Source: nodeURN, Target: "dashboard-restore", Prop: map[string]interface{}{
+				"root":              nodeURN,
+				"source_is_deleted": false,
+				"target_is_deleted": false,
+			}},
+		}, graph)
+
+		// soft delete
+		err = r.repository.SoftDeleteByURN(r.ctx, nodeURN)
+		r.NoError(err)
+		graph, err = r.repository.GetGraph(r.ctx, nodeURN, asset.LineageQuery{})
+		r.Require().NoError(err)
+		r.compareGraphsWithProp(asset.LineageGraph{
+			{Source: "job-restore", Target: nodeURN, Prop: map[string]interface{}{
+				"root":              nodeURN,
+				"source_is_deleted": false,
+				"target_is_deleted": true,
+			}},
+			{Source: nodeURN, Target: "dashboard-restore", Prop: map[string]interface{}{
+				"root":              nodeURN,
+				"source_is_deleted": true,
+				"target_is_deleted": false,
+			}},
+		}, graph)
+
+		// re-sync
+		err = r.repository.Upsert(r.ctx, nodeURN, []string{"job-restore"}, []string{"dashboard-restore"})
+		r.NoError(err)
+		graph, err = r.repository.GetGraph(r.ctx, nodeURN, asset.LineageQuery{})
+		r.Require().NoError(err)
+		r.compareGraphsWithProp(asset.LineageGraph{
+			{Source: "job-restore", Target: nodeURN, Prop: map[string]interface{}{
+				"root":              nodeURN,
+				"source_is_deleted": false,
+				"target_is_deleted": false,
+			}},
+			{Source: nodeURN, Target: "dashboard-restore", Prop: map[string]interface{}{
+				"root":              nodeURN,
+				"source_is_deleted": false,
+				"target_is_deleted": false,
+			}},
+		}, graph)
+	})
 }
 
 func (r *LineageRepositoryTestSuite) compareGraphs(expected, actual asset.LineageGraph) {
@@ -198,6 +290,17 @@ func (r *LineageRepositoryTestSuite) compareGraphs(expected, actual asset.Lineag
 	for i := 0; i < expLen; i++ {
 		r.Equal(expected[i].Source, actual[i].Source, fmt.Sprintf("different source on index %d", i))
 		r.Equal(expected[i].Target, actual[i].Target, fmt.Sprintf("different target on index %d", i))
+	}
+}
+
+func (r *LineageRepositoryTestSuite) compareGraphsWithProp(expected, actual asset.LineageGraph) {
+	expLen := len(expected)
+	r.Require().Len(actual, expLen)
+
+	for i := 0; i < expLen; i++ {
+		r.Equal(expected[i].Source, actual[i].Source, fmt.Sprintf("different source on index %d", i))
+		r.Equal(expected[i].Target, actual[i].Target, fmt.Sprintf("different target on index %d", i))
+		r.Equal(expected[i].Prop, actual[i].Prop, fmt.Sprintf("different prop on index %d", i))
 	}
 }
 

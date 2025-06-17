@@ -197,6 +197,9 @@ func (s *Service) SoftDeleteAsset(ctx context.Context, id, updatedBy string) (er
 		newVersion, err = s.assetRepository.SoftDeleteByURN(ctx, currentTime, urn, updatedBy)
 	}
 	if err != nil {
+		if errors.Is(err, ErrAssetAlreadyDeleted) {
+			return nil
+		}
 		return err
 	}
 
@@ -207,7 +210,12 @@ func (s *Service) SoftDeleteAsset(ctx context.Context, id, updatedBy string) (er
 		UpdatedBy:   updatedBy,
 		NewVersion:  newVersion,
 	}
-	return s.worker.EnqueueSoftDeleteAssetJob(ctx, params)
+
+	if err := s.worker.EnqueueSoftDeleteAssetJob(ctx, params); err != nil {
+		return err
+	}
+
+	return s.lineageRepository.SoftDeleteByURN(ctx, urn)
 }
 
 func (s *Service) DeleteAssets(ctx context.Context, request DeleteAssetsRequest) (affectedRows uint32, err error) {
