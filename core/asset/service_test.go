@@ -612,14 +612,14 @@ func TestService_SoftDeleteAsset(t *testing.T) {
 		Description string
 		ID          string
 		Err         error
-		Setup       func(context.Context, *mocks.AssetRepository, *mocks.DiscoveryRepository)
+		Setup       func(context.Context, *mocks.AssetRepository, *mocks.DiscoveryRepository, *mocks.LineageRepository)
 	}
 
 	testCases := []testCase{
 		{
 			Description: `with ID, should return error if asset repository soft delete by id returns error`,
 			ID:          assetID,
-			Setup: func(ctx context.Context, ar *mocks.AssetRepository, _ *mocks.DiscoveryRepository) {
+			Setup: func(ctx context.Context, ar *mocks.AssetRepository, _ *mocks.DiscoveryRepository, _ *mocks.LineageRepository) {
 				ar.EXPECT().SoftDeleteByID(ctx, mock.AnythingOfType("time.Time"), assetID, userID).Return(urn, newVersion, errors.New("unknown error"))
 			},
 			Err: errors.New("unknown error"),
@@ -627,7 +627,7 @@ func TestService_SoftDeleteAsset(t *testing.T) {
 		{
 			Description: `with ID, should return error if discovery repository soft delete return error`,
 			ID:          assetID,
-			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository) {
+			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository, _ *mocks.LineageRepository) {
 				ar.EXPECT().SoftDeleteByID(ctx, mock.AnythingOfType("time.Time"), assetID, userID).Return(urn, newVersion, nil)
 				dr.EXPECT().SoftDeleteByURN(ctx, mock.AnythingOfType("asset.SoftDeleteAssetParams")).Return(errors.New("unknown error"))
 			},
@@ -636,7 +636,7 @@ func TestService_SoftDeleteAsset(t *testing.T) {
 		{
 			Description: `with URN, should return error if asset repository soft delete return error`,
 			ID:          urn,
-			Setup: func(ctx context.Context, ar *mocks.AssetRepository, _ *mocks.DiscoveryRepository) {
+			Setup: func(ctx context.Context, ar *mocks.AssetRepository, _ *mocks.DiscoveryRepository, _ *mocks.LineageRepository) {
 				ar.EXPECT().SoftDeleteByURN(ctx, mock.AnythingOfType("time.Time"), urn, userID).Return(newVersion, errors.New("unknown error"))
 			},
 			Err: errors.New("unknown error"),
@@ -644,27 +644,39 @@ func TestService_SoftDeleteAsset(t *testing.T) {
 		{
 			Description: `with URN, should return error if discovery repository soft delete return error`,
 			ID:          urn,
-			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository) {
+			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository, _ *mocks.LineageRepository) {
 				ar.EXPECT().SoftDeleteByURN(ctx, mock.AnythingOfType("time.Time"), urn, userID).Return(newVersion, nil)
 				dr.EXPECT().SoftDeleteByURN(ctx, mock.AnythingOfType("asset.SoftDeleteAssetParams")).Return(errors.New("unknown error"))
 			},
 			Err: errors.New("unknown error"),
 		},
 		{
-			Description: `should call DeleteByURN on repositories by fetching URN when given an ID`,
+			Description: `should return error if lineage repository soft delete return error`,
 			ID:          assetID,
-			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository) {
+			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository, lr *mocks.LineageRepository) {
 				ar.EXPECT().SoftDeleteByID(ctx, mock.AnythingOfType("time.Time"), assetID, userID).Return(urn, newVersion, nil)
 				dr.EXPECT().SoftDeleteByURN(ctx, mock.AnythingOfType("asset.SoftDeleteAssetParams")).Return(nil)
+				lr.EXPECT().SoftDeleteByURN(ctx, urn).Return(errors.New("unknown error"))
+			},
+			Err: errors.New("unknown error"),
+		},
+		{
+			Description: `should call SoftDeleteByURN on repositories by fetching URN when given an ID`,
+			ID:          assetID,
+			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository, lr *mocks.LineageRepository) {
+				ar.EXPECT().SoftDeleteByID(ctx, mock.AnythingOfType("time.Time"), assetID, userID).Return(urn, newVersion, nil)
+				dr.EXPECT().SoftDeleteByURN(ctx, mock.AnythingOfType("asset.SoftDeleteAssetParams")).Return(nil)
+				lr.EXPECT().SoftDeleteByURN(ctx, urn).Return(nil)
 			},
 			Err: nil,
 		},
 		{
-			Description: `should call DeleteByURN on repositories when not given an ID`,
+			Description: `should call SoftDeleteByURN on repositories when not given an ID`,
 			ID:          urn,
-			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository) {
+			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository, lr *mocks.LineageRepository) {
 				ar.EXPECT().SoftDeleteByURN(ctx, mock.AnythingOfType("time.Time"), urn, userID).Return(newVersion, nil)
 				dr.EXPECT().SoftDeleteByURN(ctx, mock.AnythingOfType("asset.SoftDeleteAssetParams")).Return(nil)
+				lr.EXPECT().SoftDeleteByURN(ctx, urn).Return(nil)
 			},
 			Err: nil,
 		},
@@ -677,7 +689,7 @@ func TestService_SoftDeleteAsset(t *testing.T) {
 			discoveryRepo := mocks.NewDiscoveryRepository(t)
 			lineageRepo := mocks.NewLineageRepository(t)
 			if tc.Setup != nil {
-				tc.Setup(ctx, assetRepo, discoveryRepo)
+				tc.Setup(ctx, assetRepo, discoveryRepo, lineageRepo)
 			}
 
 			svc, cancel := asset.NewService(asset.ServiceDeps{

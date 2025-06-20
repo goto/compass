@@ -18,7 +18,6 @@ import (
 	"github.com/r3labs/diff/v2"
 )
 
-var errAssetAlreadyDeleted = errors.New("asset already deleted")
 var errOffsetCannotBeNegative = errors.New("offset cannot be negative")
 var errSizeCannotBeNegative = errors.New("size cannot be negative")
 
@@ -545,7 +544,7 @@ func (r *AssetRepository) SoftDeleteByID(
 		urn = fetchedAsset.URN
 
 		if fetchedAsset.IsDeleted {
-			return errAssetAlreadyDeleted
+			return asset.ErrAssetAlreadyDeleted
 		}
 
 		newVersion, err = asset.IncreaseMinorVersion(fetchedAsset.Version)
@@ -591,7 +590,7 @@ func (r *AssetRepository) SoftDeleteByURN(ctx context.Context, executedAt time.T
 		}
 
 		if fetchedAsset.IsDeleted {
-			return errAssetAlreadyDeleted
+			return asset.ErrAssetAlreadyDeleted
 		}
 
 		newVersion, err = asset.IncreaseMinorVersion(fetchedAsset.Version)
@@ -1004,9 +1003,14 @@ func (r *AssetRepository) insertAssetVersion(ctx context.Context, execer sqlx.Ex
 		return err
 	}
 	query, args, err := sq.Insert("assets_versions").
-		Columns("asset_id", "urn", "type", "service", "name", "description", "data", "labels", "created_at", "updated_at", "updated_by", "version", "owners", "changelog").
-		Values(newAsset.ID, newAsset.URN, newAsset.Type, newAsset.Service, newAsset.Name, newAsset.Description, newAsset.Data, newAsset.Labels,
-			newAsset.CreatedAt, newAsset.UpdatedAt, newAsset.UpdatedBy.ID, newAsset.Version, newAsset.Owners, jsonChangelog).
+		Columns("asset_id", "urn", "type", "service",
+			"name", "description", "data", "labels",
+			"created_at", "updated_at", "updated_by", "version",
+			"owners", "is_deleted", "changelog").
+		Values(newAsset.ID, newAsset.URN, newAsset.Type, newAsset.Service,
+			newAsset.Name, newAsset.Description, newAsset.Data, newAsset.Labels,
+			newAsset.CreatedAt, newAsset.UpdatedAt, newAsset.UpdatedBy.ID, newAsset.Version,
+			newAsset.Owners, newAsset.IsDeleted, jsonChangelog).
 		PlaceholderFormat(sq.Dollar).
 		ToSql()
 	if err != nil {
