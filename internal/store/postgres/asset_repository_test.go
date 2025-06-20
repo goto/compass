@@ -982,6 +982,7 @@ func (r *AssetRepositoryTestSuite) TestVersions() {
 
 func (r *AssetRepositoryTestSuite) TestUpsert() {
 	refreshedAtTime := time.Date(2024, time.August, 20, 8, 19, 49, 0, time.UTC)
+	currentTime := time.Now().UTC()
 	r.Run("on insert", func() {
 		r.Run("set ID to asset and version to base version", func() {
 			ast := asset.Asset{
@@ -1219,6 +1220,35 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 			r.Equal(r.users[1].ID, upsertedAsset.Owners[0].ID)
 			r.NotEmpty(upsertedAsset.Owners[1].ID)
 			r.Equal(newAsset.Owners[1].Email, upsertedAsset.Owners[1].Email)
+		})
+
+		r.Run("should restore the asset and update the asset version if re-sync/update soft deleted asset", func() {
+			updatedBy := r.users[0]
+			ast := asset.Asset{
+				URN:       uuid.NewString() + "urn-u-2",
+				Type:      "table",
+				Service:   "bigquery",
+				UpdatedBy: updatedBy,
+				Version:   "0.1",
+			}
+
+			insertedAsset, err := r.repository.Upsert(r.ctx, &ast)
+			r.Require().NoError(err)
+			r.NotEmpty(insertedAsset.ID)
+			ast.ID = insertedAsset.ID
+
+			newVersion, err := r.repository.SoftDeleteByURN(r.ctx, currentTime, ast.URN, updatedBy.ID)
+			r.Require().NoError(err)
+			r.Equal("0.2", newVersion) // successfully soft deleted the asset
+
+			softDeletedAsset, err := r.repository.GetByURN(r.ctx, ast.URN)
+			r.Require().NoError(err)
+			r.Equal(true, softDeletedAsset.IsDeleted) // asset is soft deleted
+
+			upsertedAsset, err := r.repository.Upsert(r.ctx, &ast)
+			r.Require().NoError(err)
+			r.Equal(false, upsertedAsset.IsDeleted) // asset is restored
+			r.Equal("0.3", upsertedAsset.Version)
 		})
 	})
 }

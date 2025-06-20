@@ -234,7 +234,7 @@ The Lineage API allows the clients to query the data flow relationship between d
 
 See the swagger definition of [Lineage API](https://github.com/goto/compass/blob/main/third_party/OpenAPI/compass.swagger.json)) for more information.
 
-Lineage API returns a list of directed edges. For each edge, there are `source` and `target` fields that represent nodes to indicate the direction of the edge. Each edge could have an optional property in the `props` field.
+Lineage API returns a list of directed edges. For each edge, there are `source` and `target` fields that represent nodes to indicate the direction of the edge. Each edge could have an optional property in the `prop` field.
 
 #### We can search for lineage in the following ways:
 
@@ -272,7 +272,7 @@ $ curl 'http://localhost:8080/v1beta1/lineage/data-project%3Adatalake.events' \
                 "type": "csv",
                 "service": "s3",
             },
-            "props": {}
+            "prop": {}
         },
         {
             "source": {
@@ -285,7 +285,7 @@ $ curl 'http://localhost:8080/v1beta1/lineage/data-project%3Adatalake.events' \
                 "type": "table",
                 "service": "bigquery",
             },
-            "props": {}
+            "prop": {}
         },
     ]
 }

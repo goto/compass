@@ -165,6 +165,49 @@ func (_c *LineageRepository_GetGraph_Call) RunAndReturn(run func(context.Context
 	return _c
 }
 
+// SoftDeleteByURN provides a mock function with given fields: ctx, urn
+func (_m *LineageRepository) SoftDeleteByURN(ctx context.Context, urn string) error {
+	ret := _m.Called(ctx, urn)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, string) error); ok {
+		r0 = rf(ctx, urn)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// LineageRepository_SoftDeleteByURN_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SoftDeleteByURN'
+type LineageRepository_SoftDeleteByURN_Call struct {
+	*mock.Call
+}
+
+// SoftDeleteByURN is a helper method to define mock.On call
+//   - ctx context.Context
+//   - urn string
+func (_e *LineageRepository_Expecter) SoftDeleteByURN(ctx interface{}, urn interface{}) *LineageRepository_SoftDeleteByURN_Call {
+	return &LineageRepository_SoftDeleteByURN_Call{Call: _e.mock.On("SoftDeleteByURN", ctx, urn)}
+}
+
+func (_c *LineageRepository_SoftDeleteByURN_Call) Run(run func(ctx context.Context, urn string)) *LineageRepository_SoftDeleteByURN_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(string))
+	})
+	return _c
+}
+
+func (_c *LineageRepository_SoftDeleteByURN_Call) Return(_a0 error) *LineageRepository_SoftDeleteByURN_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *LineageRepository_SoftDeleteByURN_Call) RunAndReturn(run func(context.Context, string) error) *LineageRepository_SoftDeleteByURN_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // Upsert provides a mock function with given fields: ctx, urn, upstreams, downstreams
 func (_m *LineageRepository) Upsert(ctx context.Context, urn string, upstreams []string, downstreams []string) error {
 	ret := _m.Called(ctx, urn, upstreams, downstreams)

@@ -52,6 +52,10 @@ func (repo *LineageRepository) DeleteByURN(ctx context.Context, urn string) erro
 	return repo.DeleteByURNs(ctx, []string{urn})
 }
 
+func (repo *LineageRepository) SoftDeleteByURN(ctx context.Context, urn string) error {
+	return repo.softDeleteByURNs(ctx, []string{urn})
+}
+
 func (repo *LineageRepository) DeleteByURNs(ctx context.Context, urns []string) error {
 	qry, args, err := sq.Delete("lineage_graph").
 		Where(sq.Or{
@@ -71,6 +75,43 @@ func (repo *LineageRepository) DeleteByURNs(ctx context.Context, urns []string) 
 	return nil
 }
 
+func (repo *LineageRepository) softDeleteByURNs(ctx context.Context, urns []string) error {
+	// Process source soft deletion
+	if err := repo.softDeleteByURNsAndProp(ctx, urns, true); err != nil {
+		return err
+	}
+
+	// Process target soft deletion
+	return repo.softDeleteByURNsAndProp(ctx, urns, false)
+}
+
+func (repo *LineageRepository) softDeleteByURNsAndProp(ctx context.Context, urns []string, isSource bool) error {
+	// Determine which field and column to use based on isSource
+	field := "target_is_deleted"
+	whereColumn := "target"
+	if isSource {
+		field = "source_is_deleted"
+		whereColumn = "source"
+	}
+
+	qry, args, err := sq.Update("lineage_graph").
+		Set("prop", sq.Expr(
+			fmt.Sprintf("jsonb_set(prop, '{%s}', to_jsonb(true))", field),
+		)).
+		Where(sq.Eq{whereColumn: urns}).
+		PlaceholderFormat(sq.Dollar).
+		ToSql()
+	if err != nil {
+		return fmt.Errorf("build soft delete %s lineage query: URNs = %v: %w", whereColumn, urns, err)
+	}
+
+	if _, err := repo.client.db.ExecContext(ctx, qry, args...); err != nil {
+		return fmt.Errorf("soft delete %s lineage: URNs = %v: %w", whereColumn, urns, err)
+	}
+
+	return nil
+}
+
 // Upsert insert or delete connections of a given node by comparing them with current state
 func (repo *LineageRepository) Upsert(ctx context.Context, urn string, upstreams, downstreams []string) error {
 	currentGraph, err := repo.getDirectLineage(ctx, urn)
@@ -82,13 +123,15 @@ func (repo *LineageRepository) Upsert(ctx context.Context, urn string, upstreams
 	toRemoves = repo.filterSelfDeleteOnly(urn, toRemoves)
 
 	return repo.client.RunWithinTx(ctx, func(tx *sqlx.Tx) error {
-		err := repo.insertGraph(ctx, tx, toInserts)
-		if err != nil {
+		if err := repo.restoreGraph(ctx, tx, urn); err != nil {
+			return fmt.Errorf("error restoring graph: %w", err)
+		}
+
+		if err := repo.insertGraph(ctx, tx, toInserts); err != nil {
 			return fmt.Errorf("error inserting graph: %w", err)
 		}
 
-		err = repo.removeGraph(ctx, tx, toRemoves)
-		if err != nil {
+		if err := repo.removeGraph(ctx, tx, toRemoves); err != nil {
 			return fmt.Errorf("error removing graph: %w", err)
 		}
 
@@ -103,7 +146,10 @@ func (*LineageRepository) buildGraph(urn string, upstreams, downstreams []string
 			Source: us,
 			Target: urn,
 			Prop: map[string]interface{}{
-				"root": urn, // this is to note which node is updating the relation
+				"root":              urn, // this is to note which node is updating the relation
+				"target_is_deleted": false,
+				// default we assume that the upstream is not deleted
+				"source_is_deleted": false,
 			},
 		})
 	}
@@ -112,7 +158,10 @@ func (*LineageRepository) buildGraph(urn string, upstreams, downstreams []string
 			Source: urn,
 			Target: ds,
 			Prop: map[string]interface{}{
-				"root": urn, // this is to note which node is updating the relation
+				"root":              urn, // this is to note which node is updating the relation
+				"source_is_deleted": false,
+				// default we assume that the downstream is not deleted
+				"target_is_deleted": false,
 			},
 		})
 	}
@@ -134,6 +183,45 @@ func (*LineageRepository) filterSelfDeleteOnly(urn string, toRemoves asset.Linea
 	}
 
 	return res
+}
+
+func (repo *LineageRepository) restoreGraph(ctx context.Context, execer sqlx.ExecerContext, urn string) error {
+	// Process source restoration
+	if err := repo.restoreGraphByProp(ctx, execer, urn, true); err != nil {
+		return err
+	}
+
+	// Process target restoration
+	return repo.restoreGraphByProp(ctx, execer, urn, false)
+}
+
+func (*LineageRepository) restoreGraphByProp(ctx context.Context, execer sqlx.ExecerContext, urn string, isSource bool) error {
+	// Determine which field we're updating based on isSource flag
+	field := "target_is_deleted"
+	whereColumn := "target"
+	if isSource {
+		field = "source_is_deleted"
+		whereColumn = "source"
+	}
+
+	// Build the update query
+	sql, args, err := sq.Update("lineage_graph").
+		Set("prop", sq.Expr(
+			fmt.Sprintf("jsonb_set(prop, '{%s}', to_jsonb(false))", field),
+		)).
+		Where(sq.Eq{whereColumn: urn}).
+		PlaceholderFormat(sq.Dollar).
+		ToSql()
+	if err != nil {
+		return fmt.Errorf("error building restore %s lineage query: %w", whereColumn, err)
+	}
+
+	_, err = execer.ExecContext(ctx, sql, args...)
+	if err != nil {
+		return fmt.Errorf("error executing update %s lineage query: %w", whereColumn, err)
+	}
+
+	return nil
 }
 
 func (*LineageRepository) insertGraph(ctx context.Context, execer sqlx.ExecerContext, graph asset.LineageGraph) error {
