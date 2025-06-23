@@ -111,6 +111,49 @@ func (_c *DiscoveryRepository_DeleteByURN_Call) RunAndReturn(run func(context.Co
 	return _c
 }
 
+// SoftDeleteByQueryExpr provides a mock function with given fields: ctx, softDeleteAssetsByQueryExpr
+func (_m *DiscoveryRepository) SoftDeleteByQueryExpr(ctx context.Context, softDeleteAssetsByQueryExpr asset.SoftDeleteAssetsByQueryExpr) error {
+	ret := _m.Called(ctx, softDeleteAssetsByQueryExpr)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, asset.SoftDeleteAssetsByQueryExpr) error); ok {
+		r0 = rf(ctx, softDeleteAssetsByQueryExpr)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// DiscoveryRepository_SoftDeleteByQueryExpr_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SoftDeleteByQueryExpr'
+type DiscoveryRepository_SoftDeleteByQueryExpr_Call struct {
+	*mock.Call
+}
+
+// SoftDeleteByQueryExpr is a helper method to define mock.On call
+//   - ctx context.Context
+//   - softDeleteAssetsByQueryExpr asset.SoftDeleteAssetsByQueryExpr
+func (_e *DiscoveryRepository_Expecter) SoftDeleteByQueryExpr(ctx interface{}, softDeleteAssetsByQueryExpr interface{}) *DiscoveryRepository_SoftDeleteByQueryExpr_Call {
+	return &DiscoveryRepository_SoftDeleteByQueryExpr_Call{Call: _e.mock.On("SoftDeleteByQueryExpr", ctx, softDeleteAssetsByQueryExpr)}
+}
+
+func (_c *DiscoveryRepository_SoftDeleteByQueryExpr_Call) Run(run func(ctx context.Context, softDeleteAssetsByQueryExpr asset.SoftDeleteAssetsByQueryExpr)) *DiscoveryRepository_SoftDeleteByQueryExpr_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(asset.SoftDeleteAssetsByQueryExpr))
+	})
+	return _c
+}
+
+func (_c *DiscoveryRepository_SoftDeleteByQueryExpr_Call) Return(_a0 error) *DiscoveryRepository_SoftDeleteByQueryExpr_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *DiscoveryRepository_SoftDeleteByQueryExpr_Call) RunAndReturn(run func(context.Context, asset.SoftDeleteAssetsByQueryExpr) error) *DiscoveryRepository_SoftDeleteByQueryExpr_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // SoftDeleteByURN provides a mock function with given fields: ctx, params
 func (_m *DiscoveryRepository) SoftDeleteByURN(ctx context.Context, params asset.SoftDeleteAssetParams) error {
 	ret := _m.Called(ctx, params)
