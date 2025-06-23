@@ -13,7 +13,7 @@ type DiscoveryRepository interface {
 	DeleteByURN(ctx context.Context, assetURN string) error
 	SoftDeleteByURN(ctx context.Context, params SoftDeleteAssetParams) error
 	DeleteByQueryExpr(ctx context.Context, queryExpr queryexpr.ExprStr) error
-	SoftDeleteByQueryExpr(ctx context.Context, softDeleteAssetsByQueryExpr SoftDeleteAssetsByQueryExpr) error
+	SoftDeleteAssets(ctx context.Context, assets []Asset, doUpdateVersion bool) error
 	Search(ctx context.Context, cfg SearchConfig) (results []SearchResult, err error)
 	Suggest(ctx context.Context, cfg SearchConfig) (suggestions []string, err error)
 	GroupAssets(ctx context.Context, cfg GroupConfig) (results []GroupResult, err error)

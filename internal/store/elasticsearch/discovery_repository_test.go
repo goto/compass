@@ -10,6 +10,7 @@ import (
 
 	"github.com/elastic/go-elasticsearch/v7"
 	"github.com/goto/compass/core/asset"
+	"github.com/goto/compass/core/user"
 	store "github.com/goto/compass/internal/store/elasticsearch"
 	"github.com/goto/compass/pkg/queryexpr"
 	"github.com/goto/salt/log"
@@ -506,54 +507,6 @@ func TestDiscoveryRepository_SoftDeleteByURN(t *testing.T) {
 	})
 }
 
-func TestDiscoveryRepository_GetCurrentVersionAsset(t *testing.T) {
-	var (
-		ctx             = context.Background()
-		bigqueryService = "bigquery-test"
-	)
-
-	cli, err := esTestServer.NewClient()
-	require.NoError(t, err)
-
-	esClient, err := store.NewClient(
-		log.NewNoop(), store.Config{}, store.WithClient(cli),
-	)
-	require.NoError(t, err)
-
-	repo := store.NewDiscoveryRepository(esClient, log.NewNoop(), time.Second*10, []string{"number", "id"})
-
-	t.Run("should return error not found if the given urn is not exist", func(t *testing.T) {
-		_, err = repo.GetCurrentAssetVersion(ctx, "test-urn", 1*time.Second)
-		assert.ErrorContains(t, err, "asset test-urn not found")
-	})
-
-	t.Run("should not return error on success", func(t *testing.T) {
-		ast := asset.Asset{
-			ID:      "some-id",
-			Type:    asset.Type("table"),
-			Service: bigqueryService,
-			URN:     "some-urn",
-			Version: "0.1",
-		}
-
-		err = repo.Upsert(ctx, ast)
-		require.NoError(t, err)
-
-		// Ensure the asset exists before soft delete
-		version, err := repo.GetCurrentAssetVersion(ctx, ast.URN, 2*time.Second)
-		require.NoError(t, err)
-		assert.Equal(t, "0.1", version)
-
-		err = repo.SoftDeleteByURN(ctx, asset.SoftDeleteAsset{URN: ast.URN})
-		assert.NoError(t, err)
-
-		// Soft delete increase the version
-		newVersion, err := repo.GetCurrentAssetVersion(ctx, ast.URN, 2*time.Second)
-		require.NoError(t, err)
-		assert.Equal(t, "0.2", newVersion)
-	})
-}
-
 func TestDiscoveryRepository_DeleteByQueryExpr(t *testing.T) {
 	var (
 		ctx             = context.Background()
@@ -666,7 +619,7 @@ func TestDiscoveryRepository_DeleteByQueryExpr(t *testing.T) {
 	})
 }
 
-func TestDiscoveryRepository_SoftDeleteByQueryExpr(t *testing.T) {
+func TestDiscoveryRepository_SoftDeleteAssets(t *testing.T) {
 	var (
 		ctx             = context.Background()
 		bigqueryService = "bigquery-test"
@@ -685,51 +638,81 @@ func TestDiscoveryRepository_SoftDeleteByQueryExpr(t *testing.T) {
 
 	repo := store.NewDiscoveryRepository(esClient, log.NewNoop(), time.Second*10, []string{"number", "id"})
 
-	t.Run("should return error if the given query expr is empty", func(t *testing.T) {
-		queryExpr := asset.DeleteAssetExpr{
-			ExprStr: queryexpr.ESExpr(""),
-		}
-		softDeleteAssetsByQueryExpr := asset.NewSoftDeleteAssetsByQueryExpr(
-			currentTime, currentTime, userID, "", queryExpr)
-		err = repo.SoftDeleteByQueryExpr(ctx, softDeleteAssetsByQueryExpr)
-		assert.ErrorIs(t, err, asset.ErrEmptyQuery)
+	t.Run("should not return error if the given assets is empty", func(t *testing.T) {
+		err = repo.SoftDeleteAssets(ctx, []asset.Asset{}, false)
+		assert.NoError(t, err)
 	})
 
-	t.Run("should not return error on success", func(t *testing.T) {
+	t.Run("should not return error on success with do update version", func(t *testing.T) {
 		ast := asset.Asset{
-			ID:          "delete-id",
+			ID:          "delete-id-1",
 			Type:        asset.Type("table"),
 			Service:     bigqueryService,
-			URN:         "some-urn",
+			URN:         "some-urn-1",
 			Version:     "0.1",
+			UpdatedAt:   currentTime,
 			RefreshedAt: &currentTime,
+			UpdatedBy:   user.User{ID: userID},
 		}
 
 		err = repo.Upsert(ctx, ast)
+		time.Sleep(1 * time.Second)
 		require.NoError(t, err)
 
 		// Ensure the asset exists before soft delete
-		version, err := repo.GetCurrentAssetVersion(ctx, ast.URN, 2*time.Second)
-		require.NoError(t, err)
-		assert.Equal(t, "0.1", version)
+		hits, total := searchByURN(t, cli, ast.URN)
+		assert.Equal(t, int64(1), total)
+		assert.Equal(t, false, hits[0].IsDeleted)
+		assert.Equal(t, asset.BaseVersion, hits[0].Version)
 
-		query := "refreshed_at <= '" + time.Now().Format("2006-01-02T15:04:05Z") +
-			"' && service == '" + bigqueryService +
-			"' && type == '" + asset.Type("table").String() + "'"
-		queryExpr := asset.DeleteAssetExpr{
-			ExprStr: queryexpr.ESExpr(query),
-		}
-		softDeleteAssetsByQueryExpr := asset.NewSoftDeleteAssetsByQueryExpr(
-			currentTime, currentTime, userID, query, queryExpr)
-
-		err = repo.SoftDeleteByQueryExpr(ctx, softDeleteAssetsByQueryExpr)
-		time.Sleep(500 * time.Millisecond)
+		// Soft delete the asset
+		err = repo.SoftDeleteAssets(ctx, []asset.Asset{ast}, true)
+		time.Sleep(1 * time.Second)
 		assert.NoError(t, err)
 
-		// Soft delete does not remove the asset, it just marks it as deleted and increase the version
-		newVersion, err := repo.GetCurrentAssetVersion(ctx, ast.URN, 2*time.Second)
+		// Soft delete does not remove the asset, but marks it as deleted
+		hits, total = searchByURN(t, cli, ast.URN)
+		assert.Equal(t, int64(1), total)
+		assert.Equal(t, true, hits[0].IsDeleted)
+		assert.Equal(t, "0.2", hits[0].Version) // updated
+		assert.Equal(t, currentTime, hits[0].UpdatedAt)
+		assert.Equal(t, currentTime, hits[0].RefreshedAt)
+	})
+
+	t.Run("should not return error on success without do update version", func(t *testing.T) {
+		ast := asset.Asset{
+			ID:          "delete-id-2",
+			Type:        asset.Type("table"),
+			Service:     bigqueryService,
+			URN:         "some-urn-2",
+			Version:     "0.1",
+			UpdatedAt:   currentTime,
+			RefreshedAt: &currentTime,
+			UpdatedBy:   user.User{ID: userID},
+		}
+
+		err = repo.Upsert(ctx, ast)
+		time.Sleep(1 * time.Second)
 		require.NoError(t, err)
-		assert.Equal(t, "0.2", newVersion)
+
+		// Ensure the asset exists before soft delete
+		hits, total := searchByURN(t, cli, ast.URN)
+		assert.Equal(t, int64(1), total)
+		assert.Equal(t, false, hits[0].IsDeleted)
+		assert.Equal(t, asset.BaseVersion, hits[0].Version)
+
+		// Soft delete the asset
+		err = repo.SoftDeleteAssets(ctx, []asset.Asset{ast}, false)
+		time.Sleep(1000 * time.Millisecond)
+		assert.NoError(t, err)
+
+		// Soft delete does not remove the asset, but marks it as deleted
+		hits, total = searchByURN(t, cli, ast.URN)
+		assert.Equal(t, int64(1), total)
+		assert.Equal(t, true, hits[0].IsDeleted)
+		assert.Equal(t, "0.1", hits[0].Version) // still the same version
+		assert.Equal(t, currentTime, hits[0].UpdatedAt)
+		assert.Equal(t, currentTime, hits[0].RefreshedAt)
 	})
 
 	t.Run("should ignore unavailable indices", func(t *testing.T) {
@@ -738,14 +721,18 @@ func TestDiscoveryRepository_SoftDeleteByQueryExpr(t *testing.T) {
 			Type:        asset.Type("table"),
 			Service:     bigqueryService,
 			URN:         "urn1",
+			UpdatedAt:   currentTime,
 			RefreshedAt: &currentTime,
+			UpdatedBy:   user.User{ID: userID},
 		}
 		ast2 := asset.Asset{
 			ID:          "id2",
 			Type:        asset.Type("topic"),
 			Service:     kafkaService,
 			URN:         "urn2",
+			UpdatedAt:   currentTime,
 			RefreshedAt: &currentTime,
+			UpdatedBy:   user.User{ID: userID},
 		}
 		cli, err := esTestServer.NewClient()
 		require.NoError(t, err)
@@ -767,16 +754,8 @@ func TestDiscoveryRepository_SoftDeleteByQueryExpr(t *testing.T) {
 		_, err = cli.Indices.Close([]string{kafkaService})
 		require.NoError(t, err)
 
-		query := "refreshed_at <= '" + time.Now().Format("2006-01-02T15:04:05Z") +
-			"' && service == '" + kafkaService +
-			"' && type == '" + asset.Type("topic").String() + "'"
-		queryExpr := asset.DeleteAssetExpr{
-			ExprStr: queryexpr.ESExpr(query),
-		}
-		softDeleteAssetsByQueryExpr := asset.NewSoftDeleteAssetsByQueryExpr(
-			currentTime, currentTime, userID, query, queryExpr)
-
-		err = repo.SoftDeleteByQueryExpr(ctx, softDeleteAssetsByQueryExpr)
+		// Soft delete the asset
+		err = repo.SoftDeleteAssets(ctx, []asset.Asset{ast1, ast2}, false)
 		assert.NoError(t, err)
 	})
 }

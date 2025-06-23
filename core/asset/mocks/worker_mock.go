@@ -236,13 +236,13 @@ func (_c *Worker_EnqueueSoftDeleteAssetJob_Call) RunAndReturn(run func(context.C
 	return _c
 }
 
-// EnqueueSoftDeleteAssetsByQueryExprJob provides a mock function with given fields: ctx, softDeleteAssetsByQueryExpr
-func (_m *Worker) EnqueueSoftDeleteAssetsByQueryExprJob(ctx context.Context, softDeleteAssetsByQueryExpr asset.SoftDeleteAssetsByQueryExpr) error {
-	ret := _m.Called(ctx, softDeleteAssetsByQueryExpr)
+// EnqueueSoftDeleteAssetsJob provides a mock function with given fields: ctx, assets
+func (_m *Worker) EnqueueSoftDeleteAssetsJob(ctx context.Context, assets []asset.Asset) error {
+	ret := _m.Called(ctx, assets)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, asset.SoftDeleteAssetsByQueryExpr) error); ok {
-		r0 = rf(ctx, softDeleteAssetsByQueryExpr)
+	if rf, ok := ret.Get(0).(func(context.Context, []asset.Asset) error); ok {
+		r0 = rf(ctx, assets)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -250,31 +250,31 @@ func (_m *Worker) EnqueueSoftDeleteAssetsByQueryExprJob(ctx context.Context, sof
 	return r0
 }
 
-// Worker_EnqueueSoftDeleteAssetsByQueryExprJob_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'EnqueueSoftDeleteAssetsByQueryExprJob'
-type Worker_EnqueueSoftDeleteAssetsByQueryExprJob_Call struct {
+// Worker_EnqueueSoftDeleteAssetsJob_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'EnqueueSoftDeleteAssetsJob'
+type Worker_EnqueueSoftDeleteAssetsJob_Call struct {
 	*mock.Call
 }
 
-// EnqueueSoftDeleteAssetsByQueryExprJob is a helper method to define mock.On call
+// EnqueueSoftDeleteAssetsJob is a helper method to define mock.On call
 //   - ctx context.Context
-//   - softDeleteAssetsByQueryExpr asset.SoftDeleteAssetsByQueryExpr
-func (_e *Worker_Expecter) EnqueueSoftDeleteAssetsByQueryExprJob(ctx interface{}, softDeleteAssetsByQueryExpr interface{}) *Worker_EnqueueSoftDeleteAssetsByQueryExprJob_Call {
-	return &Worker_EnqueueSoftDeleteAssetsByQueryExprJob_Call{Call: _e.mock.On("EnqueueSoftDeleteAssetsByQueryExprJob", ctx, softDeleteAssetsByQueryExpr)}
+//   - assets []asset.Asset
+func (_e *Worker_Expecter) EnqueueSoftDeleteAssetsJob(ctx interface{}, assets interface{}) *Worker_EnqueueSoftDeleteAssetsJob_Call {
+	return &Worker_EnqueueSoftDeleteAssetsJob_Call{Call: _e.mock.On("EnqueueSoftDeleteAssetsJob", ctx, assets)}
 }
 
-func (_c *Worker_EnqueueSoftDeleteAssetsByQueryExprJob_Call) Run(run func(ctx context.Context, softDeleteAssetsByQueryExpr asset.SoftDeleteAssetsByQueryExpr)) *Worker_EnqueueSoftDeleteAssetsByQueryExprJob_Call {
+func (_c *Worker_EnqueueSoftDeleteAssetsJob_Call) Run(run func(ctx context.Context, assets []asset.Asset)) *Worker_EnqueueSoftDeleteAssetsJob_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(asset.SoftDeleteAssetsByQueryExpr))
+		run(args[0].(context.Context), args[1].([]asset.Asset))
 	})
 	return _c
 }
 
-func (_c *Worker_EnqueueSoftDeleteAssetsByQueryExprJob_Call) Return(_a0 error) *Worker_EnqueueSoftDeleteAssetsByQueryExprJob_Call {
+func (_c *Worker_EnqueueSoftDeleteAssetsJob_Call) Return(_a0 error) *Worker_EnqueueSoftDeleteAssetsJob_Call {
 	_c.Call.Return(_a0)
 	return _c
 }
 
-func (_c *Worker_EnqueueSoftDeleteAssetsByQueryExprJob_Call) RunAndReturn(run func(context.Context, asset.SoftDeleteAssetsByQueryExpr) error) *Worker_EnqueueSoftDeleteAssetsByQueryExprJob_Call {
+func (_c *Worker_EnqueueSoftDeleteAssetsJob_Call) RunAndReturn(run func(context.Context, []asset.Asset) error) *Worker_EnqueueSoftDeleteAssetsJob_Call {
 	_c.Call.Return(run)
 	return _c
 }

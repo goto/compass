@@ -33,7 +33,7 @@ type Worker interface {
 	EnqueueDeleteAssetJob(ctx context.Context, urn string) error
 	EnqueueSoftDeleteAssetJob(ctx context.Context, params SoftDeleteAssetParams) error
 	EnqueueDeleteAssetsByQueryExprJob(ctx context.Context, queryExpr string) error
-	EnqueueSoftDeleteAssetsByQueryExprJob(ctx context.Context, softDeleteAssetsByQueryExpr SoftDeleteAssetsByQueryExpr) error
+	EnqueueSoftDeleteAssetsJob(ctx context.Context, assets []Asset) error
 	EnqueueSyncAssetJob(ctx context.Context, service string) error
 	Close() error
 }
@@ -269,13 +269,12 @@ func (s *Service) SoftDeleteAssets(ctx context.Context, request DeleteAssetsRequ
 	}
 
 	if !request.DryRun && total > 0 {
-		currentTime := time.Now()
-		softDeleteAssetsByQueryExpr := NewSoftDeleteAssetsByQueryExpr(currentTime, currentTime, updatedBy, queryExprStr, deleteSQLExpr)
+		executedTime := time.Now()
 		newCtx, cancel := context.WithTimeout(context.Background(), s.config.DeleteAssetsTimeout)
 		cancelID := uuid.New().String()
 		s.cancelFnMap.Store(cancelID, cancel)
 		go func(id string) {
-			s.executeSoftDeleteAssets(newCtx, softDeleteAssetsByQueryExpr)
+			s.executeSoftDeleteAssets(newCtx, executedTime, updatedBy, deleteSQLExpr)
 			cancel()
 			s.cancelFnMap.Delete(id)
 		}(cancelID)
@@ -284,14 +283,15 @@ func (s *Service) SoftDeleteAssets(ctx context.Context, request DeleteAssetsRequ
 	return uint32(total), nil
 }
 
-func (s *Service) executeSoftDeleteAssets(ctx context.Context, softDeleteAssetsByQueryExpr SoftDeleteAssetsByQueryExpr) {
-	if err := s.assetRepository.SoftDeleteByQueryExpr(ctx, softDeleteAssetsByQueryExpr); err != nil {
-		s.logger.Error("asset deletion failed, skipping elasticsearch and lineage deletions", "err:", err)
+func (s *Service) executeSoftDeleteAssets(ctx context.Context, executedTime time.Time, updatedByID string, queryExpr queryexpr.ExprStr) {
+	updatedAssets, err := s.assetRepository.SoftDeleteByQueryExpr(ctx, executedTime, updatedByID, queryExpr)
+	if err != nil {
+		s.logger.Error("asset deletion failed, skipping elasticsearch and lineage soft deletions", "err:", err)
 		return
 	}
 
-	if err := s.worker.EnqueueSoftDeleteAssetsByQueryExprJob(ctx, softDeleteAssetsByQueryExpr); err != nil {
-		s.logger.Error("error occurred during elasticsearch deletion", "err:", err)
+	if err := s.worker.EnqueueSoftDeleteAssetsJob(ctx, updatedAssets); err != nil {
+		s.logger.Error("error occurred during elasticsearch soft deletion", "err:", err)
 	}
 }
 

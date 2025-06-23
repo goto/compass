@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/goto/compass/core/asset"
+	"github.com/goto/compass/core/user"
 	"github.com/goto/compass/internal/testutils"
 	"github.com/goto/compass/internal/workermanager"
 	"github.com/goto/compass/internal/workermanager/mocks"
@@ -296,8 +297,19 @@ func TestManager_EnqueueDeleteAssetsByQueryExprJob(t *testing.T) {
 	}
 }
 
-func TestManager_EnqueueSoftDeleteAssetsByQueryExprJob(t *testing.T) {
+func TestManager_EnqueueSoftDeleteAssetsJob(t *testing.T) {
 	currentTime := time.Now().UTC()
+	dummyAssets := []asset.Asset{
+		{
+			ID:          "asset-1",
+			URN:         "urn:asset:1",
+			Type:        asset.Type("table"),
+			Service:     "test-service",
+			UpdatedAt:   currentTime,
+			RefreshedAt: &currentTime,
+			UpdatedBy:   user.User{ID: "some-user"},
+		},
+	}
 	cases := []struct {
 		name        string
 		enqueueErr  error
@@ -307,31 +319,24 @@ func TestManager_EnqueueSoftDeleteAssetsByQueryExprJob(t *testing.T) {
 		{
 			name:        "Failure",
 			enqueueErr:  errors.New("fail"),
-			expectedErr: "enqueue soft delete assets job: fail: query expr:",
+			expectedErr: "enqueue soft delete assets job:",
 		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			queryExpr := "refreshed_at <= '" + time.Now().Format("2006-01-02T15:04:05Z") +
-				"' && service == 'test-service'" +
-				"' && type == 'table'" +
-				"' && urn == 'some-urn'"
-			wrkr := mocks.NewWorker(t)
-
-			softDeleteAssetsByQueryExpr := asset.NewSoftDeleteAssetsByQueryExpr(
-				currentTime, currentTime, "some-user", queryExpr, nil)
-			payload, err := json.Marshal(softDeleteAssetsByQueryExpr)
+			payload, err := json.Marshal(dummyAssets)
 			assert.NoError(t, err, "failed to marshal soft delete assets by query expr")
 
+			wrkr := mocks.NewWorker(t)
 			wrkr.EXPECT().
 				Enqueue(ctx, worker.JobSpec{
-					Type:    "soft-delete-assets-by-query",
+					Type:    "soft-delete-assets",
 					Payload: payload,
 				}).
 				Return(tc.enqueueErr)
 
 			mgr := workermanager.NewWithWorker(wrkr, workermanager.Deps{})
-			err = mgr.EnqueueSoftDeleteAssetsByQueryExprJob(ctx, softDeleteAssetsByQueryExpr)
+			err = mgr.EnqueueSoftDeleteAssetsJob(ctx, dummyAssets)
 			if tc.expectedErr != "" {
 				assert.ErrorContains(t, err, tc.expectedErr)
 			} else {
@@ -388,6 +393,17 @@ func TestManager_DeleteAssets(t *testing.T) {
 
 func TestManager_SoftDeleteAssets(t *testing.T) {
 	currentTime := time.Now().UTC()
+	dummyAssets := []asset.Asset{
+		{
+			ID:          "asset-1",
+			URN:         "urn:asset:1",
+			Type:        asset.Type("table"),
+			Service:     "test-service",
+			UpdatedAt:   currentTime,
+			RefreshedAt: &currentTime,
+			UpdatedBy:   user.User{ID: "some-user"},
+		},
+	}
 	cases := []struct {
 		name         string
 		discoveryErr error
@@ -402,28 +418,19 @@ func TestManager_SoftDeleteAssets(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			queryExpr := "refreshed_at <= '" + time.Now().Format("2006-01-02T15:04:05Z") +
-				"' && service == 'test-service'" +
-				"' && type == 'table'" +
-				"' && urn == 'some-urn'"
-			deleteESExpr := asset.DeleteAssetExpr{
-				ExprStr: queryexpr.ESExpr(queryExpr),
-			}
-			softDeleteAssetsByQueryExpr := asset.NewSoftDeleteAssetsByQueryExpr(
-				currentTime, currentTime, "some-user", queryExpr, deleteESExpr)
-			payload, err := json.Marshal(softDeleteAssetsByQueryExpr)
-			assert.NoError(t, err, "failed to marshal soft delete assets by query expr")
+			payload, err := json.Marshal(dummyAssets)
+			assert.NoError(t, err, "failed to marshal soft delete assets")
 
 			discoveryRepo := mocks.NewDiscoveryRepository(t)
 			discoveryRepo.EXPECT().
-				SoftDeleteByQueryExpr(ctx, softDeleteAssetsByQueryExpr).
+				SoftDeleteAssets(ctx, dummyAssets, false).
 				Return(tc.discoveryErr)
 
 			mgr := workermanager.NewWithWorker(mocks.NewWorker(t), workermanager.Deps{
 				DiscoveryRepo: discoveryRepo,
 			})
-			err = mgr.SoftDeleteAssetsByQueryExpr(ctx, worker.JobSpec{
-				Type:    "soft-delete-assets-by-query",
+			err = mgr.SoftDeleteAssets(ctx, worker.JobSpec{
+				Type:    "soft-delete-assets",
 				Payload: payload,
 			})
 			if tc.expectedErr {

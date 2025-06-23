@@ -840,9 +840,9 @@ func TestService_SoftDeleteAssets(t *testing.T) {
 			Setup: func(ctx context.Context, ar *mocks.AssetRepository, w *mocks.Worker) {
 				ar.EXPECT().GetCountByQueryExpr(ctx, mock.AnythingOfType("asset.DeleteAssetExpr")).
 					Return(2, nil)
-				ar.EXPECT().SoftDeleteByQueryExpr(mock.Anything, mock.Anything).
-					Return(nil)
-				w.EXPECT().EnqueueSoftDeleteAssetsByQueryExprJob(mock.Anything, mock.Anything).
+				ar.EXPECT().SoftDeleteByQueryExpr(mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return([]asset.Asset{}, nil)
+				w.EXPECT().EnqueueSoftDeleteAssetsJob(mock.Anything, mock.Anything).
 					Return(nil)
 			},
 			ExpectAffectedRows: 2,

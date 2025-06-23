@@ -634,23 +634,33 @@ func (r *AssetRepository) DeleteByQueryExpr(ctx context.Context, queryExpr query
 
 func (r *AssetRepository) SoftDeleteByQueryExpr(
 	ctx context.Context,
-	softDeleteAssetsByQueryExpr asset.SoftDeleteAssetsByQueryExpr,
-) (err error) {
+	executedAt time.Time,
+	updatedByID string,
+	queryExpr queryexpr.ExprStr,
+) (updatedAssets []asset.Asset, err error) {
 	err = r.client.RunWithinTx(ctx, func(tx *sqlx.Tx) error {
-		query, err := queryexpr.ValidateAndGetQueryFromExpr(softDeleteAssetsByQueryExpr.QueryExpr)
+		query, err := queryexpr.ValidateAndGetQueryFromExpr(queryExpr)
 		if err != nil {
 			return err
 		}
 
-		newAssets, err := r.softDeleteByQuery(ctx, tx, query, softDeleteAssetsByQueryExpr)
+		updatedAssets, err = r.softDeleteByQuery(ctx, tx, query, executedAt, updatedByID)
 		if err != nil {
 			return fmt.Errorf("error soft deleting assets by query: %w", err)
 		}
 
-		return r.insertAssetVersions(ctx, tx, newAssets, softDeleteAssetsByQueryExpr.Changelog)
+		softDeleteChangelog := diff.Changelog{
+			{
+				Type: "delete",
+				Path: []string{"is_deleted"},
+				From: false,
+				To:   true,
+			},
+		}
+		return r.insertAssetVersions(ctx, tx, updatedAssets, softDeleteChangelog)
 	})
 
-	return err
+	return updatedAssets, err
 }
 
 // deleteByQueryAndReturnURNS remove all assets that match to query and return array of urn of asset that deleted.
@@ -677,12 +687,14 @@ func (r *AssetRepository) softDeleteByQuery(
 	ctx context.Context,
 	tx *sqlx.Tx,
 	whereCondition string,
-	softDeleteAssetsByQueryExpr asset.SoftDeleteAssetsByQueryExpr,
+	executedAt time.Time,
+	updatedByID string,
 ) ([]asset.Asset, error) {
 	updateCTE := sq.Update("assets").
 		Set("is_deleted", true).
-		Set("updated_at", softDeleteAssetsByQueryExpr.UpdatedAt).
-		Set("refreshed_at", softDeleteAssetsByQueryExpr.RefreshedAt).
+		Set("updated_at", executedAt).
+		Set("refreshed_at", executedAt).
+		Set("updated_by", updatedByID).
 		Where(whereCondition).
 		Suffix("RETURNING *").
 		Prefix("WITH assets AS (").
@@ -1089,7 +1101,7 @@ func (r *AssetRepository) insertAssetVersions(
 
 	builder := sq.Insert("assets_versions").
 		Columns("asset_id", "urn", "type", "service", "name", "description", "data", "labels",
-			"created_at", "updated_at", "updated_by", "version", "owners", "changelog").
+			"created_at", "updated_at", "updated_by", "version", "owners", "is_deleted", "changelog").
 		PlaceholderFormat(sq.Dollar)
 
 	for _, newAsset := range newAssets {
@@ -1111,6 +1123,7 @@ func (r *AssetRepository) insertAssetVersions(
 			newAsset.UpdatedBy.ID,
 			newAsset.Version,
 			newAsset.Owners,
+			newAsset.IsDeleted,
 			clog,
 		)
 	}

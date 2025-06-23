@@ -27,7 +27,7 @@ type Repository interface {
 	SoftDeleteByID(ctx context.Context, executedAt time.Time, id, updatedByID string) (string, string, error)
 	SoftDeleteByURN(ctx context.Context, executedAt time.Time, urn, updatedByID string) (string, error)
 	DeleteByQueryExpr(ctx context.Context, queryExpr queryexpr.ExprStr) ([]string, error)
-	SoftDeleteByQueryExpr(ctx context.Context, softDeleteAssetsByQueryExpr SoftDeleteAssetsByQueryExpr) error
+	SoftDeleteByQueryExpr(ctx context.Context, executedAt time.Time, updatedByID string, queryExpr queryexpr.ExprStr) ([]Asset, error)
 	AddProbe(ctx context.Context, assetURN string, probe *Probe) error
 	GetProbes(ctx context.Context, assetURN string) ([]Probe, error)
 	GetProbesWithFilter(ctx context.Context, flt ProbesFilter) (map[string][]Probe, error)
@@ -61,39 +61,6 @@ type SoftDeleteAssetParams struct {
 	RefreshedAt time.Time `json:"refreshed_at"`
 	NewVersion  string    `json:"version"`
 	UpdatedBy   string    `json:"updated_by"`
-}
-
-type SoftDeleteAssetsByQueryExpr struct {
-	UpdatedAt    time.Time         `json:"updated_at"`
-	RefreshedAt  time.Time         `json:"refreshed_at"`
-	UpdatedBy    string            `json:"updated_by"`
-	IsDeleted    bool              `json:"is_deleted"`
-	Changelog    diff.Changelog    `json:"changelog,omitempty"`
-	QueryExprStr string            `json:"query_expr"`
-	QueryExpr    queryexpr.ExprStr `json:"-"`
-}
-
-func NewSoftDeleteAssetsByQueryExpr(
-	updatedAt, refreshedAt time.Time,
-	updatedBy, queryExprStr string,
-	queryExpr queryexpr.ExprStr,
-) SoftDeleteAssetsByQueryExpr {
-	return SoftDeleteAssetsByQueryExpr{
-		UpdatedAt:    updatedAt,
-		RefreshedAt:  refreshedAt,
-		UpdatedBy:    updatedBy,
-		QueryExprStr: queryExprStr,
-		QueryExpr:    queryExpr,
-		IsDeleted:    true,
-		Changelog: diff.Changelog{
-			{
-				Type: "delete",
-				Path: []string{"is_deleted"},
-				From: false,
-				To:   true,
-			},
-		},
-	}
 }
 
 // Diff returns nil changelog with nil error if equal

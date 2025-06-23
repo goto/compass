@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/goto/compass/core/asset"
+	"github.com/goto/compass/core/user"
 	"github.com/goto/compass/internal/workermanager"
 	"github.com/goto/compass/internal/workermanager/mocks"
 	"github.com/goto/compass/pkg/queryexpr"
@@ -166,8 +167,19 @@ func TestInSituWorker_EnqueueDeleteAssetsByQueryExprJob(t *testing.T) {
 	}
 }
 
-func TestInSituWorker_EnqueueSoftDeleteAssetsByQueryExprJob(t *testing.T) {
+func TestInSituWorker_EnqueueSoftDeleteAssetsJob(t *testing.T) {
 	currentTime := time.Now().UTC()
+	dummyAssets := []asset.Asset{
+		{
+			ID:          "asset-1",
+			URN:         "urn:asset:1",
+			Type:        asset.Type("table"),
+			Service:     "test-service",
+			UpdatedAt:   currentTime,
+			RefreshedAt: &currentTime,
+			UpdatedBy:   user.User{ID: "some-user"},
+		},
+	}
 	cases := []struct {
 		name         string
 		discoveryErr error
@@ -182,25 +194,15 @@ func TestInSituWorker_EnqueueSoftDeleteAssetsByQueryExprJob(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			queryExpr := "refreshed_at <= '" + time.Now().Format("2006-01-02T15:04:05Z") +
-				"' && service == 'test-service'" +
-				"' && type == 'table'" +
-				"' && urn == 'some-urn'"
-			deleteESExpr := asset.DeleteAssetExpr{
-				ExprStr: queryexpr.ESExpr(queryExpr),
-			}
-			softDeleteAssetsByQueryExpr := asset.NewSoftDeleteAssetsByQueryExpr(
-				currentTime, currentTime, "some-user", queryExpr, deleteESExpr)
-
 			discoveryRepo := mocks.NewDiscoveryRepository(t)
 			discoveryRepo.EXPECT().
-				SoftDeleteByQueryExpr(ctx, softDeleteAssetsByQueryExpr).
+				SoftDeleteAssets(ctx, dummyAssets, false).
 				Return(tc.discoveryErr)
 
 			wrkr := workermanager.NewInSituWorker(workermanager.Deps{
 				DiscoveryRepo: discoveryRepo,
 			})
-			err := wrkr.EnqueueSoftDeleteAssetsByQueryExprJob(ctx, softDeleteAssetsByQueryExpr)
+			err := wrkr.EnqueueSoftDeleteAssetsJob(ctx, dummyAssets)
 			if tc.expectedErr {
 				assert.Error(t, err)
 				assert.ErrorIs(t, err, tc.discoveryErr)

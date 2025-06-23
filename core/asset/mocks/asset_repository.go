@@ -880,18 +880,30 @@ func (_c *AssetRepository_SoftDeleteByID_Call) RunAndReturn(run func(context.Con
 	return _c
 }
 
-// SoftDeleteByQueryExpr provides a mock function with given fields: ctx, softDeleteAssetsByQueryExpr
-func (_m *AssetRepository) SoftDeleteByQueryExpr(ctx context.Context, softDeleteAssetsByQueryExpr asset.SoftDeleteAssetsByQueryExpr) error {
-	ret := _m.Called(ctx, softDeleteAssetsByQueryExpr)
+// SoftDeleteByQueryExpr provides a mock function with given fields: ctx, executedAt, updatedByID, queryExpr
+func (_m *AssetRepository) SoftDeleteByQueryExpr(ctx context.Context, executedAt time.Time, updatedByID string, queryExpr queryexpr.ExprStr) ([]asset.Asset, error) {
+	ret := _m.Called(ctx, executedAt, updatedByID, queryExpr)
 
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, asset.SoftDeleteAssetsByQueryExpr) error); ok {
-		r0 = rf(ctx, softDeleteAssetsByQueryExpr)
+	var r0 []asset.Asset
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, time.Time, string, queryexpr.ExprStr) ([]asset.Asset, error)); ok {
+		return rf(ctx, executedAt, updatedByID, queryExpr)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, time.Time, string, queryexpr.ExprStr) []asset.Asset); ok {
+		r0 = rf(ctx, executedAt, updatedByID, queryExpr)
 	} else {
-		r0 = ret.Error(0)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]asset.Asset)
+		}
 	}
 
-	return r0
+	if rf, ok := ret.Get(1).(func(context.Context, time.Time, string, queryexpr.ExprStr) error); ok {
+		r1 = rf(ctx, executedAt, updatedByID, queryExpr)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // AssetRepository_SoftDeleteByQueryExpr_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SoftDeleteByQueryExpr'
@@ -901,24 +913,26 @@ type AssetRepository_SoftDeleteByQueryExpr_Call struct {
 
 // SoftDeleteByQueryExpr is a helper method to define mock.On call
 //   - ctx context.Context
-//   - softDeleteAssetsByQueryExpr asset.SoftDeleteAssetsByQueryExpr
-func (_e *AssetRepository_Expecter) SoftDeleteByQueryExpr(ctx interface{}, softDeleteAssetsByQueryExpr interface{}) *AssetRepository_SoftDeleteByQueryExpr_Call {
-	return &AssetRepository_SoftDeleteByQueryExpr_Call{Call: _e.mock.On("SoftDeleteByQueryExpr", ctx, softDeleteAssetsByQueryExpr)}
+//   - executedAt time.Time
+//   - updatedByID string
+//   - queryExpr queryexpr.ExprStr
+func (_e *AssetRepository_Expecter) SoftDeleteByQueryExpr(ctx interface{}, executedAt interface{}, updatedByID interface{}, queryExpr interface{}) *AssetRepository_SoftDeleteByQueryExpr_Call {
+	return &AssetRepository_SoftDeleteByQueryExpr_Call{Call: _e.mock.On("SoftDeleteByQueryExpr", ctx, executedAt, updatedByID, queryExpr)}
 }
 
-func (_c *AssetRepository_SoftDeleteByQueryExpr_Call) Run(run func(ctx context.Context, softDeleteAssetsByQueryExpr asset.SoftDeleteAssetsByQueryExpr)) *AssetRepository_SoftDeleteByQueryExpr_Call {
+func (_c *AssetRepository_SoftDeleteByQueryExpr_Call) Run(run func(ctx context.Context, executedAt time.Time, updatedByID string, queryExpr queryexpr.ExprStr)) *AssetRepository_SoftDeleteByQueryExpr_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(asset.SoftDeleteAssetsByQueryExpr))
+		run(args[0].(context.Context), args[1].(time.Time), args[2].(string), args[3].(queryexpr.ExprStr))
 	})
 	return _c
 }
 
-func (_c *AssetRepository_SoftDeleteByQueryExpr_Call) Return(_a0 error) *AssetRepository_SoftDeleteByQueryExpr_Call {
-	_c.Call.Return(_a0)
+func (_c *AssetRepository_SoftDeleteByQueryExpr_Call) Return(_a0 []asset.Asset, _a1 error) *AssetRepository_SoftDeleteByQueryExpr_Call {
+	_c.Call.Return(_a0, _a1)
 	return _c
 }
 
-func (_c *AssetRepository_SoftDeleteByQueryExpr_Call) RunAndReturn(run func(context.Context, asset.SoftDeleteAssetsByQueryExpr) error) *AssetRepository_SoftDeleteByQueryExpr_Call {
+func (_c *AssetRepository_SoftDeleteByQueryExpr_Call) RunAndReturn(run func(context.Context, time.Time, string, queryexpr.ExprStr) ([]asset.Asset, error)) *AssetRepository_SoftDeleteByQueryExpr_Call {
 	_c.Call.Return(run)
 	return _c
 }

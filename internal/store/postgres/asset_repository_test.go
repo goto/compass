@@ -2058,9 +2058,7 @@ func (r *AssetRepositoryTestSuite) TestSoftDeleteByQueryExpr() {
 			ExprStr: sqlExpr,
 		}
 
-		softDeleteAssetsByQueryExpr := asset.NewSoftDeleteAssetsByQueryExpr(
-			currentTime, currentTime, userID, query, queryExpr)
-		err = r.repository.SoftDeleteByQueryExpr(r.ctx, softDeleteAssetsByQueryExpr)
+		_, err = r.repository.SoftDeleteByQueryExpr(r.ctx, currentTime, userID, queryExpr)
 		r.NoError(err)
 
 		asset1FromDB, err := r.repository.GetByURN(r.ctx, asset1.URN)

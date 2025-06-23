@@ -167,145 +167,55 @@ func (repo *DiscoveryRepository) DeleteByQueryExpr(ctx context.Context, queryExp
 	return repo.deleteWithQuery(ctx, "DeleteByQueryExpr", esQuery)
 }
 
-func (repo *DiscoveryRepository) SoftDeleteByQueryExpr(ctx context.Context, softDeleteAssetsByQueryExpr asset.SoftDeleteAssetsByQueryExpr) error {
-	if strings.TrimSpace(softDeleteAssetsByQueryExpr.QueryExprStr) == "" {
-		return asset.ErrEmptyQuery
-	}
-
-	buf, err := repo.buildSearchVersionRequest(softDeleteAssetsByQueryExpr.QueryExpr)
-	if err != nil {
-		return err
-	}
-
-	return repo.processScroll(ctx, "DeleteByQueryExpr", buf, softDeleteAssetsByQueryExpr)
+func (repo *DiscoveryRepository) SoftDeleteAssets(ctx context.Context, assets []asset.Asset, doUpdateVersion bool) error {
+	return repo.bulkSoftDeleteAssets(ctx, "SoftDeleteAssets", assets, doUpdateVersion)
 }
 
-func (*DiscoveryRepository) buildSearchVersionRequest(expr queryexpr.ExprStr) (*bytes.Buffer, error) {
-	esQuery, err := queryexpr.ValidateAndGetQueryFromExpr(expr)
-	if err != nil {
-		return nil, fmt.Errorf("failed to validate query expression: %w", err)
-	}
-
-	queryMap, err := queryexpr.QueryStringToMap(esQuery)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse query map: %w", err)
-	}
-
-	// Build final query with version only in _source
-	request := map[string]interface{}{
-		"query":   queryMap["query"],
-		"_source": []string{"version"},
-		"size":    1000,
-	}
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(request); err != nil {
-		return nil, fmt.Errorf("failed to encode search request: %w", err)
-	}
-	return &buf, nil
-}
-
-func (repo *DiscoveryRepository) processScroll(
+func (repo *DiscoveryRepository) bulkSoftDeleteAssets(
 	ctx context.Context,
 	discoveryOp string,
-	buf *bytes.Buffer,
-	softDeleteAssetsByQuery asset.SoftDeleteAssetsByQueryExpr,
-) error {
+	assets []asset.Asset,
+	doUpdateVersion bool,
+) (err error) {
 	defer func(start time.Time) {
-		const op = "soft_delete_by_query"
+		const op = "soft_delete_assets"
 		repo.cli.instrumentOp(ctx, instrumentParams{
 			op:          op,
 			discoveryOp: discoveryOp,
 			start:       start,
-			err:         nil,
+			err:         err,
 		})
 	}(time.Now())
 
-	type hitVersion struct {
-		ID     string            `json:"_id"`
-		Index  string            `json:"_index"`
-		Source map[string]string `json:"_source"`
-	}
-	type searchVersionResponse struct {
-		ScrollID string `json:"_scroll_id"`
-		Hits     struct {
-			Hits []hitVersion `json:"hits"`
-		} `json:"hits"`
-	}
+	bulkOps := make([]string, 0, len(assets)*2)
 
-	search := repo.cli.client.Search
-	res, err := search(
-		search.WithContext(ctx),
-		search.WithIndex(defaultSearchIndex),
-		search.WithBody(buf),
-		search.WithScroll(1*time.Minute),
-	)
-	if err != nil {
-		return fmt.Errorf("initial search error: %w", err)
-	}
-	defer res.Body.Close()
-
-	var sr searchVersionResponse
-	if err := json.NewDecoder(res.Body).Decode(&sr); err != nil {
-		return fmt.Errorf("initial response decode error: %w", err)
-	}
-
-	scrollID := sr.ScrollID
-	hits := sr.Hits.Hits
-
-	for len(hits) > 0 {
-		bulkOps := make([]string, 0, len(hits)*2)
-		for _, hit := range hits {
-			version := "0.0"
-			if v := hit.Source["version"]; v != "" {
-				version = v
-			}
-			newVersion, err := asset.IncreaseMinorVersion(version)
+	for _, a := range assets {
+		newVersion := a.Version
+		if doUpdateVersion {
+			newVersion, err = asset.IncreaseMinorVersion(a.Version)
 			if err != nil {
-				return fmt.Errorf("increase version error for ID %s: %w", hit.ID, err)
+				return fmt.Errorf("error increase version for ID %s: %w", a.ID, err)
 			}
-
-			meta := fmt.Sprintf(`{ "update": { "_index": %q, "_id": %q } }`, hit.Index, hit.ID)
-			update := map[string]interface{}{
-				"doc": map[string]interface{}{
-					"is_deleted":   true,
-					"updated_at":   softDeleteAssetsByQuery.UpdatedAt,
-					"refreshed_at": softDeleteAssetsByQuery.RefreshedAt,
-					"updated_by":   user.User{ID: softDeleteAssetsByQuery.UpdatedBy},
-					"version":      newVersion,
-				},
-			}
-			updateJSON, err := json.Marshal(update)
-			if err != nil {
-				return fmt.Errorf("marshal update doc for ID %s: %w", hit.ID, err)
-			}
-			bulkOps = append(bulkOps, meta, string(updateJSON))
 		}
 
-		if err := repo.sendBulkUpdate(ctx, bulkOps); err != nil {
-			return err
+		meta := fmt.Sprintf(`{ "update": { "_index": %q, "_id": %q } }`, a.Service, a.ID)
+		update := map[string]interface{}{
+			"doc": map[string]interface{}{
+				"is_deleted":   true,
+				"updated_at":   a.UpdatedAt,
+				"refreshed_at": a.RefreshedAt,
+				"updated_by":   a.UpdatedBy,
+				"version":      newVersion,
+			},
 		}
-
-		scroll := repo.cli.client.Scroll
-		scrollRes, err := scroll(
-			scroll.WithScrollID(scrollID),
-			scroll.WithScroll(1*time.Minute),
-		)
+		updateJSON, err := json.Marshal(update)
 		if err != nil {
-			return fmt.Errorf("scroll error: %w", err)
+			return fmt.Errorf("marshal update doc for ID %s: %w", a.ID, err)
 		}
-
-		if err := json.NewDecoder(scrollRes.Body).Decode(&sr); err != nil {
-			scrollRes.Body.Close()
-			return fmt.Errorf("scroll decode error: %w", err)
-		}
-		scrollRes.Body.Close()
-
-		scrollID = sr.ScrollID
-		hits = sr.Hits.Hits
+		bulkOps = append(bulkOps, meta, string(updateJSON))
 	}
 
-	return nil
+	return repo.sendBulkUpdate(ctx, bulkOps)
 }
 
 func (repo *DiscoveryRepository) sendBulkUpdate(ctx context.Context, bulkOps []string) error {
@@ -439,76 +349,6 @@ func (repo *DiscoveryRepository) softDeleteAssetByURN(ctx context.Context, disco
 	}
 
 	return nil
-}
-
-// GetCurrentAssetVersion is helper function to get current version. Used in soft delete func and tests.
-func (repo *DiscoveryRepository) GetCurrentAssetVersion(
-	ctx context.Context,
-	urn string,
-	timeout time.Duration,
-) (string, error) {
-	ctx, cancel := context.WithTimeout(ctx, timeout)
-	defer cancel()
-
-	query := map[string]interface{}{
-		"query": map[string]interface{}{
-			"term": map[string]interface{}{
-				"urn.keyword": urn,
-			},
-		},
-		"size":    1,
-		"_source": []string{"version"},
-	}
-
-	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(query); err != nil {
-		return "", fmt.Errorf("failed to encode query: %w", err)
-	}
-
-	// Retry loop every 500ms
-	ticker := time.NewTicker(500 * time.Millisecond)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			// Timeout reached
-			return "", fmt.Errorf("asset %s not found after %v", urn, timeout)
-
-		case <-ticker.C:
-			search := repo.cli.client.Search
-			res, err := search(
-				search.WithContext(ctx),
-				search.WithIndex(defaultSearchIndex),
-				search.WithBody(&buf),
-				search.WithIgnoreUnavailable(true),
-			)
-			if err != nil {
-				continue // Retry on network errors
-			}
-
-			// Process response if no error
-			var result struct {
-				Hits struct {
-					Hits []struct {
-						Source struct {
-							Version string `json:"version"`
-						} `json:"_source"`
-					} `json:"hits"`
-				} `json:"hits"`
-			}
-
-			if err := json.NewDecoder(res.Body).Decode(&result); err != nil {
-				res.Body.Close()
-				continue // Retry on decode errors
-			}
-			res.Body.Close()
-
-			if len(result.Hits.Hits) > 0 {
-				return result.Hits.Hits[0].Source.Version, nil // Found!
-			}
-		}
-	}
 }
 
 func (repo *DiscoveryRepository) indexAsset(ctx context.Context, ast asset.Asset) (err error) {
