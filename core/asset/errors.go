@@ -7,13 +7,14 @@ import (
 )
 
 var (
-	ErrEmptyID     = errors.New("asset does not have ID")
-	ErrProbeExists = errors.New("asset probe already exists")
-	ErrEmptyURN    = errors.New("asset does not have URN")
-	ErrEmptyQuery  = errors.New("query is empty")
-	ErrUnknownType = errors.New("unknown type")
-	ErrNilAsset    = errors.New("nil asset")
-	ErrURNExist    = errors.New("urn asset is already exist")
+	ErrEmptyID             = errors.New("asset does not have ID")
+	ErrProbeExists         = errors.New("asset probe already exists")
+	ErrEmptyURN            = errors.New("asset does not have URN")
+	ErrEmptyQuery          = errors.New("query is empty")
+	ErrUnknownType         = errors.New("unknown type")
+	ErrNilAsset            = errors.New("nil asset")
+	ErrURNExist            = errors.New("urn asset is already exist")
+	ErrAssetAlreadyDeleted = errors.New("asset already deleted")
 )
 
 type NotFoundError struct {

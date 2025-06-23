@@ -84,7 +84,13 @@ func TestInSituWorker_EnqueueDeleteAssetJob(t *testing.T) {
 
 func TestInSituWorker_EnqueueSoftDeleteAssetJob(t *testing.T) {
 	currentTime := time.Now().UTC()
-	softDeleteAsset := asset.NewSoftDeleteAsset(currentTime, currentTime, "some-user")
+	params := asset.SoftDeleteAssetParams{
+		URN:         "some-urn",
+		UpdatedAt:   currentTime,
+		RefreshedAt: currentTime,
+		NewVersion:  "0.1",
+		UpdatedBy:   "some-user",
+	}
 
 	cases := []struct {
 		name         string
@@ -101,15 +107,14 @@ func TestInSituWorker_EnqueueSoftDeleteAssetJob(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			discoveryRepo := mocks.NewDiscoveryRepository(t)
-			softDeleteAsset.URN = "some-urn"
 			discoveryRepo.EXPECT().
-				SoftDeleteByURN(ctx, softDeleteAsset).
+				SoftDeleteByURN(ctx, params).
 				Return(tc.discoveryErr)
 
 			wrkr := workermanager.NewInSituWorker(workermanager.Deps{
 				DiscoveryRepo: discoveryRepo,
 			})
-			err := wrkr.EnqueueSoftDeleteAssetJob(ctx, softDeleteAsset)
+			err := wrkr.EnqueueSoftDeleteAssetJob(ctx, params)
 			if tc.expectedErr {
 				assert.Error(t, err)
 				assert.ErrorIs(t, err, tc.discoveryErr)

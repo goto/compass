@@ -195,7 +195,7 @@ func TestService_UpsertAsset(t *testing.T) {
 			Description: `should return error if asset repository upsert return error`,
 			Asset:       sampleAsset,
 			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository, lr *mocks.LineageRepository) {
-				ar.EXPECT().Upsert(ctx, sampleAsset).Return("", errors.New("unknown error"))
+				ar.EXPECT().Upsert(ctx, sampleAsset).Return(nil, errors.New("unknown error"))
 			},
 			Err:        errors.New("unknown error"),
 			ReturnedID: "",
@@ -204,7 +204,7 @@ func TestService_UpsertAsset(t *testing.T) {
 			Description: `should return error if discovery repository upsert return error`,
 			Asset:       sampleAsset,
 			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository, lr *mocks.LineageRepository) {
-				ar.EXPECT().Upsert(ctx, sampleAsset).Return(sampleAsset.ID, nil)
+				ar.EXPECT().Upsert(ctx, sampleAsset).Return(sampleAsset, nil)
 				dr.EXPECT().Upsert(ctx, mock.AnythingOfType("asset.Asset")).Return(errors.New("unknown error"))
 			},
 			Err:        errors.New("unknown error"),
@@ -216,7 +216,7 @@ func TestService_UpsertAsset(t *testing.T) {
 			Upstreams:   sampleNodes1,
 			Downstreams: sampleNodes2,
 			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository, lr *mocks.LineageRepository) {
-				ar.EXPECT().Upsert(ctx, sampleAsset).Return(sampleAsset.ID, nil)
+				ar.EXPECT().Upsert(ctx, sampleAsset).Return(sampleAsset, nil)
 				dr.EXPECT().Upsert(ctx, mock.AnythingOfType("asset.Asset")).Return(nil)
 				lr.EXPECT().Upsert(ctx, sampleAsset.URN, sampleNodes1, sampleNodes2).Return(errors.New("unknown error"))
 			},
@@ -229,7 +229,7 @@ func TestService_UpsertAsset(t *testing.T) {
 			Upstreams:   sampleNodes1,
 			Downstreams: sampleNodes2,
 			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository, lr *mocks.LineageRepository) {
-				ar.EXPECT().Upsert(ctx, sampleAsset).Return(sampleAsset.ID, nil)
+				ar.EXPECT().Upsert(ctx, sampleAsset).Return(sampleAsset, nil)
 				dr.EXPECT().Upsert(ctx, mock.AnythingOfType("asset.Asset")).Return(nil)
 				lr.EXPECT().Upsert(ctx, sampleAsset.URN, sampleNodes1, sampleNodes2).Return(nil)
 			},
@@ -280,7 +280,7 @@ func TestService_UpsertAssetWithoutLineage(t *testing.T) {
 			Description: `should return error if asset repository upsert return error`,
 			Asset:       sampleAsset,
 			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository) {
-				ar.EXPECT().Upsert(ctx, sampleAsset).Return("", errors.New("unknown error"))
+				ar.EXPECT().Upsert(ctx, sampleAsset).Return(nil, errors.New("unknown error"))
 			},
 			Err: errors.New("unknown error"),
 		},
@@ -288,7 +288,7 @@ func TestService_UpsertAssetWithoutLineage(t *testing.T) {
 			Description: `should return error if discovery repository upsert return error`,
 			Asset:       sampleAsset,
 			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository) {
-				ar.EXPECT().Upsert(ctx, sampleAsset).Return(sampleAsset.ID, nil)
+				ar.EXPECT().Upsert(ctx, sampleAsset).Return(sampleAsset, nil)
 				dr.EXPECT().Upsert(ctx, mock.AnythingOfType("asset.Asset")).Return(errors.New("unknown error"))
 			},
 			Err: errors.New("unknown error"),
@@ -297,7 +297,7 @@ func TestService_UpsertAssetWithoutLineage(t *testing.T) {
 			Description: `should return no error if all repositories upsert return no error`,
 			Asset:       sampleAsset,
 			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository) {
-				ar.EXPECT().Upsert(ctx, sampleAsset).Return(sampleAsset.ID, nil)
+				ar.EXPECT().Upsert(ctx, sampleAsset).Return(sampleAsset, nil)
 				dr.EXPECT().Upsert(ctx, mock.AnythingOfType("asset.Asset")).Return(nil)
 			},
 			ReturnedID: sampleAsset.ID,
@@ -351,7 +351,7 @@ func TestService_UpsertPatchAsset(t *testing.T) {
 			Description: `should return error if asset repository upsert return error`,
 			Asset:       sampleAsset,
 			Setup: func(ctx context.Context, ar *mocks.AssetRepository, _ *mocks.DiscoveryRepository, _ *mocks.LineageRepository) {
-				ar.EXPECT().UpsertPatch(ctx, sampleAsset, mock.Anything).Return("", errors.New("unknown error"))
+				ar.EXPECT().UpsertPatch(ctx, sampleAsset, mock.Anything).Return(nil, errors.New("unknown error"))
 			},
 			Err:        errors.New("unknown error"),
 			ReturnedID: "",
@@ -360,7 +360,7 @@ func TestService_UpsertPatchAsset(t *testing.T) {
 			Description: `should return error if discovery repository upsert return error`,
 			Asset:       sampleAsset,
 			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository, _ *mocks.LineageRepository) {
-				ar.EXPECT().UpsertPatch(ctx, sampleAsset, mock.Anything).Return(sampleAsset.ID, nil)
+				ar.EXPECT().UpsertPatch(ctx, sampleAsset, mock.Anything).Return(sampleAsset, nil)
 				dr.EXPECT().Upsert(ctx, mock.AnythingOfType("asset.Asset")).Return(errors.New("unknown error"))
 			},
 			Err:        errors.New("unknown error"),
@@ -372,7 +372,7 @@ func TestService_UpsertPatchAsset(t *testing.T) {
 			Upstreams:   sampleNodes1,
 			Downstreams: sampleNodes2,
 			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository, lr *mocks.LineageRepository) {
-				ar.EXPECT().UpsertPatch(ctx, sampleAsset, mock.Anything).Return(sampleAsset.ID, nil)
+				ar.EXPECT().UpsertPatch(ctx, sampleAsset, mock.Anything).Return(sampleAsset, nil)
 				dr.EXPECT().Upsert(ctx, mock.AnythingOfType("asset.Asset")).Return(nil)
 				lr.EXPECT().Upsert(ctx, sampleAsset.URN, sampleNodes1, sampleNodes2).Return(errors.New("unknown error"))
 			},
@@ -385,7 +385,7 @@ func TestService_UpsertPatchAsset(t *testing.T) {
 			Upstreams:   sampleNodes1,
 			Downstreams: sampleNodes2,
 			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository, lr *mocks.LineageRepository) {
-				ar.EXPECT().UpsertPatch(ctx, sampleAsset, mock.Anything).Return(sampleAsset.ID, nil)
+				ar.EXPECT().UpsertPatch(ctx, sampleAsset, mock.Anything).Return(sampleAsset, nil)
 				dr.EXPECT().Upsert(ctx, mock.AnythingOfType("asset.Asset")).Return(nil)
 				lr.EXPECT().Upsert(ctx, sampleAsset.URN, sampleNodes1, sampleNodes2).Return(nil)
 			},
@@ -437,7 +437,7 @@ func TestService_UpsertPatchAssetWithoutLineage(t *testing.T) {
 			Description: `should return error if asset repository upsert return error`,
 			Asset:       sampleAsset,
 			Setup: func(ctx context.Context, ar *mocks.AssetRepository, _ *mocks.DiscoveryRepository) {
-				ar.EXPECT().UpsertPatch(ctx, sampleAsset, mock.Anything).Return("", errors.New("unknown error"))
+				ar.EXPECT().UpsertPatch(ctx, sampleAsset, mock.Anything).Return(nil, errors.New("unknown error"))
 			},
 			Err: errors.New("unknown error"),
 		},
@@ -445,7 +445,7 @@ func TestService_UpsertPatchAssetWithoutLineage(t *testing.T) {
 			Description: `should return error if discovery repository upsert return error`,
 			Asset:       sampleAsset,
 			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository) {
-				ar.EXPECT().UpsertPatch(ctx, sampleAsset, mock.Anything).Return(sampleAsset.ID, nil)
+				ar.EXPECT().UpsertPatch(ctx, sampleAsset, mock.Anything).Return(sampleAsset, nil)
 				dr.EXPECT().Upsert(ctx, mock.AnythingOfType("asset.Asset")).Return(errors.New("unknown error"))
 			},
 			Err: errors.New("unknown error"),
@@ -454,7 +454,7 @@ func TestService_UpsertPatchAssetWithoutLineage(t *testing.T) {
 			Description: `should return no error if all repositories upsert return no error`,
 			Asset:       sampleAsset,
 			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository) {
-				ar.EXPECT().UpsertPatch(ctx, sampleAsset, mock.Anything).Return(sampleAsset.ID, nil)
+				ar.EXPECT().UpsertPatch(ctx, sampleAsset, mock.Anything).Return(sampleAsset, nil)
 				dr.EXPECT().Upsert(ctx, mock.AnythingOfType("asset.Asset")).Return(nil)
 			},
 			ReturnedID: sampleAsset.ID,
@@ -607,63 +607,76 @@ func TestService_SoftDeleteAsset(t *testing.T) {
 	assetID := uuid.New().String()
 	userID := uuid.New().String()
 	urn := "my-test-urn"
+	newVersion := "0.2"
 	type testCase struct {
 		Description string
 		ID          string
 		Err         error
-		Setup       func(context.Context, *mocks.AssetRepository, *mocks.DiscoveryRepository)
+		Setup       func(context.Context, *mocks.AssetRepository, *mocks.DiscoveryRepository, *mocks.LineageRepository)
 	}
 
 	testCases := []testCase{
 		{
 			Description: `with ID, should return error if asset repository soft delete by id returns error`,
 			ID:          assetID,
-			Setup: func(ctx context.Context, ar *mocks.AssetRepository, _ *mocks.DiscoveryRepository) {
-				ar.EXPECT().SoftDeleteByID(ctx, assetID, mock.AnythingOfType("asset.SoftDeleteAsset")).Return(urn, errors.New("unknown error"))
+			Setup: func(ctx context.Context, ar *mocks.AssetRepository, _ *mocks.DiscoveryRepository, _ *mocks.LineageRepository) {
+				ar.EXPECT().SoftDeleteByID(ctx, mock.AnythingOfType("time.Time"), assetID, userID).Return(urn, newVersion, errors.New("unknown error"))
 			},
 			Err: errors.New("unknown error"),
 		},
 		{
 			Description: `with ID, should return error if discovery repository soft delete return error`,
 			ID:          assetID,
-			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository) {
-				ar.EXPECT().SoftDeleteByID(ctx, assetID, mock.AnythingOfType("asset.SoftDeleteAsset")).Return(urn, nil)
-				dr.EXPECT().SoftDeleteByURN(ctx, mock.AnythingOfType("asset.SoftDeleteAsset")).Return(errors.New("unknown error"))
+			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository, _ *mocks.LineageRepository) {
+				ar.EXPECT().SoftDeleteByID(ctx, mock.AnythingOfType("time.Time"), assetID, userID).Return(urn, newVersion, nil)
+				dr.EXPECT().SoftDeleteByURN(ctx, mock.AnythingOfType("asset.SoftDeleteAssetParams")).Return(errors.New("unknown error"))
 			},
 			Err: errors.New("unknown error"),
 		},
 		{
 			Description: `with URN, should return error if asset repository soft delete return error`,
 			ID:          urn,
-			Setup: func(ctx context.Context, ar *mocks.AssetRepository, _ *mocks.DiscoveryRepository) {
-				ar.EXPECT().SoftDeleteByURN(ctx, urn, mock.AnythingOfType("asset.SoftDeleteAsset")).Return(errors.New("unknown error"))
+			Setup: func(ctx context.Context, ar *mocks.AssetRepository, _ *mocks.DiscoveryRepository, _ *mocks.LineageRepository) {
+				ar.EXPECT().SoftDeleteByURN(ctx, mock.AnythingOfType("time.Time"), urn, userID).Return(newVersion, errors.New("unknown error"))
 			},
 			Err: errors.New("unknown error"),
 		},
 		{
 			Description: `with URN, should return error if discovery repository soft delete return error`,
 			ID:          urn,
-			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository) {
-				ar.EXPECT().SoftDeleteByURN(ctx, urn, mock.AnythingOfType("asset.SoftDeleteAsset")).Return(nil)
-				dr.EXPECT().SoftDeleteByURN(ctx, mock.AnythingOfType("asset.SoftDeleteAsset")).Return(errors.New("unknown error"))
+			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository, _ *mocks.LineageRepository) {
+				ar.EXPECT().SoftDeleteByURN(ctx, mock.AnythingOfType("time.Time"), urn, userID).Return(newVersion, nil)
+				dr.EXPECT().SoftDeleteByURN(ctx, mock.AnythingOfType("asset.SoftDeleteAssetParams")).Return(errors.New("unknown error"))
 			},
 			Err: errors.New("unknown error"),
 		},
 		{
-			Description: `should call DeleteByURN on repositories by fetching URN when given an ID`,
+			Description: `should return error if lineage repository soft delete return error`,
 			ID:          assetID,
-			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository) {
-				ar.EXPECT().SoftDeleteByID(ctx, assetID, mock.AnythingOfType("asset.SoftDeleteAsset")).Return(urn, nil)
-				dr.EXPECT().SoftDeleteByURN(ctx, mock.AnythingOfType("asset.SoftDeleteAsset")).Return(nil)
+			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository, lr *mocks.LineageRepository) {
+				ar.EXPECT().SoftDeleteByID(ctx, mock.AnythingOfType("time.Time"), assetID, userID).Return(urn, newVersion, nil)
+				dr.EXPECT().SoftDeleteByURN(ctx, mock.AnythingOfType("asset.SoftDeleteAssetParams")).Return(nil)
+				lr.EXPECT().SoftDeleteByURN(ctx, urn).Return(errors.New("unknown error"))
+			},
+			Err: errors.New("unknown error"),
+		},
+		{
+			Description: `should call SoftDeleteByURN on repositories by fetching URN when given an ID`,
+			ID:          assetID,
+			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository, lr *mocks.LineageRepository) {
+				ar.EXPECT().SoftDeleteByID(ctx, mock.AnythingOfType("time.Time"), assetID, userID).Return(urn, newVersion, nil)
+				dr.EXPECT().SoftDeleteByURN(ctx, mock.AnythingOfType("asset.SoftDeleteAssetParams")).Return(nil)
+				lr.EXPECT().SoftDeleteByURN(ctx, urn).Return(nil)
 			},
 			Err: nil,
 		},
 		{
-			Description: `should call DeleteByURN on repositories when not given an ID`,
+			Description: `should call SoftDeleteByURN on repositories when not given an ID`,
 			ID:          urn,
-			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository) {
-				ar.EXPECT().SoftDeleteByURN(ctx, urn, mock.AnythingOfType("asset.SoftDeleteAsset")).Return(nil)
-				dr.EXPECT().SoftDeleteByURN(ctx, mock.AnythingOfType("asset.SoftDeleteAsset")).Return(nil)
+			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository, lr *mocks.LineageRepository) {
+				ar.EXPECT().SoftDeleteByURN(ctx, mock.AnythingOfType("time.Time"), urn, userID).Return(newVersion, nil)
+				dr.EXPECT().SoftDeleteByURN(ctx, mock.AnythingOfType("asset.SoftDeleteAssetParams")).Return(nil)
+				lr.EXPECT().SoftDeleteByURN(ctx, urn).Return(nil)
 			},
 			Err: nil,
 		},
@@ -676,7 +689,7 @@ func TestService_SoftDeleteAsset(t *testing.T) {
 			discoveryRepo := mocks.NewDiscoveryRepository(t)
 			lineageRepo := mocks.NewLineageRepository(t)
 			if tc.Setup != nil {
-				tc.Setup(ctx, assetRepo, discoveryRepo)
+				tc.Setup(ctx, assetRepo, discoveryRepo, lineageRepo)
 			}
 
 			svc, cancel := asset.NewService(asset.ServiceDeps{

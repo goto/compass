@@ -146,12 +146,12 @@ func (repo *DiscoveryRepository) DeleteByURN(ctx context.Context, assetURN strin
 	return repo.deleteWithQuery(ctx, "DeleteByURN", fmt.Sprintf(`{"query":{"term":{"urn.keyword": %q}}}`, assetURN))
 }
 
-func (repo *DiscoveryRepository) SoftDeleteByURN(ctx context.Context, softDeleteAsset asset.SoftDeleteAsset) error {
-	if softDeleteAsset.URN == "" {
+func (repo *DiscoveryRepository) SoftDeleteByURN(ctx context.Context, params asset.SoftDeleteAssetParams) error {
+	if params.URN == "" {
 		return asset.ErrEmptyURN
 	}
 
-	return repo.softDeleteAsset(ctx, "DeleteByURN", softDeleteAsset)
+	return repo.softDeleteAssetByURN(ctx, "SoftDeleteByURN", params)
 }
 
 func (repo *DiscoveryRepository) DeleteByQueryExpr(ctx context.Context, queryExpr queryexpr.ExprStr) error {
@@ -367,7 +367,7 @@ func (repo *DiscoveryRepository) deleteWithQuery(ctx context.Context, discoveryO
 	return nil
 }
 
-func (repo *DiscoveryRepository) softDeleteAsset(ctx context.Context, discoveryOp string, softDeleteAsset asset.SoftDeleteAsset) (err error) {
+func (repo *DiscoveryRepository) softDeleteAssetByURN(ctx context.Context, discoveryOp string, softDeleteAsset asset.SoftDeleteAssetParams) (err error) {
 	defer func(start time.Time) {
 		const op = "soft_delete_by_urn"
 		repo.cli.instrumentOp(ctx, instrumentParams{
@@ -377,19 +377,6 @@ func (repo *DiscoveryRepository) softDeleteAsset(ctx context.Context, discoveryO
 			err:         err,
 		})
 	}(time.Now())
-
-	// First get the current version
-	currentVersion, err := repo.GetCurrentAssetVersion(ctx, softDeleteAsset.URN, 2*time.Second)
-	if err != nil {
-		return asset.DiscoveryError{
-			Op:  "GetCurrentVersion",
-			Err: fmt.Errorf("failed to get current version for URN %s: %w", softDeleteAsset.URN, err),
-		}
-	}
-	newVersion, err := asset.IncreaseMinorVersion(currentVersion)
-	if err != nil {
-		return err
-	}
 
 	// Create the update request body
 	body := map[string]interface{}{
@@ -411,7 +398,7 @@ func (repo *DiscoveryRepository) softDeleteAsset(ctx context.Context, discoveryO
 				"updated_at":   softDeleteAsset.UpdatedAt,
 				"refreshed_at": softDeleteAsset.RefreshedAt,
 				"updated_by":   user.User{ID: softDeleteAsset.UpdatedBy},
-				"version":      newVersion,
+				"version":      softDeleteAsset.NewVersion,
 			},
 		},
 	}
@@ -424,7 +411,6 @@ func (repo *DiscoveryRepository) softDeleteAsset(ctx context.Context, discoveryO
 		}
 	}
 
-	// Execute UpdateByQuery
 	updateByQuery := repo.cli.client.UpdateByQuery
 	res, err := updateByQuery(
 		[]string{defaultSearchIndex},
@@ -437,7 +423,7 @@ func (repo *DiscoveryRepository) softDeleteAsset(ctx context.Context, discoveryO
 	)
 	if err != nil {
 		return asset.DiscoveryError{
-			Op:  "DeleteDoc",
+			Op:  "SoftDeleteDoc",
 			Err: fmt.Errorf("urn: %s: %w", softDeleteAsset.URN, err),
 		}
 	}
@@ -446,7 +432,7 @@ func (repo *DiscoveryRepository) softDeleteAsset(ctx context.Context, discoveryO
 	if res.IsError() {
 		code, reason := errorCodeAndReason(res)
 		return asset.DiscoveryError{
-			Op:     "DeleteDoc",
+			Op:     "SoftDeleteDoc",
 			ESCode: code,
 			Err:    fmt.Errorf("urn: %s: %s", softDeleteAsset.URN, reason),
 		}

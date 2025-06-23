@@ -193,13 +193,13 @@ func (_c *Worker_EnqueueIndexAssetJob_Call) RunAndReturn(run func(context.Contex
 	return _c
 }
 
-// EnqueueSoftDeleteAssetJob provides a mock function with given fields: ctx, softDeleteAsset
-func (_m *Worker) EnqueueSoftDeleteAssetJob(ctx context.Context, softDeleteAsset asset.SoftDeleteAsset) error {
-	ret := _m.Called(ctx, softDeleteAsset)
+// EnqueueSoftDeleteAssetJob provides a mock function with given fields: ctx, params
+func (_m *Worker) EnqueueSoftDeleteAssetJob(ctx context.Context, params asset.SoftDeleteAssetParams) error {
+	ret := _m.Called(ctx, params)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, asset.SoftDeleteAsset) error); ok {
-		r0 = rf(ctx, softDeleteAsset)
+	if rf, ok := ret.Get(0).(func(context.Context, asset.SoftDeleteAssetParams) error); ok {
+		r0 = rf(ctx, params)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -214,14 +214,14 @@ type Worker_EnqueueSoftDeleteAssetJob_Call struct {
 
 // EnqueueSoftDeleteAssetJob is a helper method to define mock.On call
 //   - ctx context.Context
-//   - softDeleteAsset asset.SoftDeleteAsset
-func (_e *Worker_Expecter) EnqueueSoftDeleteAssetJob(ctx interface{}, softDeleteAsset interface{}) *Worker_EnqueueSoftDeleteAssetJob_Call {
-	return &Worker_EnqueueSoftDeleteAssetJob_Call{Call: _e.mock.On("EnqueueSoftDeleteAssetJob", ctx, softDeleteAsset)}
+//   - params asset.SoftDeleteAssetParams
+func (_e *Worker_Expecter) EnqueueSoftDeleteAssetJob(ctx interface{}, params interface{}) *Worker_EnqueueSoftDeleteAssetJob_Call {
+	return &Worker_EnqueueSoftDeleteAssetJob_Call{Call: _e.mock.On("EnqueueSoftDeleteAssetJob", ctx, params)}
 }
 
-func (_c *Worker_EnqueueSoftDeleteAssetJob_Call) Run(run func(ctx context.Context, softDeleteAsset asset.SoftDeleteAsset)) *Worker_EnqueueSoftDeleteAssetJob_Call {
+func (_c *Worker_EnqueueSoftDeleteAssetJob_Call) Run(run func(ctx context.Context, params asset.SoftDeleteAssetParams)) *Worker_EnqueueSoftDeleteAssetJob_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(asset.SoftDeleteAsset))
+		run(args[0].(context.Context), args[1].(asset.SoftDeleteAssetParams))
 	})
 	return _c
 }
@@ -231,7 +231,7 @@ func (_c *Worker_EnqueueSoftDeleteAssetJob_Call) Return(_a0 error) *Worker_Enque
 	return _c
 }
 
-func (_c *Worker_EnqueueSoftDeleteAssetJob_Call) RunAndReturn(run func(context.Context, asset.SoftDeleteAsset) error) *Worker_EnqueueSoftDeleteAssetJob_Call {
+func (_c *Worker_EnqueueSoftDeleteAssetJob_Call) RunAndReturn(run func(context.Context, asset.SoftDeleteAssetParams) error) *Worker_EnqueueSoftDeleteAssetJob_Call {
 	_c.Call.Return(run)
 	return _c
 }
