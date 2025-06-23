@@ -131,6 +131,7 @@ func (m *Manager) init() error {
 		jobDeleteAsset:         m.deleteAssetHandler(),
 		jobSoftDeleteAsset:     m.softDeleteAssetHandler(),
 		jobDeleteAssetsByQuery: m.deleteAssetsByQueryHandler(),
+		jobSoftDeleteAssets:    m.softDeleteAssetsByQueryHandler(),
 		jobSyncAsset:           m.syncAssetHandler(),
 	}
 	for typ, h := range jobHandlers {

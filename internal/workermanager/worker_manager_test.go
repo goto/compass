@@ -89,6 +89,9 @@ func TestManager_Run(t *testing.T) {
 				Register("soft-delete-asset", mock.AnythingOfType("worker.JobHandler")).
 				Return(nil)
 			wrkr.EXPECT().
+				Register("soft-delete-assets", mock.AnythingOfType("worker.JobHandler")).
+				Return(nil)
+			wrkr.EXPECT().
 				Register("sync-asset", mock.AnythingOfType("worker.JobHandler")).
 				Return(nil)
 			wrkr.EXPECT().

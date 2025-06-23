@@ -2019,6 +2019,64 @@ func (r *AssetRepositoryTestSuite) TestDeleteByQueryExpr() {
 	})
 }
 
+func (r *AssetRepositoryTestSuite) TestSoftDeleteByQueryExpr() {
+	refreshedAtTime := time.Date(2024, time.August, 20, 8, 19, 49, 0, time.UTC)
+	currentTime := time.Now().UTC()
+	r.Run("should delete correct asset", func() {
+		userID := r.users[0].ID
+		oneYearAgoRefreshedAtTime := refreshedAtTime.AddDate(-1, 0, 0)
+		asset1 := asset.Asset{
+			URN:         "urn-del-1",
+			Name:        "del-1",
+			Type:        "table",
+			Service:     "bigquery",
+			UpdatedBy:   user.User{ID: userID},
+			RefreshedAt: &oneYearAgoRefreshedAtTime,
+		}
+		asset2 := asset.Asset{
+			URN:         "urn-del-2",
+			Name:        "del-2",
+			Type:        "topic",
+			Service:     "kafka",
+			Version:     asset.BaseVersion,
+			UpdatedBy:   user.User{ID: userID},
+			RefreshedAt: &oneYearAgoRefreshedAtTime,
+		}
+
+		_, err := r.repository.Upsert(r.ctx, &asset1)
+		r.Require().NoError(err)
+
+		_, err = r.repository.Upsert(r.ctx, &asset2)
+		r.Require().NoError(err)
+
+		query := "refreshed_at <= '" + refreshedAtTime.Format("2006-01-02T15:04:05Z") +
+			"' && service == '" + asset1.Service +
+			"' && type == '" + asset1.Type.String() +
+			"' && urn == '" + asset1.URN + "'"
+		sqlExpr := queryexpr.SQLExpr(query)
+		queryExpr := asset.DeleteAssetExpr{
+			ExprStr: sqlExpr,
+		}
+
+		_, err = r.repository.SoftDeleteByQueryExpr(r.ctx, currentTime, userID, queryExpr)
+		r.NoError(err)
+
+		asset1FromDB, err := r.repository.GetByURN(r.ctx, asset1.URN)
+		r.NoError(err)
+		r.True(asset1FromDB.IsDeleted)
+
+		asset2FromDB, err := r.repository.GetByURN(r.ctx, asset2.URN)
+		r.NoError(err)
+		r.False(asset2FromDB.IsDeleted)
+
+		// cleanup
+		err = r.repository.DeleteByURN(r.ctx, asset1.URN)
+		r.NoError(err)
+		err = r.repository.DeleteByURN(r.ctx, asset2.URN)
+		r.NoError(err)
+	})
+}
+
 func (r *AssetRepositoryTestSuite) TestAddProbe() {
 	const typeJob = asset.Type("job")
 

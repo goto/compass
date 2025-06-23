@@ -33,6 +33,7 @@ type Worker interface {
 	EnqueueDeleteAssetJob(ctx context.Context, urn string) error
 	EnqueueSoftDeleteAssetJob(ctx context.Context, params SoftDeleteAssetParams) error
 	EnqueueDeleteAssetsByQueryExprJob(ctx context.Context, queryExpr string) error
+	EnqueueSoftDeleteAssetsJob(ctx context.Context, assets []Asset) error
 	EnqueueSyncAssetJob(ctx context.Context, service string) error
 	Close() error
 }
@@ -254,6 +255,51 @@ func (s *Service) executeDeleteAssets(ctx context.Context, deleteSQLExpr queryex
 
 	if err := s.worker.EnqueueDeleteAssetsByQueryExprJob(ctx, deleteSQLExpr.String()); err != nil {
 		s.logger.Error("error occurred during elasticsearch deletion", "err:", err)
+	}
+}
+
+func (s *Service) SoftDeleteAssets(ctx context.Context, request DeleteAssetsRequest, updatedBy string) (affectedRows uint32, err error) {
+	queryExprStr := request.QueryExpr + " && is_deleted == false"
+	deleteSQLExpr := DeleteAssetExpr{
+		ExprStr: queryexpr.SQLExpr(queryExprStr),
+	}
+	total, err := s.assetRepository.GetCountByQueryExpr(ctx, deleteSQLExpr)
+	if err != nil {
+		return 0, err
+	}
+
+	if !request.DryRun && total > 0 {
+		executedTime := time.Now()
+		newCtx, cancel := context.WithTimeout(context.Background(), s.config.DeleteAssetsTimeout)
+		cancelID := uuid.New().String()
+		s.cancelFnMap.Store(cancelID, cancel)
+		go func(id string) {
+			s.executeSoftDeleteAssets(newCtx, executedTime, updatedBy, deleteSQLExpr)
+			cancel()
+			s.cancelFnMap.Delete(id)
+		}(cancelID)
+	}
+
+	return uint32(total), nil
+}
+
+func (s *Service) executeSoftDeleteAssets(ctx context.Context, executedTime time.Time, updatedByID string, queryExpr queryexpr.ExprStr) {
+	updatedAssets, err := s.assetRepository.SoftDeleteByQueryExpr(ctx, executedTime, updatedByID, queryExpr)
+	if err != nil {
+		s.logger.Error("asset deletion failed, skipping elasticsearch and lineage soft deletions", "err:", err)
+		return
+	}
+
+	deletedURNs := make([]string, 0, len(updatedAssets))
+	for _, ast := range updatedAssets {
+		deletedURNs = append(deletedURNs, ast.URN)
+	}
+	if err := s.lineageRepository.SoftDeleteByURNs(ctx, deletedURNs); err != nil {
+		s.logger.Error("error occurred during lineage soft deletion", "err:", err)
+	}
+
+	if err := s.worker.EnqueueSoftDeleteAssetsJob(ctx, updatedAssets); err != nil {
+		s.logger.Error("error occurred during elasticsearch soft deletion", "err:", err)
 	}
 }
 

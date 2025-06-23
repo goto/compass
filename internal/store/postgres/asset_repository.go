@@ -644,6 +644,37 @@ func (r *AssetRepository) DeleteByQueryExpr(ctx context.Context, queryExpr query
 	return urns, err
 }
 
+func (r *AssetRepository) SoftDeleteByQueryExpr(
+	ctx context.Context,
+	executedAt time.Time,
+	updatedByID string,
+	queryExpr queryexpr.ExprStr,
+) (updatedAssets []asset.Asset, err error) {
+	err = r.client.RunWithinTx(ctx, func(tx *sqlx.Tx) error {
+		query, err := queryexpr.ValidateAndGetQueryFromExpr(queryExpr)
+		if err != nil {
+			return err
+		}
+
+		updatedAssets, err = r.softDeleteByQuery(ctx, tx, query, executedAt, updatedByID)
+		if err != nil {
+			return fmt.Errorf("error soft deleting assets by query: %w", err)
+		}
+
+		softDeleteChangelog := diff.Changelog{
+			{
+				Type: "delete",
+				Path: []string{"is_deleted"},
+				From: false,
+				To:   true,
+			},
+		}
+		return r.insertAssetVersions(ctx, tx, updatedAssets, softDeleteChangelog)
+	})
+
+	return updatedAssets, err
+}
+
 // deleteByQueryAndReturnURNS remove all assets that match to query and return array of urn of asset that deleted.
 func (r *AssetRepository) deleteByQueryAndReturnURNS(ctx context.Context, whereCondition string) ([]string, error) {
 	builder := sq.Delete("assets").
@@ -661,6 +692,51 @@ func (r *AssetRepository) deleteByQueryAndReturnURNS(ctx context.Context, whereC
 	}
 
 	return urns, nil
+}
+
+// softDeleteByQuery soft delete all assets that match to query
+func (r *AssetRepository) softDeleteByQuery(
+	ctx context.Context,
+	tx *sqlx.Tx,
+	whereCondition string,
+	executedAt time.Time,
+	updatedByID string,
+) ([]asset.Asset, error) {
+	updateCTE := sq.Update("assets").
+		Set("is_deleted", true).
+		Set("updated_at", executedAt).
+		Set("refreshed_at", executedAt).
+		Set("updated_by", updatedByID).
+		Where(whereCondition).
+		Suffix("RETURNING *").
+		Prefix("WITH assets AS (").
+		Suffix(")")
+
+	returnQuery := r.getAssetSQL()
+
+	fullQuery := returnQuery.PrefixExpr(updateCTE)
+	query, args, err := fullQuery.PlaceholderFormat(sq.Dollar).ToSql()
+	if err != nil {
+		return nil, fmt.Errorf("build query: %w", err)
+	}
+
+	var ams []AssetModel
+	err = sqlx.SelectContext(ctx, tx, &ams, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("error executing query: %w", err)
+	}
+
+	var assets []asset.Asset
+	for _, am := range ams {
+		owners, err := r.getOwnersWithTx(ctx, tx, am.ID)
+		if err != nil {
+			return nil, fmt.Errorf("get owners with ID: %s, %w", am.ID, err)
+		}
+
+		assets = append(assets, am.toAsset(owners))
+	}
+
+	return assets, nil
 }
 
 func (r *AssetRepository) AddProbe(ctx context.Context, assetURN string, probe *asset.Probe) error {
@@ -1019,6 +1095,58 @@ func (r *AssetRepository) insertAssetVersion(ctx context.Context, execer sqlx.Ex
 
 	if err = r.execContext(ctx, execer, query, args...); err != nil {
 		return fmt.Errorf("insert asset version: %w", err)
+	}
+
+	return nil
+}
+
+// insertAssetVersions run same as insertAssetVersion, but for bulk insert with same changelogs
+func (r *AssetRepository) insertAssetVersions(
+	ctx context.Context,
+	execer sqlx.ExecerContext,
+	newAssets []asset.Asset,
+	clog diff.Changelog,
+) error {
+	if len(newAssets) == 0 {
+		return nil // nothing to insert
+	}
+
+	builder := sq.Insert("assets_versions").
+		Columns("asset_id", "urn", "type", "service", "name", "description", "data", "labels",
+			"created_at", "updated_at", "updated_by", "version", "owners", "is_deleted", "changelog").
+		PlaceholderFormat(sq.Dollar)
+
+	for _, newAsset := range newAssets {
+		if newAsset.ID == "" {
+			return asset.ErrNilAsset
+		}
+
+		builder = builder.Values(
+			newAsset.ID,
+			newAsset.URN,
+			newAsset.Type,
+			newAsset.Service,
+			newAsset.Name,
+			newAsset.Description,
+			newAsset.Data,
+			newAsset.Labels,
+			newAsset.CreatedAt,
+			newAsset.UpdatedAt,
+			newAsset.UpdatedBy.ID,
+			newAsset.Version,
+			newAsset.Owners,
+			newAsset.IsDeleted,
+			clog,
+		)
+	}
+
+	query, args, err := builder.ToSql()
+	if err != nil {
+		return fmt.Errorf("build bulk insert query: %w", err)
+	}
+
+	if err := r.execContext(ctx, execer, query, args...); err != nil {
+		return fmt.Errorf("bulk insert asset versions: %w", err)
 	}
 
 	return nil

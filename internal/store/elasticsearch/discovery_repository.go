@@ -167,6 +167,77 @@ func (repo *DiscoveryRepository) DeleteByQueryExpr(ctx context.Context, queryExp
 	return repo.deleteWithQuery(ctx, "DeleteByQueryExpr", esQuery)
 }
 
+func (repo *DiscoveryRepository) SoftDeleteAssets(ctx context.Context, assets []asset.Asset, doUpdateVersion bool) error {
+	return repo.bulkSoftDeleteAssets(ctx, "SoftDeleteAssets", assets, doUpdateVersion)
+}
+
+func (repo *DiscoveryRepository) bulkSoftDeleteAssets(
+	ctx context.Context,
+	discoveryOp string,
+	assets []asset.Asset,
+	doUpdateVersion bool,
+) (err error) {
+	defer func(start time.Time) {
+		const op = "soft_delete_assets"
+		repo.cli.instrumentOp(ctx, instrumentParams{
+			op:          op,
+			discoveryOp: discoveryOp,
+			start:       start,
+			err:         err,
+		})
+	}(time.Now())
+
+	bulkOps := make([]string, 0, len(assets)*2)
+
+	for _, a := range assets {
+		newVersion := a.Version
+		if doUpdateVersion {
+			newVersion, err = asset.IncreaseMinorVersion(a.Version)
+			if err != nil {
+				return fmt.Errorf("error increase version for ID %s: %w", a.ID, err)
+			}
+		}
+
+		meta := fmt.Sprintf(`{ "update": { "_index": %q, "_id": %q } }`, a.Service, a.ID)
+		update := map[string]interface{}{
+			"doc": map[string]interface{}{
+				"is_deleted":   true,
+				"updated_at":   a.UpdatedAt,
+				"refreshed_at": a.RefreshedAt,
+				"updated_by":   a.UpdatedBy,
+				"version":      newVersion,
+			},
+		}
+		updateJSON, err := json.Marshal(update)
+		if err != nil {
+			return fmt.Errorf("marshal update doc for ID %s: %w", a.ID, err)
+		}
+		bulkOps = append(bulkOps, meta, string(updateJSON))
+	}
+
+	return repo.sendBulkUpdate(ctx, bulkOps)
+}
+
+func (repo *DiscoveryRepository) sendBulkUpdate(ctx context.Context, bulkOps []string) error {
+	if len(bulkOps) == 0 {
+		return nil
+	}
+
+	payload := strings.Join(bulkOps, "\n") + "\n"
+	bulk := repo.cli.client.Bulk
+	res, err := bulk(
+		bytes.NewReader([]byte(payload)),
+		bulk.WithContext(ctx),
+		bulk.WithIndex(defaultSearchIndex),
+	)
+	if err != nil {
+		return fmt.Errorf("bulk update error: %w", err)
+	}
+	defer res.Body.Close()
+
+	return nil
+}
+
 func (repo *DiscoveryRepository) deleteWithQuery(ctx context.Context, discoveryOp, qry string) (err error) {
 	defer func(start time.Time) {
 		const op = "delete_by_query"

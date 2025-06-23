@@ -33,6 +33,7 @@ type LineageRepository interface {
 	DeleteByURN(ctx context.Context, urn string) error
 	SoftDeleteByURN(ctx context.Context, urn string) error
 	DeleteByURNs(ctx context.Context, urns []string) error
+	SoftDeleteByURNs(ctx context.Context, urns []string) error
 }
 
 type LineageGraph []LineageEdge

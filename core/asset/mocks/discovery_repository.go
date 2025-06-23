@@ -264,6 +264,50 @@ func (_c *DiscoveryRepository_Search_Call) RunAndReturn(run func(context.Context
 	return _c
 }
 
+// SoftDeleteAssets provides a mock function with given fields: ctx, assets, doUpdateVersion
+func (_m *DiscoveryRepository) SoftDeleteAssets(ctx context.Context, assets []asset.Asset, doUpdateVersion bool) error {
+	ret := _m.Called(ctx, assets, doUpdateVersion)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, []asset.Asset, bool) error); ok {
+		r0 = rf(ctx, assets, doUpdateVersion)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// DiscoveryRepository_SoftDeleteAssets_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'SoftDeleteAssets'
+type DiscoveryRepository_SoftDeleteAssets_Call struct {
+	*mock.Call
+}
+
+// SoftDeleteAssets is a helper method to define mock.On call
+//   - ctx context.Context
+//   - assets []asset.Asset
+//   - doUpdateVersion bool
+func (_e *DiscoveryRepository_Expecter) SoftDeleteAssets(ctx interface{}, assets interface{}, doUpdateVersion interface{}) *DiscoveryRepository_SoftDeleteAssets_Call {
+	return &DiscoveryRepository_SoftDeleteAssets_Call{Call: _e.mock.On("SoftDeleteAssets", ctx, assets, doUpdateVersion)}
+}
+
+func (_c *DiscoveryRepository_SoftDeleteAssets_Call) Run(run func(ctx context.Context, assets []asset.Asset, doUpdateVersion bool)) *DiscoveryRepository_SoftDeleteAssets_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].([]asset.Asset), args[2].(bool))
+	})
+	return _c
+}
+
+func (_c *DiscoveryRepository_SoftDeleteAssets_Call) Return(_a0 error) *DiscoveryRepository_SoftDeleteAssets_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *DiscoveryRepository_SoftDeleteAssets_Call) RunAndReturn(run func(context.Context, []asset.Asset, bool) error) *DiscoveryRepository_SoftDeleteAssets_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // SoftDeleteByURN provides a mock function with given fields: ctx, params
 func (_m *DiscoveryRepository) SoftDeleteByURN(ctx context.Context, params asset.SoftDeleteAssetParams) error {
 	ret := _m.Called(ctx, params)

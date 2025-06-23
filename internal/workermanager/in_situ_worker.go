@@ -58,6 +58,13 @@ func (m *InSituWorker) EnqueueDeleteAssetsByQueryExprJob(ctx context.Context, qu
 	return nil
 }
 
+func (m *InSituWorker) EnqueueSoftDeleteAssetsJob(ctx context.Context, assets []asset.Asset) error {
+	if err := m.discoveryRepo.SoftDeleteAssets(ctx, assets, false); err != nil {
+		return fmt.Errorf("soft delete assets from discovery repo: %w", err)
+	}
+	return nil
+}
+
 func (m *InSituWorker) EnqueueSyncAssetJob(ctx context.Context, service string) error {
 	const batchSize = 1000
 
