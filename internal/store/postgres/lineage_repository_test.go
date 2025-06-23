@@ -187,6 +187,62 @@ func (r *LineageRepositoryTestSuite) TestDeleteByURNs() {
 	})
 }
 
+func (r *LineageRepositoryTestSuite) TestSoftDeleteByURNs() {
+	r.Run("should delete assets from lineage", func() {
+		nodeURN1a := "table-1a"
+		nodeURN1b := "table-1b"
+		nodeURNs := []string{nodeURN1a, nodeURN1b}
+
+		// create initial
+		err := r.repository.Upsert(r.ctx, nodeURN1a, []string{"table-2"}, []string{"table-3"})
+		r.NoError(err)
+		err = r.repository.Upsert(r.ctx, nodeURN1b, []string{"table-2"}, []string{"table-3"})
+		r.NoError(err)
+
+		err = r.repository.SoftDeleteByURNs(r.ctx, nodeURNs)
+		r.NoError(err)
+
+		graph, err := r.repository.GetGraph(r.ctx, nodeURN1a, asset.LineageQuery{})
+		r.Require().NoError(err)
+		r.compareGraphsWithProp(asset.LineageGraph{
+			{Source: "table-2", Target: nodeURN1a, Prop: map[string]interface{}{
+				"root":              nodeURN1a,
+				"source_is_deleted": false,
+				"target_is_deleted": true,
+			}},
+			{Source: nodeURN1a, Target: "table-3", Prop: map[string]interface{}{
+				"root":              nodeURN1a,
+				"source_is_deleted": true,
+				"target_is_deleted": false,
+			}},
+		}, graph)
+
+		graph, err = r.repository.GetGraph(r.ctx, nodeURN1b, asset.LineageQuery{})
+		r.Require().NoError(err)
+		r.compareGraphsWithProp(asset.LineageGraph{
+			{Source: "table-2", Target: nodeURN1b, Prop: map[string]interface{}{
+				"root":              nodeURN1b,
+				"source_is_deleted": false,
+				"target_is_deleted": true,
+			}},
+			{Source: nodeURN1b, Target: "table-3", Prop: map[string]interface{}{
+				"root":              nodeURN1b,
+				"source_is_deleted": true,
+				"target_is_deleted": false,
+			}},
+		}, graph)
+	})
+
+	r.Run("not return error when URNs has no lineage", func() {
+		nodeURN1a := "table-1a"
+		nodeURN1b := "table-1b"
+		nodeURNs := []string{nodeURN1a, nodeURN1b}
+
+		err := r.repository.SoftDeleteByURNs(r.ctx, nodeURNs)
+		r.NoError(err)
+	})
+}
+
 func (r *LineageRepositoryTestSuite) TestUpsert() {
 	r.Run("should insert all as graph if upstreams and downstreams are new", func() {
 		nodeURN := "table-1"

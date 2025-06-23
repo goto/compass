@@ -53,7 +53,7 @@ func (repo *LineageRepository) DeleteByURN(ctx context.Context, urn string) erro
 }
 
 func (repo *LineageRepository) SoftDeleteByURN(ctx context.Context, urn string) error {
-	return repo.softDeleteByURNs(ctx, []string{urn})
+	return repo.SoftDeleteByURNs(ctx, []string{urn})
 }
 
 func (repo *LineageRepository) DeleteByURNs(ctx context.Context, urns []string) error {
@@ -75,7 +75,7 @@ func (repo *LineageRepository) DeleteByURNs(ctx context.Context, urns []string) 
 	return nil
 }
 
-func (repo *LineageRepository) softDeleteByURNs(ctx context.Context, urns []string) error {
+func (repo *LineageRepository) SoftDeleteByURNs(ctx context.Context, urns []string) error {
 	// Process source soft deletion
 	if err := repo.softDeleteByURNsAndProp(ctx, urns, true); err != nil {
 		return err

@@ -290,6 +290,14 @@ func (s *Service) executeSoftDeleteAssets(ctx context.Context, executedTime time
 		return
 	}
 
+	deletedURNs := make([]string, 0, len(updatedAssets))
+	for _, ast := range updatedAssets {
+		deletedURNs = append(deletedURNs, ast.URN)
+	}
+	if err := s.lineageRepository.SoftDeleteByURNs(ctx, deletedURNs); err != nil {
+		s.logger.Error("error occurred during lineage soft deletion", "err:", err)
+	}
+
 	if err := s.worker.EnqueueSoftDeleteAssetsJob(ctx, updatedAssets); err != nil {
 		s.logger.Error("error occurred during elasticsearch soft deletion", "err:", err)
 	}

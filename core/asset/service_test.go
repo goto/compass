@@ -808,7 +808,7 @@ func TestService_SoftDeleteAssets(t *testing.T) {
 	type testCase struct {
 		Description        string
 		Request            asset.DeleteAssetsRequest
-		Setup              func(context.Context, *mocks.AssetRepository, *mocks.Worker)
+		Setup              func(context.Context, *mocks.AssetRepository, *mocks.LineageRepository, *mocks.Worker)
 		ExpectAffectedRows uint32
 		ExpectErr          error
 	}
@@ -817,7 +817,7 @@ func TestService_SoftDeleteAssets(t *testing.T) {
 		{
 			Description: `should return error if getting affected rows got error`,
 			Request:     dummyRequestDryRunTrue,
-			Setup: func(ctx context.Context, ar *mocks.AssetRepository, _ *mocks.Worker) {
+			Setup: func(ctx context.Context, ar *mocks.AssetRepository, _ *mocks.LineageRepository, _ *mocks.Worker) {
 				ar.EXPECT().GetCountByQueryExpr(ctx, mock.AnythingOfType("asset.DeleteAssetExpr")).
 					Return(0, errors.New("something wrong"))
 			},
@@ -827,7 +827,7 @@ func TestService_SoftDeleteAssets(t *testing.T) {
 		{
 			Description: `should only return the affected rows that match the given query when getting affected rows successful and dry run is true`,
 			Request:     dummyRequestDryRunTrue,
-			Setup: func(ctx context.Context, ar *mocks.AssetRepository, _ *mocks.Worker) {
+			Setup: func(ctx context.Context, ar *mocks.AssetRepository, _ *mocks.LineageRepository, _ *mocks.Worker) {
 				ar.EXPECT().GetCountByQueryExpr(ctx, mock.AnythingOfType("asset.DeleteAssetExpr")).
 					Return(11, nil)
 			},
@@ -837,11 +837,13 @@ func TestService_SoftDeleteAssets(t *testing.T) {
 		{
 			Description: `should return the affected rows and perform deletion in the background when getting affected rows successful and dry run is false`,
 			Request:     dummyRequestDryRunFalse,
-			Setup: func(ctx context.Context, ar *mocks.AssetRepository, w *mocks.Worker) {
+			Setup: func(ctx context.Context, ar *mocks.AssetRepository, lr *mocks.LineageRepository, w *mocks.Worker) {
 				ar.EXPECT().GetCountByQueryExpr(ctx, mock.AnythingOfType("asset.DeleteAssetExpr")).
 					Return(2, nil)
 				ar.EXPECT().SoftDeleteByQueryExpr(mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 					Return([]asset.Asset{}, nil)
+				lr.EXPECT().SoftDeleteByURNs(mock.Anything, mock.Anything).
+					Return(nil)
 				w.EXPECT().EnqueueSoftDeleteAssetsJob(mock.Anything, mock.Anything).
 					Return(nil)
 			},
@@ -858,7 +860,7 @@ func TestService_SoftDeleteAssets(t *testing.T) {
 			worker := mocks.NewWorker(t)
 			lineageRepo := mocks.NewLineageRepository(t)
 			if tc.Setup != nil {
-				tc.Setup(ctx, assetRepo, worker)
+				tc.Setup(ctx, assetRepo, lineageRepo, worker)
 			}
 
 			svc, cancel := asset.NewService(asset.ServiceDeps{
