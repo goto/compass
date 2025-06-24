@@ -38,11 +38,11 @@ func (r *AssetRepository) GetAll(ctx context.Context, flt asset.Filter) ([]asset
 		return nil, errSizeCannotBeNegative
 	}
 
-	builder := r.getAssetSQLWithForUpdate(&flt.IsDeleted).Offset(uint64(flt.Offset))
+	builder := r.getAssetSQLWithIsDeleted(flt.IsDeleted, true).Offset(uint64(flt.Offset))
 	size := flt.Size
 
 	if size > 0 {
-		builder = r.getAssetSQLWithForUpdate(&flt.IsDeleted).Limit(uint64(size)).Offset(uint64(flt.Offset))
+		builder = r.getAssetSQLWithIsDeleted(flt.IsDeleted, true).Limit(uint64(size)).Offset(uint64(flt.Offset))
 	}
 	builder = r.BuildFilterQuery(builder, flt)
 	builder = r.buildOrderQuery(builder, flt)
@@ -222,7 +222,7 @@ func (r *AssetRepository) getWithPredicate(ctx context.Context, pred sq.Eq) (ass
 }
 
 func (r *AssetRepository) getWithPredicateWithTx(ctx context.Context, tx *sqlx.Tx, pred sq.Eq) (asset.Asset, error) {
-	query, args, err := r.getAssetSQLWithForUpdate(nil).
+	query, args, err := r.getAssetSQLWithForUpdate().
 		Where(pred).
 		Limit(1).
 		PlaceholderFormat(sq.Dollar).
@@ -712,8 +712,7 @@ func (r *AssetRepository) softDeleteByQuery(
 		Prefix("WITH assets AS (").
 		Suffix(")")
 
-	falseCondition := false
-	returnQuery := r.getAssetSQL(&falseCondition)
+	returnQuery := r.getAssetSQLWithIsDeleted(false, false)
 
 	fullQuery := returnQuery.PrefixExpr(updateCTE)
 	query, args, err := fullQuery.PlaceholderFormat(sq.Dollar).ToSql()
@@ -893,7 +892,7 @@ func (r *AssetRepository) insert(ctx context.Context, tx *sqlx.Tx, ast *asset.As
 		Suffix("RETURNING *").
 		Prefix("WITH assets AS (").
 		Suffix(")")
-	returnQuery := r.getAssetSQL(nil)
+	returnQuery := r.getAssetSQL()
 
 	// Combine CTE and main query
 	fullQuery := returnQuery.PrefixExpr(insertCTE)
@@ -1010,7 +1009,7 @@ func (r *AssetRepository) updateAsset(ctx context.Context, tx *sqlx.Tx, assetID 
 		Suffix("RETURNING *").
 		Prefix("WITH assets AS (").
 		Suffix(")")
-	returnQuery := r.getAssetSQL(nil)
+	returnQuery := r.getAssetSQL()
 
 	fullQuery := returnQuery.PrefixExpr(updateCTE)
 	query, args, err := fullQuery.PlaceholderFormat(sq.Dollar).ToSql()
@@ -1039,7 +1038,7 @@ func (r *AssetRepository) updateAssetRefreshedAt(ctx context.Context, tx *sqlx.T
 		Suffix("RETURNING *").
 		Prefix("WITH assets AS (").
 		Suffix(")")
-	returnQuery := r.getAssetSQL(nil)
+	returnQuery := r.getAssetSQL()
 
 	fullQuery := returnQuery.PrefixExpr(updateCTE)
 	query, args, err := fullQuery.PlaceholderFormat(sq.Dollar).ToSql()
@@ -1341,7 +1340,7 @@ func (*AssetRepository) getAssetsGroupByCountSQL(columnName string, isDeleted bo
 		GroupBy(columnName)
 }
 
-func (*AssetRepository) getAssetSQL(isDeleted *bool) sq.SelectBuilder {
+func (*AssetRepository) getAssetSQL() sq.SelectBuilder {
 	selectAssetQuery := sq.Select(`
 		a.id as id,
 		a.urn as urn,
@@ -1366,16 +1365,22 @@ func (*AssetRepository) getAssetSQL(isDeleted *bool) sq.SelectBuilder {
 		From("assets a").
 		LeftJoin("users u ON a.updated_by = u.id")
 
-	if isDeleted != nil {
-		return selectAssetQuery.
-			Where(sq.Eq{"a.is_deleted": isDeleted})
-	}
-
 	return selectAssetQuery
 }
 
-func (r *AssetRepository) getAssetSQLWithForUpdate(isDeleted *bool) sq.SelectBuilder {
-	return r.getAssetSQL(isDeleted).
+func (r *AssetRepository) getAssetSQLWithIsDeleted(isDeleted, doForUpdate bool) sq.SelectBuilder {
+	query := r.getAssetSQL().
+		Where(sq.Eq{"a.is_deleted": isDeleted})
+
+	if doForUpdate {
+		return query.Suffix("FOR UPDATE OF a")
+	}
+
+	return query
+}
+
+func (r *AssetRepository) getAssetSQLWithForUpdate() sq.SelectBuilder {
+	return r.getAssetSQL().
 		Suffix("FOR UPDATE OF a")
 }
 
