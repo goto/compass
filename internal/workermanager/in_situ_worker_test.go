@@ -181,8 +181,8 @@ func TestInSituWorker_EnqueueSoftDeleteAssetsJob(t *testing.T) {
 		},
 	}
 	cases := []struct {
-		name         string
 		discoveryErr error
+		name         string
 		expectedErr  bool
 	}{
 		{name: "Success"},

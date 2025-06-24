@@ -239,7 +239,7 @@ func (s *Service) DeleteAssets(ctx context.Context, request DeleteAssetsRequest)
 		}(cancelID)
 	}
 
-	return uint32(total), nil
+	return total, nil
 }
 
 func (s *Service) executeDeleteAssets(ctx context.Context, deleteSQLExpr queryexpr.ExprStr) {
@@ -280,7 +280,7 @@ func (s *Service) SoftDeleteAssets(ctx context.Context, request DeleteAssetsRequ
 		}(cancelID)
 	}
 
-	return uint32(total), nil
+	return total, nil
 }
 
 func (s *Service) executeSoftDeleteAssets(ctx context.Context, executedTime time.Time, updatedByID string, queryExpr queryexpr.ExprStr) {

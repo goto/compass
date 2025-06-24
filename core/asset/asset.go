@@ -13,7 +13,7 @@ import (
 type Repository interface {
 	GetAll(context.Context, Filter) ([]Asset, error)
 	GetCount(context.Context, Filter) (int, error)
-	GetCountByQueryExpr(ctx context.Context, queryExpr queryexpr.ExprStr) (int, error)
+	GetCountByQueryExpr(ctx context.Context, queryExpr queryexpr.ExprStr) (uint32, error)
 	GetByID(ctx context.Context, id string) (Asset, error)
 	GetByURN(ctx context.Context, urn string) (Asset, error)
 	GetVersionHistory(ctx context.Context, flt Filter, id string) ([]Asset, error)

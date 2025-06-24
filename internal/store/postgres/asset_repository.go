@@ -127,7 +127,7 @@ func (r *AssetRepository) GetCount(ctx context.Context, flt asset.Filter) (int, 
 }
 
 // GetCountByQueryExpr retrieves number of assets for every type based on query expr
-func (r *AssetRepository) GetCountByQueryExpr(ctx context.Context, queryExpr queryexpr.ExprStr) (int, error) {
+func (r *AssetRepository) GetCountByQueryExpr(ctx context.Context, queryExpr queryexpr.ExprStr) (uint32, error) {
 	query, err := queryexpr.ValidateAndGetQueryFromExpr(queryExpr)
 	if err != nil {
 		return 0, err
@@ -142,7 +142,7 @@ func (r *AssetRepository) GetCountByQueryExpr(ctx context.Context, queryExpr que
 }
 
 // GetCountByQueryExpr retrieves number of assets for every type based on query expr
-func (r *AssetRepository) getCountByQuery(ctx context.Context, sqlQuery string) (int, error) {
+func (r *AssetRepository) getCountByQuery(ctx context.Context, sqlQuery string) (uint32, error) {
 	builder := sq.Select("count(1)").
 		From("assets").
 		Where(sqlQuery)
@@ -151,7 +151,7 @@ func (r *AssetRepository) getCountByQuery(ctx context.Context, sqlQuery string) 
 		return 0, fmt.Errorf("build count query: %w", err)
 	}
 
-	var total int
+	var total uint32
 	if err := r.client.db.GetContext(ctx, &total, query, args...); err != nil {
 		return 0, fmt.Errorf("get asset list: %w", err)
 	}
@@ -712,7 +712,8 @@ func (r *AssetRepository) softDeleteByQuery(
 		Prefix("WITH assets AS (").
 		Suffix(")")
 
-	returnQuery := r.getAssetSQL()
+	falseCondition := false
+	returnQuery := r.getAssetSQL(&falseCondition)
 
 	fullQuery := returnQuery.PrefixExpr(updateCTE)
 	query, args, err := fullQuery.PlaceholderFormat(sq.Dollar).ToSql()
@@ -726,7 +727,7 @@ func (r *AssetRepository) softDeleteByQuery(
 		return nil, fmt.Errorf("error executing query: %w", err)
 	}
 
-	var assets []asset.Asset
+	assets := make([]asset.Asset, 0, len(ams))
 	for _, am := range ams {
 		owners, err := r.getOwnersWithTx(ctx, tx, am.ID)
 		if err != nil {

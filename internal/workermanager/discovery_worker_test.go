@@ -405,8 +405,8 @@ func TestManager_SoftDeleteAssets(t *testing.T) {
 		},
 	}
 	cases := []struct {
-		name         string
 		discoveryErr error
+		name         string
 		expectedErr  bool
 	}{
 		{name: "Success"},

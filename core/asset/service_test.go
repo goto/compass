@@ -806,11 +806,11 @@ func TestService_SoftDeleteAssets(t *testing.T) {
 	}
 	userID := uuid.New().String()
 	type testCase struct {
-		Description        string
-		Request            asset.DeleteAssetsRequest
-		Setup              func(context.Context, *mocks.AssetRepository, *mocks.LineageRepository, *mocks.Worker)
-		ExpectAffectedRows uint32
 		ExpectErr          error
+		Description        string
+		Setup              func(context.Context, *mocks.AssetRepository, *mocks.LineageRepository, *mocks.Worker)
+		Request            asset.DeleteAssetsRequest
+		ExpectAffectedRows uint32
 	}
 
 	testCases := []testCase{
