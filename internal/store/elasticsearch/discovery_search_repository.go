@@ -293,6 +293,15 @@ func (repo *DiscoveryRepository) buildQuery(cfg asset.SearchConfig) (io.Reader, 
 		}
 	}
 
+	isDeletedQuery, isDeleteQueryExist := cfg.Queries["is_deleted"]
+	isDeletedFilters, isDeletedFilterExist := cfg.Filters["is_deleted"]
+	if !isDeleteQueryExist && !isDeletedFilterExist {
+		boolQuery.Filter(elastic.NewTermQuery("is_deleted", false))
+	}
+	if isDeleteQueryExist && isDeletedFilterExist && isDeletedQuery != isDeletedFilters[0] {
+		return nil, fmt.Errorf("conflicting is_deleted query and filter: query=%s, filter=%s", isDeletedQuery, isDeletedFilters[0])
+	}
+
 	buildFilterTermQueries(boolQuery, cfg.Filters)
 	buildMustMatchQueries(boolQuery, cfg)
 	query := buildFunctionScoreQuery(boolQuery, cfg.RankBy, cfg.Text, field)
@@ -352,6 +361,19 @@ func buildTextQuery(q *elastic.BoolQuery, cfg asset.SearchConfig) {
 	}
 }
 
+func convertQueryValue(value string) any {
+	var v interface{}
+	switch value {
+	case "true":
+		v = true
+	case "false":
+		v = false
+	default:
+		v = value
+	}
+	return v
+}
+
 func buildMustMatchQueries(q *elastic.BoolQuery, cfg asset.SearchConfig) {
 	if len(cfg.Queries) == 0 {
 		return
@@ -373,19 +395,6 @@ func buildMustMatchQueries(q *elastic.BoolQuery, cfg asset.SearchConfig) {
 	}
 }
 
-func convertQueryValue(value string) interface{} {
-	var v interface{}
-	switch value {
-	case "true":
-		v = true
-	case "false":
-		v = false
-	default:
-		v = value
-	}
-	return v
-}
-
 func buildFilterTermQueries(q *elastic.BoolQuery, filters map[string][]string) {
 	if len(filters) == 0 {
 		return
@@ -398,7 +407,14 @@ func buildFilterTermQueries(q *elastic.BoolQuery, filters map[string][]string) {
 
 		key := fmt.Sprintf("%s.keyword", field)
 		if len(rawValues) == 1 {
-			q.Filter(elastic.NewTermQuery(key, rawValues[0]))
+			v := convertQueryValue(rawValues[0])
+
+			if _, ok := v.(string); ok {
+				q.Filter(elastic.NewTermQuery(key, v))
+			} else {
+				q.Filter(elastic.NewTermsQuery(field, v))
+			}
+
 			continue
 		}
 
