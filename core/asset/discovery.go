@@ -84,15 +84,15 @@ type SearchConfig struct {
 
 // SearchResult represents an item/result in a list of search results
 type SearchResult struct {
-	ID          string                 `json:"id"`
-	URN         string                 `json:"urn"`
-	Title       string                 `json:"title"`
-	Type        string                 `json:"type"`
-	Service     string                 `json:"service"`
-	Description string                 `json:"description"`
-	Labels      map[string]string      `json:"labels"`
-	Data        map[string]interface{} `json:"data"`
-	IsDeleted   bool                   `json:"is_deleted"`
+	ID          string
+	URN         string
+	Title       string
+	Type        string
+	Service     string
+	Description string
+	Labels      map[string]string
+	Data        map[string]interface{}
+	IsDeleted   bool
 }
 
 type GroupResult struct {
@@ -116,5 +116,6 @@ func (sr SearchResult) ToAsset() Asset {
 		Description: sr.Description,
 		Labels:      sr.Labels,
 		Data:        sr.Data,
+		IsDeleted:   sr.IsDeleted,
 	}
 }

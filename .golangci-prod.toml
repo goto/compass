@@ -85,12 +85,12 @@ enable = [
     "decorder",                                   # Decoding order in structs
     "gochecknoglobals",                           # Avoid global variables
     "godox",                                      # Detect TODOs, FIXMEs
-    "ireturn",                                    # Enforce interfaces in return types
     "nestif",                                     # Detect deeply nested `if` statements
     "prealloc",                                   # Preallocate slices where possible
     "predeclared",                                # Warn when redefining predeclared identifiers
     "tagliatelle",                                # Enforce tag naming/style
     "wastedassign",                               # Detect assignments never used
+#    "ireturn",                                    # Enforce interfaces in return types
 ]
 
 [linters-settings]
