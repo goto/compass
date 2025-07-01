@@ -706,13 +706,13 @@
             {
                 "id": "is-deleted-true-1",
                 "urn": "is-deleted-true-1",
-                "name": "is-deleted-true-1",
-                "service": "kafka",
-                "description": "Topic for is-deleted-true-1",
+                "name": "is-deleted-true-dashboard",
+                "service": "metabase",
+                "description": "Metabase for is-deleted-true-1",
                 "data": {
                     "topic_name": "is-deleted-true-1"
                 },
-                "type": "topic",
+                "type": "dashboard",
                 "is_deleted": true
             }
         ]

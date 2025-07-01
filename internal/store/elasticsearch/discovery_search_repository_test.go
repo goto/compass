@@ -361,7 +361,7 @@ func TestSearcherSearch(t *testing.T) {
 					},
 				},
 				Expected: []expectedRow{
-					{Type: "topic", AssetID: "is-deleted-true-1"},
+					{Type: "dashboard", AssetID: "is-deleted-true-1"},
 				},
 			},
 			{
@@ -373,7 +373,7 @@ func TestSearcherSearch(t *testing.T) {
 					},
 				},
 				Expected: []expectedRow{
-					{Type: "topic", AssetID: "is-deleted-true-1"},
+					{Type: "dashboard", AssetID: "is-deleted-true-1"},
 				},
 			},
 		}
@@ -952,6 +952,25 @@ func TestGroupAssets(t *testing.T) {
 							{Name: "consumer-topic"},
 							{Name: "consumer-mq-2"},
 						},
+					},
+				},
+			},
+			{
+				Description: "should only return group assets that match is_deleted filter",
+
+				Config: asset.GroupConfig{
+					GroupBy: []string{"type", "name"},
+					Filters: map[string][]string{
+						"is_deleted": {"true"},
+					},
+				},
+				Expected: []asset.GroupResult{
+					{
+						Fields: []asset.GroupField{
+							{Name: "type", Value: "dashboard"},
+							{Name: "name", Value: "is-deleted-true-dashboard"},
+						},
+						Assets: []asset.Asset{{Name: "is-deleted-true-dashboard"}},
 					},
 				},
 			},
