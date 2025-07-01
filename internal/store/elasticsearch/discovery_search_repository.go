@@ -534,7 +534,13 @@ func toGroupResults(buckets []aggregationBucket) []asset.GroupResult {
 
 func buildGroupQuery(cfg asset.GroupConfig) (*strings.Reader, error) {
 	boolQuery := elastic.NewBoolQuery()
+
 	// This code takes care of creating filter term queries from the input filters mentioned in request.
+	_, isDeletedFilterExist := cfg.Filters["is_deleted"]
+	if !isDeletedFilterExist {
+		boolQuery.Filter(elastic.NewTermQuery("is_deleted", false))
+	}
+
 	buildFilterExistsQueries(boolQuery, cfg.GroupBy)
 	buildFilterTermQueries(boolQuery, cfg.Filters)
 
