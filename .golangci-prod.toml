@@ -88,9 +88,9 @@ enable = [
     "nestif",                                     # Detect deeply nested `if` statements
     "prealloc",                                   # Preallocate slices where possible
     "predeclared",                                # Warn when redefining predeclared identifiers
-    "tagliatelle",                                # Enforce tag naming/style
     "wastedassign",                               # Detect assignments never used
-#    "ireturn",                                    # Enforce interfaces in return types
+    # "tagliatelle",                                # Enforce tag naming/style
+    # "ireturn",                                    # Enforce interfaces in return types
 ]
 
 [linters-settings]

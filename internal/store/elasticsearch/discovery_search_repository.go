@@ -432,7 +432,7 @@ func buildFilterExistsQueries(q *elastic.BoolQuery, fields []string) {
 	}
 
 	for _, field := range fields {
-		q.Filter(elastic.NewExistsQuery(fmt.Sprintf("%s.keyword", field)))
+		q.Filter(elastic.NewExistsQuery(field))
 	}
 }
 
@@ -525,8 +525,9 @@ func toGroupResults(buckets []aggregationBucket) []asset.GroupResult {
 		}
 
 		groupResult[i].Fields = make([]asset.GroupField, 0, len(bucket.Key))
-		for key, value := range bucket.Key {
-			groupResult[i].Fields = append(groupResult[i].Fields, asset.GroupField{Name: key, Value: value})
+		for key, rawValue := range bucket.Key {
+			strValue := fmt.Sprintf("%v", rawValue)
+			groupResult[i].Fields = append(groupResult[i].Fields, asset.GroupField{Name: key, Value: strValue})
 		}
 	}
 	return groupResult
@@ -554,11 +555,19 @@ func buildGroupQuery(cfg asset.GroupConfig) (*strings.Reader, error) {
 	if len(cfg.IncludedFields) > 0 {
 		includedFields = append(cfg.GroupBy, cfg.IncludedFields...)
 	}
+	// Always include is_deleted field in the response to avoid misunderstanding results.
+	includedFields = append(includedFields, "is_deleted")
 
 	compositeAggSources := make([]elastic.CompositeAggregationValuesSource, len(cfg.GroupBy))
 	for i, group := range cfg.GroupBy {
+		var fieldName string
+		if group == "is_deleted" {
+			fieldName = group
+		} else {
+			fieldName = fmt.Sprintf("%s.keyword", group)
+		}
 		compositeAggSources[i] = elastic.NewCompositeAggregationTermsValuesSource(group).
-			Field(fmt.Sprintf("%s.keyword", group))
+			Field(fieldName)
 	}
 
 	// Hits aggregation helps to return the specific parts of _source in response.

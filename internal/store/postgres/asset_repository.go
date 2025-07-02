@@ -712,7 +712,7 @@ func (r *AssetRepository) softDeleteByQuery(
 		Prefix("WITH assets AS (").
 		Suffix(")")
 
-	returnQuery := r.getAssetSQLWithIsDeleted(false, false)
+	returnQuery := r.getAssetSQLWithIsDeleted(true, false)
 
 	fullQuery := returnQuery.PrefixExpr(updateCTE)
 	query, args, err := fullQuery.PlaceholderFormat(sq.Dollar).ToSql()
