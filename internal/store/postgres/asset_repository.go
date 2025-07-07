@@ -60,8 +60,8 @@ func (r *AssetRepository) GetAll(ctx context.Context, flt asset.Filter) ([]asset
 	}
 
 	assets := make([]asset.Asset, len(ams))
-	for _, am := range ams {
-		assets = append(assets, am.toAsset(nil))
+	for i, am := range ams {
+		assets[i] = am.toAsset(nil)
 	}
 
 	return assets, nil

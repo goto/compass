@@ -833,9 +833,9 @@ func searchByURN(t *testing.T, cli *elasticsearch.Client, urn string) ([]searchB
 	require.NoError(t, json.NewDecoder(res.Body).Decode(&result))
 
 	// Extract just the _source fields for easier assertion
-	sources := make([]searchByUrnFields, 0, len(result.Hits.Hits))
-	for _, hit := range result.Hits.Hits {
-		sources = append(sources, hit.searchByUrnFields)
+	sources := make([]searchByUrnFields, len(result.Hits.Hits))
+	for i, hit := range result.Hits.Hits {
+		sources[i] = hit.searchByUrnFields
 	}
 
 	return sources, result.Hits.Total.Value

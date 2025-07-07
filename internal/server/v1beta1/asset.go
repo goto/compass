@@ -80,12 +80,12 @@ func (server *APIServer) GetAllAssets(ctx context.Context, req *compassv1beta1.G
 	}
 
 	assetsProto := make([]*compassv1beta1.Asset, len(assets))
-	for _, a := range assets {
+	for i, a := range assets {
 		ap, err := assetToProto(a, false)
 		if err != nil {
 			return nil, internalServerError(server.logger, err.Error())
 		}
-		assetsProto = append(assetsProto, ap)
+		assetsProto[i] = ap
 	}
 
 	response := &compassv1beta1.GetAllAssetsResponse{
