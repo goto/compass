@@ -611,8 +611,8 @@ func TestService_SoftDeleteAsset(t *testing.T) {
 	type testCase struct {
 		Description string
 		ID          string
-		Err         error
 		Setup       func(context.Context, *mocks.AssetRepository, *mocks.DiscoveryRepository, *mocks.LineageRepository)
+		Err         error
 	}
 
 	testCases := []testCase{
