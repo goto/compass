@@ -3,14 +3,11 @@ package elasticsearch_test
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"strings"
 	"testing"
 	"time"
 
-	"github.com/elastic/go-elasticsearch/v7"
 	"github.com/goto/compass/core/asset"
-	"github.com/goto/compass/core/user"
 	store "github.com/goto/compass/internal/store/elasticsearch"
 	"github.com/goto/compass/pkg/queryexpr"
 	"github.com/goto/salt/log"
