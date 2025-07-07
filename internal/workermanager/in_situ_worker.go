@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/goto/compass/core/asset"
 	"github.com/goto/compass/pkg/queryexpr"
@@ -54,6 +55,13 @@ func (m *InSituWorker) EnqueueDeleteAssetsByQueryExprJob(ctx context.Context, qu
 	}
 	if err := m.discoveryRepo.DeleteByQueryExpr(ctx, deleteESExpr); err != nil {
 		return fmt.Errorf("delete asset from discovery repo: %w: query expr: '%s'", err, queryExpr)
+	}
+	return nil
+}
+
+func (m *InSituWorker) EnqueueDeleteAssetsByServicesAndUpdatedAtJob(ctx context.Context, services []string, expiryThreshold time.Time) error {
+	if err := m.discoveryRepo.DeleteByServicesAndUpdatedAt(ctx, services, expiryThreshold); err != nil {
+		return fmt.Errorf("delete assets from discovery repo: %w: services: %v, expiry threshold: %v", err, services, expiryThreshold)
 	}
 	return nil
 }

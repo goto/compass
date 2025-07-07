@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/goto/compass/core/asset"
 	"github.com/goto/compass/pkg/queryexpr"
@@ -18,6 +19,7 @@ type DiscoveryRepository interface {
 	DeleteByURN(ctx context.Context, assetURN string) error
 	SoftDeleteByURN(ctx context.Context, params asset.SoftDeleteAssetParams) error
 	DeleteByQueryExpr(ctx context.Context, queryExpr queryexpr.ExprStr) error
+	DeleteByServicesAndUpdatedAt(ctx context.Context, services []string, expiryThreshold time.Time) error
 	SoftDeleteAssets(ctx context.Context, assets []asset.Asset, doUpdateVersion bool) error
 	SyncAssets(ctx context.Context, indexName string) (cleanupFn func() error, err error)
 }
@@ -213,6 +215,57 @@ func (m *Manager) EnqueueDeleteAssetsByQueryExprJob(ctx context.Context, queryEx
 		return fmt.Errorf("enqueue delete asset job: %w: query expr: '%s'", err, queryExpr)
 	}
 
+	return nil
+}
+
+func (m *Manager) EnqueueDeleteAssetsByServicesAndUpdatedAtJob(ctx context.Context, services []string, expiryThreshold time.Time) error {
+	payloadMap := map[string]interface{}{
+		"services":         services,
+		"expiry_threshold": expiryThreshold,
+	}
+
+	payloadBytes, err := json.Marshal(payloadMap)
+	if err != nil {
+		return fmt.Errorf("marshal cleanup payload: %w", err)
+	}
+
+	err = m.worker.Enqueue(ctx, worker.JobSpec{
+		Type:    jobDeleteAssetsByServicesAndUpdatedAt,
+		Payload: payloadBytes,
+	})
+	if err != nil {
+		return fmt.Errorf("enqueue cleanup job: %w", err)
+	}
+
+	return nil
+}
+
+func (m *Manager) deleteAssetsByServicesAndUpdatedAtHandler() worker.JobHandler {
+	return worker.JobHandler{
+		Handle: m.DeleteAssetsByServicesAndUpdatedAt,
+		JobOpts: worker.JobOptions{
+			MaxAttempts:     m.maxAttemptsRetry,
+			Timeout:         m.indexTimeout,
+			BackoffStrategy: worker.DefaultExponentialBackoff,
+		},
+	}
+}
+
+func (m *Manager) DeleteAssetsByServicesAndUpdatedAt(ctx context.Context, job worker.JobSpec) error {
+	var payload struct {
+		Services        []string  `json:"services"`
+		ExpiryThreshold time.Time `json:"expiry_threshold"`
+	}
+
+	if err := json.Unmarshal(job.Payload, &payload); err != nil {
+		return fmt.Errorf("invalid payload: %w", err)
+	}
+
+	if err := m.discoveryRepo.DeleteByServicesAndUpdatedAt(ctx, payload.Services, payload.ExpiryThreshold); err != nil {
+		return &worker.RetryableError{
+			Cause: fmt.Errorf("delete assets from discovery repo: %w: services: %v, expiry threshold: %v", err, payload.Services, payload.ExpiryThreshold),
+		}
+	}
 	return nil
 }
 

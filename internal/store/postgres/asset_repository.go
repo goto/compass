@@ -141,11 +141,30 @@ func (r *AssetRepository) GetCountByQueryExpr(ctx context.Context, queryExpr que
 	return total, err
 }
 
-// GetCountByQueryExpr retrieves number of assets for every type based on query expr
 func (r *AssetRepository) getCountByQuery(ctx context.Context, sqlQuery string) (uint32, error) {
 	builder := sq.Select("count(1)").
 		From("assets").
 		Where(sqlQuery)
+	query, args, err := builder.PlaceholderFormat(sq.Dollar).ToSql()
+	if err != nil {
+		return 0, fmt.Errorf("build count query: %w", err)
+	}
+
+	var total uint32
+	if err := r.client.db.GetContext(ctx, &total, query, args...); err != nil {
+		return 0, fmt.Errorf("get asset list: %w", err)
+	}
+
+	return total, nil
+}
+
+// GetCountByIsDeletedAndServicesAndUpdatedAt retrieves number of assets based on IsDeleted, Services, and UpdatedAt
+func (r *AssetRepository) GetCountByIsDeletedAndServicesAndUpdatedAt(ctx context.Context, isDeleted bool, services []string, thresholdTime time.Time) (uint32, error) {
+	builder := sq.Select("count(1)").
+		From("assets").
+		Where(sq.Eq{"is_deleted": isDeleted}).
+		Where(sq.Eq{"service": services}).
+		Where(sq.Lt{"updated_at": thresholdTime})
 	query, args, err := builder.PlaceholderFormat(sq.Dollar).ToSql()
 	if err != nil {
 		return 0, fmt.Errorf("build count query: %w", err)
@@ -626,6 +645,25 @@ func (r *AssetRepository) SoftDeleteByURN(ctx context.Context, executedAt time.T
 	}
 
 	return newVersion, nil
+}
+
+func (r *AssetRepository) DeleteByServicesAndUpdatedAt(ctx context.Context, services []string, thresholdTime time.Time) (urns []string, err error) {
+	err = r.client.RunWithinTx(ctx, func(*sqlx.Tx) error {
+		builder := sq.Delete("assets").
+			Where(sq.Eq{"is_deleted": true}).
+			Where(sq.Eq{"service": services}).
+			Where(sq.Lt{"updated_at": thresholdTime}).
+			Suffix("RETURNING urn")
+
+		query, args, err := builder.PlaceholderFormat(sq.Dollar).ToSql()
+		if err != nil {
+			return fmt.Errorf("error building query: %w", err)
+		}
+
+		return r.client.db.SelectContext(ctx, &urns, query, args...)
+	})
+
+	return urns, err
 }
 
 func (r *AssetRepository) DeleteByQueryExpr(ctx context.Context, queryExpr queryexpr.ExprStr) ([]string, error) {

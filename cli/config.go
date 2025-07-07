@@ -3,6 +3,7 @@ package cli
 import (
 	"errors"
 	"fmt"
+	"github.com/goto/compass/internal/cleanup"
 	"os"
 
 	"github.com/MakeNowJust/heredoc"
@@ -105,6 +106,9 @@ type Config struct {
 	ColSearchExclusionKeywords string `yaml:"col_search_excluded_keywords" mapstructure:"col_search_excluded_keywords"`
 
 	Asset asset.Config `mapstructure:"asset"`
+
+	// Cleanup jobs
+	Cleanup cleanup.Config `mapstructure:"cleanup"`
 }
 
 func LoadConfig() (*Config, error) {
