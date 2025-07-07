@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -33,6 +34,7 @@ type Worker interface {
 	EnqueueDeleteAssetJob(ctx context.Context, urn string) error
 	EnqueueSoftDeleteAssetJob(ctx context.Context, params SoftDeleteAssetParams) error
 	EnqueueDeleteAssetsByQueryExprJob(ctx context.Context, queryExpr string) error
+	EnqueueDeleteAssetsByServicesAndUpdatedAtJob(ctx context.Context, services []string, expiryThreshold time.Time) error
 	EnqueueSoftDeleteAssetsJob(ctx context.Context, assets []Asset) error
 	EnqueueSyncAssetJob(ctx context.Context, service string) error
 	Close() error
@@ -256,6 +258,36 @@ func (s *Service) executeDeleteAssets(ctx context.Context, deleteSQLExpr queryex
 	if err := s.worker.EnqueueDeleteAssetsByQueryExprJob(ctx, deleteSQLExpr.String()); err != nil {
 		s.logger.Error("error occurred during elasticsearch deletion", "err:", err)
 	}
+}
+
+func (s *Service) DeleteAssetsByServicesAndUpdatedAt(ctx context.Context, dryRun bool, services string, expiryTime time.Duration) (uint32, error) {
+	servicesArray := strings.Split(services, ",")
+	expiryThreshold := time.Now().Add(-1 * expiryTime)
+
+	total, err := s.assetRepository.GetCountByIsDeletedAndServicesAndUpdatedAt(ctx, true, servicesArray, expiryThreshold)
+	if err != nil {
+		return 0, err
+	}
+
+	if !dryRun && total > 0 {
+		s.logger.Info("Running cleanup for services: ", services, " older than ", expiryThreshold)
+		deletedURNs, err := s.assetRepository.DeleteByServicesAndUpdatedAt(ctx, servicesArray, expiryThreshold)
+		if err != nil {
+			s.logger.Error("asset deletion failed, skipping elasticsearch and lineage deletions", "err:", err)
+			return 0, nil
+		}
+
+		if err := s.lineageRepository.DeleteByURNs(ctx, deletedURNs); err != nil {
+			s.logger.Error("error occurred during lineage deletion", "err:", err)
+		}
+
+		if err := s.worker.EnqueueDeleteAssetsByServicesAndUpdatedAtJob(ctx, servicesArray, expiryThreshold); err != nil {
+			s.logger.Error("error occurred during elasticsearch deletion", "err:", err)
+		}
+	}
+
+	s.logger.Info("Cleanup job completed", "total_deleted", total)
+	return total, nil
 }
 
 func (s *Service) SoftDeleteAssets(ctx context.Context, request DeleteAssetsRequest, updatedBy string) (affectedRows uint32, err error) {

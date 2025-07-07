@@ -14,6 +14,7 @@ type Repository interface {
 	GetAll(context.Context, Filter) ([]Asset, error)
 	GetCount(context.Context, Filter) (int, error)
 	GetCountByQueryExpr(ctx context.Context, queryExpr queryexpr.ExprStr) (uint32, error)
+	GetCountByIsDeletedAndServicesAndUpdatedAt(ctx context.Context, isDeleted bool, services []string, thresholdTime time.Time) (uint32, error)
 	GetByID(ctx context.Context, id string) (Asset, error)
 	GetByURN(ctx context.Context, urn string) (Asset, error)
 	GetVersionHistory(ctx context.Context, flt Filter, id string) ([]Asset, error)
@@ -27,6 +28,7 @@ type Repository interface {
 	SoftDeleteByID(ctx context.Context, executedAt time.Time, id, updatedByID string) (string, string, error)
 	SoftDeleteByURN(ctx context.Context, executedAt time.Time, urn, updatedByID string) (string, error)
 	DeleteByQueryExpr(ctx context.Context, queryExpr queryexpr.ExprStr) ([]string, error)
+	DeleteByServicesAndUpdatedAt(ctx context.Context, services []string, thresholdTime time.Time) (urns []string, err error)
 	SoftDeleteByQueryExpr(ctx context.Context, executedAt time.Time, updatedByID string, queryExpr queryexpr.ExprStr) ([]Asset, error)
 	AddProbe(ctx context.Context, assetURN string, probe *Probe) error
 	GetProbes(ctx context.Context, assetURN string) ([]Probe, error)
