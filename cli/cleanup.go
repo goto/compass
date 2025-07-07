@@ -3,16 +3,16 @@ package cli
 import (
 	"context"
 	"fmt"
-	"github.com/goto/compass/core/asset"
-	"github.com/goto/compass/internal/cleanup"
-	"github.com/goto/salt/term"
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/goto/compass/core/asset"
+	"github.com/goto/compass/internal/cleanup"
 	"github.com/goto/compass/internal/store/elasticsearch"
 	"github.com/goto/compass/internal/store/postgres"
 	"github.com/goto/compass/internal/workermanager"
 	"github.com/goto/compass/pkg/telemetry"
+	"github.com/goto/salt/term"
 	"github.com/spf13/cobra"
 )
 
@@ -42,7 +42,7 @@ func cleanupStartCommand(cfg *Config) *cobra.Command {
 			$ compass cleanup start -c ./config.yaml
 		`),
 		Args: cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			total, err := runCleanUp(cmd.Context(), cfg)
 			if err != nil {
 				return fmt.Errorf("run cleanup: %w", err)
@@ -86,7 +86,11 @@ func runCleanUp(ctx context.Context, cfg *Config) (uint32, error) {
 	if err != nil {
 		return 0, fmt.Errorf("create new asset repository: %w", err)
 	}
-	discoveryRepository := elasticsearch.NewDiscoveryRepository(esClient, logger, cfg.Elasticsearch.RequestTimeout, strings.Split(cfg.ColSearchExclusionKeywords, ","))
+	discoveryRepository := elasticsearch.NewDiscoveryRepository(
+		esClient,
+		logger,
+		cfg.Elasticsearch.RequestTimeout,
+		strings.Split(cfg.ColSearchExclusionKeywords, ","))
 	lineageRepository, err := postgres.NewLineageRepository(pgClient)
 	if err != nil {
 		return 0, fmt.Errorf("create new lineage repository: %w", err)

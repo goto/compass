@@ -161,7 +161,12 @@ func (r *AssetRepository) getCountByQuery(ctx context.Context, sqlQuery string) 
 }
 
 // GetCountByIsDeletedAndServicesAndUpdatedAt retrieves number of assets based on IsDeleted, Services, and UpdatedAt
-func (r *AssetRepository) GetCountByIsDeletedAndServicesAndUpdatedAt(ctx context.Context, isDeleted bool, services []string, thresholdTime time.Time) (uint32, error) {
+func (r *AssetRepository) GetCountByIsDeletedAndServicesAndUpdatedAt(
+	ctx context.Context,
+	isDeleted bool,
+	services []string,
+	thresholdTime time.Time,
+) (uint32, error) {
 	builder := sq.Select("count(1)").
 		From("assets").
 		Where(sq.Eq{"is_deleted": isDeleted}).

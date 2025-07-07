@@ -3,11 +3,11 @@ package cli
 import (
 	"errors"
 	"fmt"
-	"github.com/goto/compass/internal/cleanup"
 	"os"
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/goto/compass/core/asset"
+	"github.com/goto/compass/internal/cleanup"
 	"github.com/goto/compass/internal/client"
 	"github.com/goto/compass/internal/server"
 	esStore "github.com/goto/compass/internal/store/elasticsearch"
