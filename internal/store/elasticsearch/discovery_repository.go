@@ -12,7 +12,8 @@ import (
 	"time"
 
 	"github.com/goto/compass/core/asset"
-	queryexpr "github.com/goto/compass/pkg/queryexpr"
+	"github.com/goto/compass/core/user"
+	"github.com/goto/compass/pkg/queryexpr"
 	"github.com/goto/salt/log"
 )
 
@@ -145,6 +146,14 @@ func (repo *DiscoveryRepository) DeleteByURN(ctx context.Context, assetURN strin
 	return repo.deleteWithQuery(ctx, "DeleteByURN", fmt.Sprintf(`{"query":{"term":{"urn.keyword": %q}}}`, assetURN))
 }
 
+func (repo *DiscoveryRepository) SoftDeleteByURN(ctx context.Context, params asset.SoftDeleteAssetParams) error {
+	if params.URN == "" {
+		return asset.ErrEmptyURN
+	}
+
+	return repo.softDeleteAssetByURN(ctx, "SoftDeleteByURN", params)
+}
+
 func (repo *DiscoveryRepository) DeleteByQueryExpr(ctx context.Context, queryExpr queryexpr.ExprStr) error {
 	if strings.TrimSpace(queryExpr.String()) == "" {
 		return asset.ErrEmptyQuery
@@ -156,6 +165,77 @@ func (repo *DiscoveryRepository) DeleteByQueryExpr(ctx context.Context, queryExp
 	}
 
 	return repo.deleteWithQuery(ctx, "DeleteByQueryExpr", esQuery)
+}
+
+func (repo *DiscoveryRepository) SoftDeleteAssets(ctx context.Context, assets []asset.Asset, doUpdateVersion bool) error {
+	return repo.bulkSoftDeleteAssets(ctx, "SoftDeleteAssets", assets, doUpdateVersion)
+}
+
+func (repo *DiscoveryRepository) bulkSoftDeleteAssets(
+	ctx context.Context,
+	discoveryOp string,
+	assets []asset.Asset,
+	doUpdateVersion bool,
+) (err error) {
+	defer func(start time.Time) {
+		const op = "soft_delete_assets"
+		repo.cli.instrumentOp(ctx, instrumentParams{
+			op:          op,
+			discoveryOp: discoveryOp,
+			start:       start,
+			err:         err,
+		})
+	}(time.Now())
+
+	bulkOps := make([]string, 0, len(assets)*2)
+
+	for _, a := range assets {
+		newVersion := a.Version
+		if doUpdateVersion {
+			newVersion, err = asset.IncreaseMinorVersion(a.Version)
+			if err != nil {
+				return fmt.Errorf("error increase version for ID %s: %w", a.ID, err)
+			}
+		}
+
+		meta := fmt.Sprintf(`{ "update": { "_index": %q, "_id": %q } }`, a.Service, a.ID)
+		update := map[string]interface{}{
+			"doc": map[string]interface{}{
+				"is_deleted":   true,
+				"updated_at":   a.UpdatedAt,
+				"refreshed_at": a.RefreshedAt,
+				"updated_by":   a.UpdatedBy,
+				"version":      newVersion,
+			},
+		}
+		updateJSON, err := json.Marshal(update)
+		if err != nil {
+			return fmt.Errorf("marshal update doc for ID %s: %w", a.ID, err)
+		}
+		bulkOps = append(bulkOps, meta, string(updateJSON))
+	}
+
+	return repo.sendBulkUpdate(ctx, bulkOps)
+}
+
+func (repo *DiscoveryRepository) sendBulkUpdate(ctx context.Context, bulkOps []string) error {
+	if len(bulkOps) == 0 {
+		return nil
+	}
+
+	payload := strings.Join(bulkOps, "\n") + "\n"
+	bulk := repo.cli.client.Bulk
+	res, err := bulk(
+		bytes.NewReader([]byte(payload)),
+		bulk.WithContext(ctx),
+		bulk.WithIndex(defaultSearchIndex),
+	)
+	if err != nil {
+		return fmt.Errorf("bulk update error: %w", err)
+	}
+	defer res.Body.Close()
+
+	return nil
 }
 
 func (repo *DiscoveryRepository) deleteWithQuery(ctx context.Context, discoveryOp, qry string) (err error) {
@@ -197,6 +277,80 @@ func (repo *DiscoveryRepository) deleteWithQuery(ctx context.Context, discoveryO
 	return nil
 }
 
+func (repo *DiscoveryRepository) softDeleteAssetByURN(ctx context.Context, discoveryOp string, softDeleteAsset asset.SoftDeleteAssetParams) (err error) {
+	defer func(start time.Time) {
+		const op = "soft_delete_by_urn"
+		repo.cli.instrumentOp(ctx, instrumentParams{
+			op:          op,
+			discoveryOp: discoveryOp,
+			start:       start,
+			err:         err,
+		})
+	}(time.Now())
+
+	// Create the update request body
+	body := map[string]interface{}{
+		"query": map[string]interface{}{
+			"term": map[string]interface{}{
+				"urn.keyword": softDeleteAsset.URN,
+			},
+		},
+		"script": map[string]interface{}{
+			"source": `
+                ctx._source.is_deleted = true;
+                ctx._source.updated_at = params.updated_at;
+                ctx._source.refreshed_at = params.refreshed_at;
+                ctx._source.updated_by = params.updated_by;
+                ctx._source.version = params.version;
+            `,
+			"lang": "painless",
+			"params": map[string]interface{}{
+				"updated_at":   softDeleteAsset.UpdatedAt,
+				"refreshed_at": softDeleteAsset.RefreshedAt,
+				"updated_by":   user.User{ID: softDeleteAsset.UpdatedBy},
+				"version":      softDeleteAsset.NewVersion,
+			},
+		},
+	}
+
+	buf, err := encodeBodyRequest(body)
+	if err != nil {
+		return asset.DiscoveryError{
+			Op:  "SoftDeleteByURN",
+			Err: err,
+		}
+	}
+
+	updateByQuery := repo.cli.client.UpdateByQuery
+	res, err := updateByQuery(
+		[]string{defaultSearchIndex},
+		updateByQuery.WithContext(ctx),
+		updateByQuery.WithBody(buf),
+		updateByQuery.WithRefresh(true),
+		updateByQuery.WithIgnoreUnavailable(true),
+		updateByQuery.WithWaitForCompletion(true),
+		updateByQuery.WithConflicts("proceed"),
+	)
+	if err != nil {
+		return asset.DiscoveryError{
+			Op:  "SoftDeleteDoc",
+			Err: fmt.Errorf("urn: %s: %w", softDeleteAsset.URN, err),
+		}
+	}
+
+	defer drainBody(res)
+	if res.IsError() {
+		code, reason := errorCodeAndReason(res)
+		return asset.DiscoveryError{
+			Op:     "SoftDeleteDoc",
+			ESCode: code,
+			Err:    fmt.Errorf("urn: %s: %s", softDeleteAsset.URN, reason),
+		}
+	}
+
+	return nil
+}
+
 func (repo *DiscoveryRepository) indexAsset(ctx context.Context, ast asset.Asset) (err error) {
 	defer func(start time.Time) {
 		const op = "index"
@@ -208,7 +362,7 @@ func (repo *DiscoveryRepository) indexAsset(ctx context.Context, ast asset.Asset
 		})
 	}(time.Now())
 
-	body, err := createUpsertBody(ast)
+	body, err := encodeBodyRequest(ast)
 	if err != nil {
 		return asset.DiscoveryError{
 			Op:  "EncodeAsset",
@@ -248,10 +402,10 @@ func (repo *DiscoveryRepository) indexAsset(ctx context.Context, ast asset.Asset
 	return nil
 }
 
-func createUpsertBody(ast asset.Asset) (io.Reader, error) {
+func encodeBodyRequest(body interface{}) (io.Reader, error) {
 	var buf bytes.Buffer
-	if err := json.NewEncoder(&buf).Encode(ast); err != nil {
-		return nil, fmt.Errorf("encode asset: %w", err)
+	if err := json.NewEncoder(&buf).Encode(body); err != nil {
+		return nil, fmt.Errorf("encode request body: %w", err)
 	}
 
 	return &buf, nil

@@ -3,6 +3,7 @@ package asset
 //go:generate mockery --name=DiscoveryRepository -r --case underscore --with-expecter --structname DiscoveryRepository --filename discovery_repository.go --output=./mocks
 import (
 	"context"
+
 	"github.com/goto/compass/pkg/queryexpr"
 )
 
@@ -10,7 +11,9 @@ type DiscoveryRepository interface {
 	Upsert(context.Context, Asset) error
 	DeleteByID(ctx context.Context, assetID string) error
 	DeleteByURN(ctx context.Context, assetURN string) error
+	SoftDeleteByURN(ctx context.Context, params SoftDeleteAssetParams) error
 	DeleteByQueryExpr(ctx context.Context, queryExpr queryexpr.ExprStr) error
+	SoftDeleteAssets(ctx context.Context, assets []Asset, doUpdateVersion bool) error
 	Search(ctx context.Context, cfg SearchConfig) (results []SearchResult, err error)
 	Suggest(ctx context.Context, cfg SearchConfig) (suggestions []string, err error)
 	GroupAssets(ctx context.Context, cfg GroupConfig) (results []GroupResult, err error)
@@ -82,14 +85,15 @@ type SearchConfig struct {
 
 // SearchResult represents an item/result in a list of search results
 type SearchResult struct {
-	ID          string                 `json:"id"`
-	URN         string                 `json:"urn"`
-	Title       string                 `json:"title"`
-	Type        string                 `json:"type"`
-	Service     string                 `json:"service"`
-	Description string                 `json:"description"`
-	Labels      map[string]string      `json:"labels"`
-	Data        map[string]interface{} `json:"data"`
+	ID          string
+	URN         string
+	Title       string
+	Type        string
+	Service     string
+	Description string
+	Labels      map[string]string
+	Data        map[string]interface{}
+	IsDeleted   bool
 }
 
 type GroupResult struct {
@@ -113,5 +117,6 @@ func (sr SearchResult) ToAsset() Asset {
 		Description: sr.Description,
 		Labels:      sr.Labels,
 		Data:        sr.Data,
+		IsDeleted:   sr.IsDeleted,
 	}
 }

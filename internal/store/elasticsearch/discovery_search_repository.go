@@ -37,7 +37,7 @@ func (repo *DiscoveryRepository) Search(ctx context.Context, cfg asset.SearchCon
 	if len(cfg.IncludeFields) == 0 {
 		returnedAssetFieldsResult = []string{
 			"id", "urn", "type", "service", "name", "description", "data", "labels",
-			"created_at", "updated_at",
+			"created_at", "updated_at", "is_deleted",
 		}
 	} else {
 		returnedAssetFieldsResult = cfg.IncludeFields
@@ -293,6 +293,15 @@ func (repo *DiscoveryRepository) buildQuery(cfg asset.SearchConfig) (io.Reader, 
 		}
 	}
 
+	isDeletedQuery, isDeleteQueryExist := cfg.Queries["is_deleted"]
+	isDeletedFilters, isDeletedFilterExist := cfg.Filters["is_deleted"]
+	if !isDeleteQueryExist && !isDeletedFilterExist {
+		boolQuery.Filter(elastic.NewTermQuery("is_deleted", false))
+	}
+	if isDeleteQueryExist && isDeletedFilterExist && isDeletedQuery != isDeletedFilters[0] {
+		return nil, fmt.Errorf("conflicting is_deleted query and filter: query=%s, filter=%s", isDeletedQuery, isDeletedFilters[0])
+	}
+
 	buildFilterTermQueries(boolQuery, cfg.Filters)
 	buildMustMatchQueries(boolQuery, cfg)
 	query := buildFunctionScoreQuery(boolQuery, cfg.RankBy, cfg.Text, field)
@@ -352,19 +361,37 @@ func buildTextQuery(q *elastic.BoolQuery, cfg asset.SearchConfig) {
 	}
 }
 
+func convertQueryValue(value string) any {
+	var v interface{}
+	switch value {
+	case "true":
+		v = true
+	case "false":
+		v = false
+	default:
+		v = value
+	}
+	return v
+}
+
 func buildMustMatchQueries(q *elastic.BoolQuery, cfg asset.SearchConfig) {
 	if len(cfg.Queries) == 0 {
 		return
 	}
 
 	for field, value := range cfg.Queries {
+		v := convertQueryValue(value)
+
 		if cfg.Flags.DisableFuzzy {
-			q.Must(elastic.NewMatchQuery(field, value))
+			q.Must(elastic.NewMatchQuery(field, v))
 			continue
 		}
 
-		q.Must(elastic.NewMatchQuery(field, value).
-			Fuzziness("AUTO"))
+		if _, ok := v.(string); ok {
+			q.Must(elastic.NewMatchQuery(field, v).Fuzziness("AUTO"))
+		} else {
+			q.Must(elastic.NewMatchQuery(field, v))
+		}
 	}
 }
 
@@ -380,7 +407,14 @@ func buildFilterTermQueries(q *elastic.BoolQuery, filters map[string][]string) {
 
 		key := fmt.Sprintf("%s.keyword", field)
 		if len(rawValues) == 1 {
-			q.Filter(elastic.NewTermQuery(key, rawValues[0]))
+			v := convertQueryValue(rawValues[0])
+
+			if _, ok := v.(string); ok {
+				q.Filter(elastic.NewTermQuery(key, v))
+			} else {
+				q.Filter(elastic.NewTermsQuery(field, v))
+			}
+
 			continue
 		}
 
@@ -398,7 +432,7 @@ func buildFilterExistsQueries(q *elastic.BoolQuery, fields []string) {
 	}
 
 	for _, field := range fields {
-		q.Filter(elastic.NewExistsQuery(fmt.Sprintf("%s.keyword", field)))
+		q.Filter(elastic.NewExistsQuery(field))
 	}
 }
 
@@ -460,6 +494,7 @@ func toSearchResults(hits []searchHit) []asset.SearchResult {
 			Service:     r.Service,
 			Labels:      r.Labels,
 			Data:        data,
+			IsDeleted:   r.IsDeleted,
 		}
 	}
 	return results
@@ -490,8 +525,9 @@ func toGroupResults(buckets []aggregationBucket) []asset.GroupResult {
 		}
 
 		groupResult[i].Fields = make([]asset.GroupField, 0, len(bucket.Key))
-		for key, value := range bucket.Key {
-			groupResult[i].Fields = append(groupResult[i].Fields, asset.GroupField{Name: key, Value: value})
+		for key, rawValue := range bucket.Key {
+			strValue := fmt.Sprintf("%v", rawValue)
+			groupResult[i].Fields = append(groupResult[i].Fields, asset.GroupField{Name: key, Value: strValue})
 		}
 	}
 	return groupResult
@@ -499,7 +535,13 @@ func toGroupResults(buckets []aggregationBucket) []asset.GroupResult {
 
 func buildGroupQuery(cfg asset.GroupConfig) (*strings.Reader, error) {
 	boolQuery := elastic.NewBoolQuery()
+
 	// This code takes care of creating filter term queries from the input filters mentioned in request.
+	_, isDeletedFilterExist := cfg.Filters["is_deleted"]
+	if !isDeletedFilterExist {
+		boolQuery.Filter(elastic.NewTermQuery("is_deleted", false))
+	}
+
 	buildFilterExistsQueries(boolQuery, cfg.GroupBy)
 	buildFilterTermQueries(boolQuery, cfg.Filters)
 
@@ -513,11 +555,19 @@ func buildGroupQuery(cfg asset.GroupConfig) (*strings.Reader, error) {
 	if len(cfg.IncludedFields) > 0 {
 		includedFields = append(cfg.GroupBy, cfg.IncludedFields...)
 	}
+	// Always include is_deleted field in the response to avoid misunderstanding results.
+	includedFields = append(includedFields, "is_deleted")
 
 	compositeAggSources := make([]elastic.CompositeAggregationValuesSource, len(cfg.GroupBy))
 	for i, group := range cfg.GroupBy {
+		var fieldName string
+		if group == "is_deleted" {
+			fieldName = group
+		} else {
+			fieldName = fmt.Sprintf("%s.keyword", group)
+		}
 		compositeAggSources[i] = elastic.NewCompositeAggregationTermsValuesSource(group).
-			Field(fmt.Sprintf("%s.keyword", group))
+			Field(fieldName)
 	}
 
 	// Hits aggregation helps to return the specific parts of _source in response.

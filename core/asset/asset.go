@@ -13,7 +13,7 @@ import (
 type Repository interface {
 	GetAll(context.Context, Filter) ([]Asset, error)
 	GetCount(context.Context, Filter) (int, error)
-	GetCountByQueryExpr(ctx context.Context, queryExpr queryexpr.ExprStr) (int, error)
+	GetCountByQueryExpr(ctx context.Context, queryExpr queryexpr.ExprStr) (uint32, error)
 	GetByID(ctx context.Context, id string) (Asset, error)
 	GetByURN(ctx context.Context, urn string) (Asset, error)
 	GetVersionHistory(ctx context.Context, flt Filter, id string) ([]Asset, error)
@@ -22,9 +22,12 @@ type Repository interface {
 	GetTypes(ctx context.Context, flt Filter) (map[Type]int, error)
 	Upsert(ctx context.Context, ast *Asset) (*Asset, error)
 	UpsertPatch(ctx context.Context, ast *Asset, patchData map[string]interface{}) (*Asset, error)
-	DeleteByID(ctx context.Context, id string) error
+	DeleteByID(ctx context.Context, id string) (string, error)
 	DeleteByURN(ctx context.Context, urn string) error
+	SoftDeleteByID(ctx context.Context, executedAt time.Time, id, updatedByID string) (string, string, error)
+	SoftDeleteByURN(ctx context.Context, executedAt time.Time, urn, updatedByID string) (string, error)
 	DeleteByQueryExpr(ctx context.Context, queryExpr queryexpr.ExprStr) ([]string, error)
+	SoftDeleteByQueryExpr(ctx context.Context, executedAt time.Time, updatedByID string, queryExpr queryexpr.ExprStr) ([]Asset, error)
 	AddProbe(ctx context.Context, assetURN string, probe *Probe) error
 	GetProbes(ctx context.Context, assetURN string) ([]Probe, error)
 	GetProbesWithFilter(ctx context.Context, flt ProbesFilter) (map[string][]Probe, error)
@@ -47,8 +50,17 @@ type Asset struct {
 	RefreshedAt *time.Time             `json:"refreshed_at" diff:"-"`
 	Version     string                 `json:"version" diff:"-"`
 	UpdatedBy   user.User              `json:"updated_by" diff:"-"`
+	IsDeleted   bool                   `json:"is_deleted" diff:"is_deleted"`
 	Changelog   diff.Changelog         `json:"changelog,omitempty" diff:"-"`
 	Probes      []Probe                `json:"probes,omitempty"`
+}
+
+type SoftDeleteAssetParams struct {
+	URN         string    `json:"urn"`
+	UpdatedAt   time.Time `json:"updated_at"`
+	RefreshedAt time.Time `json:"refreshed_at"`
+	NewVersion  string    `json:"version"`
+	UpdatedBy   string    `json:"updated_by"`
 }
 
 // Diff returns nil changelog with nil error if equal

@@ -69,8 +69,8 @@ type groupResponse struct {
 }
 
 type aggregationBucket struct {
-	Key      map[string]string `json:"key"`
-	DocCount int               `json:"doc_count"`
+	Key      map[string]any `json:"key"`
+	DocCount int            `json:"doc_count"`
 	Hits     struct {
 		Hits struct {
 			Hits []groupHits `json:"hits"`

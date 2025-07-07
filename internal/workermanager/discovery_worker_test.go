@@ -1,11 +1,13 @@
 package workermanager_test
 
 import (
+	"encoding/json"
 	"errors"
 	"testing"
 	"time"
 
 	"github.com/goto/compass/core/asset"
+	"github.com/goto/compass/core/user"
 	"github.com/goto/compass/internal/testutils"
 	"github.com/goto/compass/internal/workermanager"
 	"github.com/goto/compass/internal/workermanager/mocks"
@@ -162,6 +164,101 @@ func TestManager_DeleteAsset(t *testing.T) {
 	}
 }
 
+func TestManager_EnqueueSoftDeleteAssetJob(t *testing.T) {
+	currentTime := time.Now().UTC()
+	params := asset.SoftDeleteAssetParams{
+		URN:         "some-urn",
+		UpdatedAt:   currentTime,
+		RefreshedAt: currentTime,
+		NewVersion:  "0.1",
+		UpdatedBy:   "some-user",
+	}
+
+	cases := []struct {
+		name        string
+		enqueueErr  error
+		expectedErr string
+	}{
+		{name: "Success"},
+		{
+			name:        "Failure",
+			enqueueErr:  errors.New("fail"),
+			expectedErr: "enqueue soft delete asset job: fail",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			wrkr := mocks.NewWorker(t)
+			payload, err := json.Marshal(params)
+			assert.NoError(t, err, "failed to marshal soft delete asset")
+			wrkr.EXPECT().
+				Enqueue(ctx, worker.JobSpec{
+					Type:    "soft-delete-asset",
+					Payload: payload,
+				}).
+				Return(tc.enqueueErr)
+
+			mgr := workermanager.NewWithWorker(wrkr, workermanager.Deps{})
+			err = mgr.EnqueueSoftDeleteAssetJob(ctx, params)
+			if tc.expectedErr != "" {
+				assert.ErrorContains(t, err, tc.expectedErr)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestManager_SoftDeleteAsset(t *testing.T) {
+	currentTime := time.Now().UTC()
+	params := asset.SoftDeleteAssetParams{
+		URN:         "some-urn",
+		UpdatedAt:   currentTime,
+		RefreshedAt: currentTime,
+		NewVersion:  "0.1",
+		UpdatedBy:   "some-user",
+	}
+
+	cases := []struct {
+		name         string
+		discoveryErr error
+		expectedErr  bool
+	}{
+		{name: "Success"},
+		{
+			name:         "failure",
+			discoveryErr: errors.New("fail"),
+			expectedErr:  true,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			discoveryRepo := mocks.NewDiscoveryRepository(t)
+			discoveryRepo.EXPECT().
+				SoftDeleteByURN(ctx, params).
+				Return(tc.discoveryErr)
+
+			mgr := workermanager.NewWithWorker(mocks.NewWorker(t), workermanager.Deps{
+				DiscoveryRepo: discoveryRepo,
+			})
+
+			payload, err := json.Marshal(params)
+			assert.NoError(t, err, "failed to marshal soft delete asset")
+			err = mgr.SoftDeleteAsset(ctx, worker.JobSpec{
+				Type:    "soft-delete-asset",
+				Payload: payload,
+			})
+			if tc.expectedErr {
+				var re *worker.RetryableError
+				assert.ErrorAs(t, err, &re)
+				assert.ErrorIs(t, err, tc.discoveryErr)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
 func TestManager_EnqueueDeleteAssetsByQueryExprJob(t *testing.T) {
 	cases := []struct {
 		name        string
@@ -191,6 +288,55 @@ func TestManager_EnqueueDeleteAssetsByQueryExprJob(t *testing.T) {
 
 			mgr := workermanager.NewWithWorker(wrkr, workermanager.Deps{})
 			err := mgr.EnqueueDeleteAssetsByQueryExprJob(ctx, queryExpr)
+			if tc.expectedErr != "" {
+				assert.ErrorContains(t, err, tc.expectedErr)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestManager_EnqueueSoftDeleteAssetsJob(t *testing.T) {
+	currentTime := time.Now().UTC()
+	dummyAssets := []asset.Asset{
+		{
+			ID:          "asset-1",
+			URN:         "urn:asset:1",
+			Type:        asset.Type("table"),
+			Service:     "test-service",
+			UpdatedAt:   currentTime,
+			RefreshedAt: &currentTime,
+			UpdatedBy:   user.User{ID: "some-user"},
+		},
+	}
+	cases := []struct {
+		name        string
+		enqueueErr  error
+		expectedErr string
+	}{
+		{name: "Success"},
+		{
+			name:        "Failure",
+			enqueueErr:  errors.New("fail"),
+			expectedErr: "enqueue soft delete assets job:",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			payload, err := json.Marshal(dummyAssets)
+			assert.NoError(t, err, "failed to marshal soft delete assets by query expr")
+
+			wrkr := mocks.NewWorker(t)
+			wrkr.EXPECT().
+				Enqueue(ctx, worker.JobSpec{
+					Type:    "soft-delete-assets",
+					Payload: payload,
+				}).
+				Return(tc.enqueueErr)
+
+			mgr := workermanager.NewWithWorker(wrkr, workermanager.Deps{})
+			err = mgr.EnqueueSoftDeleteAssetsJob(ctx, dummyAssets)
 			if tc.expectedErr != "" {
 				assert.ErrorContains(t, err, tc.expectedErr)
 			} else {
@@ -233,6 +379,59 @@ func TestManager_DeleteAssets(t *testing.T) {
 			err := mgr.DeleteAssetsByQueryExpr(ctx, worker.JobSpec{
 				Type:    "delete-assets-by-query",
 				Payload: []byte(queryExpr),
+			})
+			if tc.expectedErr {
+				var re *worker.RetryableError
+				assert.ErrorAs(t, err, &re)
+				assert.ErrorIs(t, err, tc.discoveryErr)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestManager_SoftDeleteAssets(t *testing.T) {
+	currentTime := time.Now().UTC()
+	dummyAssets := []asset.Asset{
+		{
+			ID:          "asset-1",
+			URN:         "urn:asset:1",
+			Type:        asset.Type("table"),
+			Service:     "test-service",
+			UpdatedAt:   currentTime,
+			RefreshedAt: &currentTime,
+			UpdatedBy:   user.User{ID: "some-user"},
+		},
+	}
+	cases := []struct {
+		discoveryErr error
+		name         string
+		expectedErr  bool
+	}{
+		{name: "Success"},
+		{
+			name:         "failure",
+			discoveryErr: errors.New("fail"),
+			expectedErr:  true,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			payload, err := json.Marshal(dummyAssets)
+			assert.NoError(t, err, "failed to marshal soft delete assets")
+
+			discoveryRepo := mocks.NewDiscoveryRepository(t)
+			discoveryRepo.EXPECT().
+				SoftDeleteAssets(ctx, dummyAssets, false).
+				Return(tc.discoveryErr)
+
+			mgr := workermanager.NewWithWorker(mocks.NewWorker(t), workermanager.Deps{
+				DiscoveryRepo: discoveryRepo,
+			})
+			err = mgr.SoftDeleteAssets(ctx, worker.JobSpec{
+				Type:    "soft-delete-assets",
+				Payload: payload,
 			})
 			if tc.expectedErr {
 				var re *worker.RetryableError

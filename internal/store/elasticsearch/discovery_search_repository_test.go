@@ -352,6 +352,30 @@ func TestSearcherSearch(t *testing.T) {
 					{Type: "table", AssetID: "bigquery::gcpproject/dataset/abc-tablename-mid"},
 				},
 			},
+			{
+				Description: "should return 'is-deleted-true-1' as it matches the filter",
+				Config: asset.SearchConfig{
+					IncludeFields: []string{"type", "id"},
+					Filters: map[string][]string{
+						"is_deleted": {"true"},
+					},
+				},
+				Expected: []expectedRow{
+					{Type: "dashboard", AssetID: "is-deleted-true-1"},
+				},
+			},
+			{
+				Description: "should return 'is-deleted-true-1' as it matches the queries",
+				Config: asset.SearchConfig{
+					IncludeFields: []string{"type", "id"},
+					Queries: map[string]string{
+						"is_deleted": "true",
+					},
+				},
+				Expected: []expectedRow{
+					{Type: "dashboard", AssetID: "is-deleted-true-1"},
+				},
+			},
 		}
 
 		columnTests := []searchTest{
@@ -928,6 +952,25 @@ func TestGroupAssets(t *testing.T) {
 							{Name: "consumer-topic"},
 							{Name: "consumer-mq-2"},
 						},
+					},
+				},
+			},
+			{
+				Description: "should only return group assets that match is_deleted filter",
+
+				Config: asset.GroupConfig{
+					GroupBy: []string{"type", "name"},
+					Filters: map[string][]string{
+						"is_deleted": {"true"},
+					},
+				},
+				Expected: []asset.GroupResult{
+					{
+						Fields: []asset.GroupField{
+							{Name: "type", Value: "dashboard"},
+							{Name: "name", Value: "is-deleted-true-dashboard"},
+						},
+						Assets: []asset.Asset{{Name: "is-deleted-true-dashboard"}},
 					},
 				},
 			},

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/goto/compass/core/asset"
+	"github.com/goto/compass/core/user"
 	"github.com/goto/compass/internal/workermanager"
 	"github.com/goto/compass/internal/workermanager/mocks"
 	"github.com/goto/compass/pkg/queryexpr"
@@ -82,6 +83,49 @@ func TestInSituWorker_EnqueueDeleteAssetJob(t *testing.T) {
 	}
 }
 
+func TestInSituWorker_EnqueueSoftDeleteAssetJob(t *testing.T) {
+	currentTime := time.Now().UTC()
+	params := asset.SoftDeleteAssetParams{
+		URN:         "some-urn",
+		UpdatedAt:   currentTime,
+		RefreshedAt: currentTime,
+		NewVersion:  "0.1",
+		UpdatedBy:   "some-user",
+	}
+
+	cases := []struct {
+		name         string
+		discoveryErr error
+		expectedErr  bool
+	}{
+		{name: "Success"},
+		{
+			name:         "Failure",
+			discoveryErr: errors.New("fail"),
+			expectedErr:  true,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			discoveryRepo := mocks.NewDiscoveryRepository(t)
+			discoveryRepo.EXPECT().
+				SoftDeleteByURN(ctx, params).
+				Return(tc.discoveryErr)
+
+			wrkr := workermanager.NewInSituWorker(workermanager.Deps{
+				DiscoveryRepo: discoveryRepo,
+			})
+			err := wrkr.EnqueueSoftDeleteAssetJob(ctx, params)
+			if tc.expectedErr {
+				assert.Error(t, err)
+				assert.ErrorIs(t, err, tc.discoveryErr)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
 func TestInSituWorker_EnqueueDeleteAssetsByQueryExprJob(t *testing.T) {
 	cases := []struct {
 		name         string
@@ -113,6 +157,52 @@ func TestInSituWorker_EnqueueDeleteAssetsByQueryExprJob(t *testing.T) {
 				DiscoveryRepo: discoveryRepo,
 			})
 			err := wrkr.EnqueueDeleteAssetsByQueryExprJob(ctx, queryExpr)
+			if tc.expectedErr {
+				assert.Error(t, err)
+				assert.ErrorIs(t, err, tc.discoveryErr)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestInSituWorker_EnqueueSoftDeleteAssetsJob(t *testing.T) {
+	currentTime := time.Now().UTC()
+	dummyAssets := []asset.Asset{
+		{
+			ID:          "asset-1",
+			URN:         "urn:asset:1",
+			Type:        asset.Type("table"),
+			Service:     "test-service",
+			UpdatedAt:   currentTime,
+			RefreshedAt: &currentTime,
+			UpdatedBy:   user.User{ID: "some-user"},
+		},
+	}
+	cases := []struct {
+		discoveryErr error
+		name         string
+		expectedErr  bool
+	}{
+		{name: "Success"},
+		{
+			name:         "Failure",
+			discoveryErr: errors.New("fail"),
+			expectedErr:  true,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			discoveryRepo := mocks.NewDiscoveryRepository(t)
+			discoveryRepo.EXPECT().
+				SoftDeleteAssets(ctx, dummyAssets, false).
+				Return(tc.discoveryErr)
+
+			wrkr := workermanager.NewInSituWorker(workermanager.Deps{
+				DiscoveryRepo: discoveryRepo,
+			})
+			err := wrkr.EnqueueSoftDeleteAssetsJob(ctx, dummyAssets)
 			if tc.expectedErr {
 				assert.Error(t, err)
 				assert.ErrorIs(t, err, tc.discoveryErr)
