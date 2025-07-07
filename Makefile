@@ -57,6 +57,9 @@ fmt: $(TOOLS_DIR)/gofumpt imports ##@dev_setup does a go fmt (stricter variant)
 lint: $(TOOLS_DIR)/golangci-lint ##@dev_setup lint source
 	$(TOOLS_DIR)/golangci-lint --config=".golangci-prod.toml" --new-from-rev=HEAD~1 --max-same-issues=0 --max-issues-per-linter=0 run
 
+lint-fix: $(TOOLS_DIR)/golangci-lint ##@dev_setup Automatically fix fixable lint issues
+	$(TOOLS_DIR)/golangci-lint run --fix --config=".golangci-prod.toml" --new-from-rev=HEAD~1 --max-same-issues=0 --max-issues-per-linter=0
+
 # BUILD #############
 
 proto: $(TOOLS_DIR)/buf ## Generate the protobuf files

@@ -19,6 +19,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type searchByUrnFields struct {
+	UpdatedAt   time.Time `json:"updated_at"`
+	RefreshedAt time.Time `json:"refreshed_at"`
+	Version     string    `json:"version"`
+	IsDeleted   bool      `json:"is_deleted"`
+}
+
 func TestDiscoveryRepository_Upsert(t *testing.T) {
 	var (
 		ctx             = context.Background()
@@ -802,13 +809,6 @@ func TestDiscoveryRepository_SyncAssets(t *testing.T) {
 	})
 }
 
-type searchByUrnFields struct {
-	IsDeleted   bool      `json:"is_deleted"`
-	Version     string    `json:"version"`
-	UpdatedAt   time.Time `json:"updated_at"`
-	RefreshedAt time.Time `json:"refreshed_at"`
-}
-
 func searchByURN(t *testing.T, cli *elasticsearch.Client, urn string) ([]searchByUrnFields, int64) {
 	t.Helper()
 
@@ -821,21 +821,21 @@ func searchByURN(t *testing.T, cli *elasticsearch.Client, urn string) ([]searchB
 
 	var result struct {
 		Hits struct {
-			Total struct {
-				Value int64 `json:"value"`
-			} `json:"total"`
 			Hits []struct {
 				searchByUrnFields `json:"_source"`
 			} `json:"hits"`
+			Total struct {
+				Value int64 `json:"value"`
+			} `json:"total"`
 		} `json:"hits"`
 	}
 
 	require.NoError(t, json.NewDecoder(res.Body).Decode(&result))
 
 	// Extract just the _source fields for easier assertion
-	var sources []searchByUrnFields
-	for _, hit := range result.Hits.Hits {
-		sources = append(sources, hit.searchByUrnFields)
+	sources := make([]searchByUrnFields, len(result.Hits.Hits))
+	for i, hit := range result.Hits.Hits {
+		sources[i] = hit.searchByUrnFields
 	}
 
 	return sources, result.Hits.Total.Value
