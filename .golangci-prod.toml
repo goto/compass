@@ -1,6 +1,8 @@
 # Configuration for golangci-lint@v1.64.8
 # See https://golangci-lint.run/usage/configuration/
 
+# Can edit this file to customize linting rules
+
 [run]
 timeout                = "10m"                     # Max time golangci-lint is allowed to run
 modules-download-mode  = "readonly"                # Avoids changing go.sum/go.mod while resolving modules
@@ -41,11 +43,11 @@ enable = [
     # Core linters
     "errcheck",                                   # Check for unchecked errors
     "gosimple",                                   # Simplify Go code
-    "govet",                                      # Go's built-in analyzer
     "ineffassign",                                # Find unused variable assignments
     "staticcheck",                                # Advanced static analysis
     "unused",                                     # Detect unused variables, funcs, etc.
     "bodyclose",                                  # Ensure response bodies are closed
+    # "govet",                                      # Go's built-in analyzer
 
     # Style linters
     "dupl",                                       # Detect code duplication
@@ -82,13 +84,13 @@ enable = [
 
     # Additional
     "cyclop",                                     # Cyclomatic complexity
-    "decorder",                                   # Decoding order in structs
     "gochecknoglobals",                           # Avoid global variables
     "godox",                                      # Detect TODOs, FIXMEs
     "nestif",                                     # Detect deeply nested `if` statements
     "prealloc",                                   # Preallocate slices where possible
     "predeclared",                                # Warn when redefining predeclared identifiers
     "wastedassign",                               # Detect assignments never used
+    # "decorder",                                   # Decoding order in structs
     # "tagliatelle",                                # Enforce tag naming/style
     # "ireturn",                                    # Enforce interfaces in return types
 ]

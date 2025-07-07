@@ -18,8 +18,10 @@ import (
 	"github.com/r3labs/diff/v2"
 )
 
-var errOffsetCannotBeNegative = errors.New("offset cannot be negative")
-var errSizeCannotBeNegative = errors.New("size cannot be negative")
+var (
+	errOffsetCannotBeNegative = errors.New("offset cannot be negative")
+	errSizeCannotBeNegative   = errors.New("size cannot be negative")
+)
 
 // AssetRepository is a type that manages user operation to the primary database
 type AssetRepository struct {
@@ -57,7 +59,7 @@ func (r *AssetRepository) GetAll(ctx context.Context, flt asset.Filter) ([]asset
 		return nil, fmt.Errorf("error getting asset list: %w", err)
 	}
 
-	var assets []asset.Asset
+	assets := make([]asset.Asset, len(ams))
 	for _, am := range ams {
 		assets = append(assets, am.toAsset(nil))
 	}
