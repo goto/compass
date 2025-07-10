@@ -167,6 +167,41 @@ func TestInSituWorker_EnqueueDeleteAssetsByQueryExprJob(t *testing.T) {
 	}
 }
 
+func TestInSituWorker_EnqueueDeleteAssetsByIsDeletedAndServicesAndUpdatedAtJob(t *testing.T) {
+	currentTime := time.Now().UTC()
+	cases := []struct {
+		name         string
+		discoveryErr error
+		expectedErr  bool
+	}{
+		{name: "Success"},
+		{
+			name:         "Failure",
+			discoveryErr: errors.New("fail"),
+			expectedErr:  true,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			discoveryRepo := mocks.NewDiscoveryRepository(t)
+			discoveryRepo.EXPECT().
+				DeleteByIsDeletedAndServicesAndUpdatedAt(ctx, true, []string{"svc1", "svc2"}, currentTime).
+				Return(tc.discoveryErr)
+
+			wrkr := workermanager.NewInSituWorker(workermanager.Deps{
+				DiscoveryRepo: discoveryRepo,
+			})
+			err := wrkr.EnqueueDeleteAssetsByIsDeletedAndServicesAndUpdatedAtJob(ctx, true, []string{"svc1", "svc2"}, currentTime)
+			if tc.expectedErr {
+				assert.Error(t, err)
+				assert.ErrorIs(t, err, tc.discoveryErr)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
 func TestInSituWorker_EnqueueSoftDeleteAssetsJob(t *testing.T) {
 	currentTime := time.Now().UTC()
 	dummyAssets := []asset.Asset{

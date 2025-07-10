@@ -132,6 +132,67 @@ func (_c *AssetRepository_DeleteByID_Call) RunAndReturn(run func(context.Context
 	return _c
 }
 
+// DeleteByIsDeletedAndServicesAndUpdatedAt provides a mock function with given fields: ctx, isDeleted, services, thresholdTime
+func (_m *AssetRepository) DeleteByIsDeletedAndServicesAndUpdatedAt(ctx context.Context, isDeleted bool, services []string, thresholdTime time.Time) ([]string, error) {
+	ret := _m.Called(ctx, isDeleted, services, thresholdTime)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteByIsDeletedAndServicesAndUpdatedAt")
+	}
+
+	var r0 []string
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, bool, []string, time.Time) ([]string, error)); ok {
+		return rf(ctx, isDeleted, services, thresholdTime)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, bool, []string, time.Time) []string); ok {
+		r0 = rf(ctx, isDeleted, services, thresholdTime)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]string)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, bool, []string, time.Time) error); ok {
+		r1 = rf(ctx, isDeleted, services, thresholdTime)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// AssetRepository_DeleteByIsDeletedAndServicesAndUpdatedAt_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteByIsDeletedAndServicesAndUpdatedAt'
+type AssetRepository_DeleteByIsDeletedAndServicesAndUpdatedAt_Call struct {
+	*mock.Call
+}
+
+// DeleteByIsDeletedAndServicesAndUpdatedAt is a helper method to define mock.On call
+//   - ctx context.Context
+//   - isDeleted bool
+//   - services []string
+//   - thresholdTime time.Time
+func (_e *AssetRepository_Expecter) DeleteByIsDeletedAndServicesAndUpdatedAt(ctx interface{}, isDeleted interface{}, services interface{}, thresholdTime interface{}) *AssetRepository_DeleteByIsDeletedAndServicesAndUpdatedAt_Call {
+	return &AssetRepository_DeleteByIsDeletedAndServicesAndUpdatedAt_Call{Call: _e.mock.On("DeleteByIsDeletedAndServicesAndUpdatedAt", ctx, isDeleted, services, thresholdTime)}
+}
+
+func (_c *AssetRepository_DeleteByIsDeletedAndServicesAndUpdatedAt_Call) Run(run func(ctx context.Context, isDeleted bool, services []string, thresholdTime time.Time)) *AssetRepository_DeleteByIsDeletedAndServicesAndUpdatedAt_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(bool), args[2].([]string), args[3].(time.Time))
+	})
+	return _c
+}
+
+func (_c *AssetRepository_DeleteByIsDeletedAndServicesAndUpdatedAt_Call) Return(urns []string, err error) *AssetRepository_DeleteByIsDeletedAndServicesAndUpdatedAt_Call {
+	_c.Call.Return(urns, err)
+	return _c
+}
+
+func (_c *AssetRepository_DeleteByIsDeletedAndServicesAndUpdatedAt_Call) RunAndReturn(run func(context.Context, bool, []string, time.Time) ([]string, error)) *AssetRepository_DeleteByIsDeletedAndServicesAndUpdatedAt_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // DeleteByQueryExpr provides a mock function with given fields: ctx, queryExpr
 func (_m *AssetRepository) DeleteByQueryExpr(ctx context.Context, queryExpr queryexpr.ExprStr) ([]string, error) {
 	ret := _m.Called(ctx, queryExpr)
@@ -580,6 +641,65 @@ func (_c *AssetRepository_GetCount_Call) Return(_a0 int, _a1 error) *AssetReposi
 }
 
 func (_c *AssetRepository_GetCount_Call) RunAndReturn(run func(context.Context, asset.Filter) (int, error)) *AssetRepository_GetCount_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// GetCountByIsDeletedAndServicesAndUpdatedAt provides a mock function with given fields: ctx, isDeleted, services, thresholdTime
+func (_m *AssetRepository) GetCountByIsDeletedAndServicesAndUpdatedAt(ctx context.Context, isDeleted bool, services []string, thresholdTime time.Time) (uint32, error) {
+	ret := _m.Called(ctx, isDeleted, services, thresholdTime)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GetCountByIsDeletedAndServicesAndUpdatedAt")
+	}
+
+	var r0 uint32
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, bool, []string, time.Time) (uint32, error)); ok {
+		return rf(ctx, isDeleted, services, thresholdTime)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, bool, []string, time.Time) uint32); ok {
+		r0 = rf(ctx, isDeleted, services, thresholdTime)
+	} else {
+		r0 = ret.Get(0).(uint32)
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, bool, []string, time.Time) error); ok {
+		r1 = rf(ctx, isDeleted, services, thresholdTime)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// AssetRepository_GetCountByIsDeletedAndServicesAndUpdatedAt_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetCountByIsDeletedAndServicesAndUpdatedAt'
+type AssetRepository_GetCountByIsDeletedAndServicesAndUpdatedAt_Call struct {
+	*mock.Call
+}
+
+// GetCountByIsDeletedAndServicesAndUpdatedAt is a helper method to define mock.On call
+//   - ctx context.Context
+//   - isDeleted bool
+//   - services []string
+//   - thresholdTime time.Time
+func (_e *AssetRepository_Expecter) GetCountByIsDeletedAndServicesAndUpdatedAt(ctx interface{}, isDeleted interface{}, services interface{}, thresholdTime interface{}) *AssetRepository_GetCountByIsDeletedAndServicesAndUpdatedAt_Call {
+	return &AssetRepository_GetCountByIsDeletedAndServicesAndUpdatedAt_Call{Call: _e.mock.On("GetCountByIsDeletedAndServicesAndUpdatedAt", ctx, isDeleted, services, thresholdTime)}
+}
+
+func (_c *AssetRepository_GetCountByIsDeletedAndServicesAndUpdatedAt_Call) Run(run func(ctx context.Context, isDeleted bool, services []string, thresholdTime time.Time)) *AssetRepository_GetCountByIsDeletedAndServicesAndUpdatedAt_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(bool), args[2].([]string), args[3].(time.Time))
+	})
+	return _c
+}
+
+func (_c *AssetRepository_GetCountByIsDeletedAndServicesAndUpdatedAt_Call) Return(_a0 uint32, _a1 error) *AssetRepository_GetCountByIsDeletedAndServicesAndUpdatedAt_Call {
+	_c.Call.Return(_a0, _a1)
+	return _c
+}
+
+func (_c *AssetRepository_GetCountByIsDeletedAndServicesAndUpdatedAt_Call) RunAndReturn(run func(context.Context, bool, []string, time.Time) (uint32, error)) *AssetRepository_GetCountByIsDeletedAndServicesAndUpdatedAt_Call {
 	_c.Call.Return(run)
 	return _c
 }

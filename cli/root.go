@@ -63,6 +63,7 @@ func New(cliConfig *Config) *cobra.Command {
 		discussionsCommand(cliConfig),
 		searchCommand(cliConfig),
 		lineageCommand(cliConfig),
+		cleanupCmd(cliConfig),
 		versionCmd(),
 	)
 

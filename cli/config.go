@@ -7,6 +7,7 @@ import (
 
 	"github.com/MakeNowJust/heredoc"
 	"github.com/goto/compass/core/asset"
+	"github.com/goto/compass/internal/cleanup"
 	"github.com/goto/compass/internal/client"
 	"github.com/goto/compass/internal/server"
 	esStore "github.com/goto/compass/internal/store/elasticsearch"
@@ -105,6 +106,9 @@ type Config struct {
 	ColSearchExclusionKeywords string `yaml:"col_search_excluded_keywords" mapstructure:"col_search_excluded_keywords"`
 
 	Asset asset.Config `mapstructure:"asset"`
+
+	// Cleanup jobs
+	Cleanup cleanup.Config `mapstructure:"cleanup"`
 }
 
 func LoadConfig() (*Config, error) {

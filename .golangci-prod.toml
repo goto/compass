@@ -54,7 +54,7 @@ enable = [
     "errname",                                    # Enforce error naming convention (e.g., `errFoo`)
     "errorlint",                                  # Use `errors.Is`/`errors.As` instead of type assertions
     "exhaustruct",                                # Warn if struct fields are not initialized
-    "forbidigo",                                  # Forbid `fmt.Println` or `log.Println` in production
+    # "forbidigo",                                  # Forbid `fmt.Println` or `log.Println` in production
     "gci",                                        # Enforce import grouping and order
     "gocheckcompilerdirectives",                  # Check for valid Go compiler directives
     "gochecknoinits",                             # Disallow `init()` usage

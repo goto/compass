@@ -297,6 +297,126 @@ func TestManager_EnqueueDeleteAssetsByQueryExprJob(t *testing.T) {
 	}
 }
 
+func TestManager_EnqueueDeleteAssetsByIsDeletedAndServicesAndUpdatedAtJob(t *testing.T) {
+	currentTime := time.Now().UTC()
+	cases := []struct {
+		name        string
+		isDeleted   bool
+		services    []string
+		expiry      time.Time
+		enqueueErr  error
+		expectedErr string
+	}{
+		{
+			name:      "Success",
+			isDeleted: true,
+			services:  []string{"svc1", "svc2"},
+			expiry:    currentTime,
+		},
+		{
+			name:        "Failure",
+			isDeleted:   false,
+			services:    []string{"svc3"},
+			expiry:      currentTime,
+			enqueueErr:  errors.New("fail"),
+			expectedErr: "enqueue cleanup job: fail",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			wrkr := mocks.NewWorker(t)
+			payloadMap := map[string]interface{}{
+				"is_deleted":       tc.isDeleted,
+				"services":         tc.services,
+				"expiry_threshold": tc.expiry,
+			}
+			payloadBytes, err := json.Marshal(payloadMap)
+			assert.NoError(t, err, "failed to marshal cleanup payload")
+			wrkr.EXPECT().
+				Enqueue(ctx, worker.JobSpec{
+					Type:    "delete-assets-by-services-and-updated-at",
+					Payload: payloadBytes,
+				}).
+				Return(tc.enqueueErr)
+
+			mgr := workermanager.NewWithWorker(wrkr, workermanager.Deps{})
+			err = mgr.EnqueueDeleteAssetsByIsDeletedAndServicesAndUpdatedAtJob(ctx, tc.isDeleted, tc.services, tc.expiry)
+			if tc.expectedErr != "" {
+				assert.ErrorContains(t, err, tc.expectedErr)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestManager_DeleteAssetsByServicesAndUpdatedAt(t *testing.T) {
+	currentTime := time.Now().UTC()
+	type payloadStruct struct {
+		IsDeleted       bool      `json:"is_deleted"`
+		Services        []string  `json:"services"`
+		ExpiryThreshold time.Time `json:"expiry_threshold"`
+	}
+
+	cases := []struct {
+		name        string
+		isDeleted   bool
+		services    []string
+		expiry      time.Time
+		repoErr     error
+		expectedErr bool
+	}{
+		{
+			name:      "Success",
+			isDeleted: true,
+			services:  []string{"svc1", "svc2"},
+			expiry:    currentTime,
+		},
+		{
+			name:        "Failure",
+			isDeleted:   false,
+			services:    []string{"svc3"},
+			expiry:      currentTime,
+			repoErr:     errors.New("fail"),
+			expectedErr: true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			discoveryRepo := mocks.NewDiscoveryRepository(t)
+			discoveryRepo.EXPECT().
+				DeleteByIsDeletedAndServicesAndUpdatedAt(ctx, tc.isDeleted, tc.services, tc.expiry).
+				Return(tc.repoErr)
+
+			mgr := workermanager.NewWithWorker(mocks.NewWorker(t), workermanager.Deps{
+				DiscoveryRepo: discoveryRepo,
+			})
+
+			payload := payloadStruct{
+				IsDeleted:       tc.isDeleted,
+				Services:        tc.services,
+				ExpiryThreshold: tc.expiry,
+			}
+			payloadBytes, err := json.Marshal(payload)
+			assert.NoError(t, err, "failed to marshal payload")
+
+			err = mgr.DeleteAssetsByServicesAndUpdatedAt(ctx, worker.JobSpec{
+				Type:    "delete-assets-by-services-and-updated-at",
+				Payload: payloadBytes,
+			})
+
+			if tc.expectedErr {
+				var re *worker.RetryableError
+				assert.ErrorAs(t, err, &re)
+				assert.ErrorIs(t, err, tc.repoErr)
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
 func TestManager_EnqueueSoftDeleteAssetsJob(t *testing.T) {
 	currentTime := time.Now().UTC()
 	dummyAssets := []asset.Asset{
