@@ -6,6 +6,8 @@ import (
 	"strings"
 )
 
+const AllServicesCleanupConfig = "all"
+
 var (
 	ErrEmptyID                   = errors.New("asset does not have ID")
 	ErrProbeExists               = errors.New("asset probe already exists")

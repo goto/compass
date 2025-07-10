@@ -167,11 +167,18 @@ func (r *AssetRepository) GetCountByIsDeletedAndServicesAndUpdatedAt(
 	services []string,
 	thresholdTime time.Time,
 ) (uint32, error) {
+	if len(services) == 0 {
+		return 0, asset.ErrEmptyServices
+	}
 	builder := sq.Select("count(1)").
 		From("assets").
 		Where(sq.Eq{"is_deleted": isDeleted}).
-		Where(sq.Eq{"service": services}).
 		Where(sq.Lt{"updated_at": thresholdTime})
+
+	if strings.TrimSpace(services[0]) != asset.AllServicesCleanupConfig {
+		builder = builder.Where(sq.Eq{"service": services})
+	}
+
 	query, args, err := builder.PlaceholderFormat(sq.Dollar).ToSql()
 	if err != nil {
 		return 0, fmt.Errorf("build count query: %w", err)
@@ -655,12 +662,18 @@ func (r *AssetRepository) SoftDeleteByURN(ctx context.Context, executedAt time.T
 }
 
 func (r *AssetRepository) DeleteByServicesAndUpdatedAt(ctx context.Context, services []string, thresholdTime time.Time) (urns []string, err error) {
+	if len(services) == 0 {
+		return nil, asset.ErrEmptyServices
+	}
 	err = r.client.RunWithinTx(ctx, func(*sqlx.Tx) error {
 		builder := sq.Delete("assets").
 			Where(sq.Eq{"is_deleted": true}).
-			Where(sq.Eq{"service": services}).
 			Where(sq.Lt{"updated_at": thresholdTime}).
 			Suffix("RETURNING urn")
+
+		if strings.TrimSpace(services[0]) != asset.AllServicesCleanupConfig {
+			builder = builder.Where(sq.Eq{"service": services})
+		}
 
 		query, args, err := builder.PlaceholderFormat(sq.Dollar).ToSql()
 		if err != nil {

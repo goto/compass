@@ -175,20 +175,30 @@ func (repo *DiscoveryRepository) DeleteByServicesAndUpdatedAt(ctx context.Contex
 		return asset.ErrExpiryThresholdTimeIsZero
 	}
 
-	servicesJSON, err := json.Marshal(services)
-	if err != nil {
-		return fmt.Errorf("failed to marshal services: %w", err)
-	}
-	query := fmt.Sprintf(`{
-	"query": {
-		"bool": {
-			"must": [
-				{"terms": {"service.keyword": %s}},
-				{"range": {"updated_at": {"lt": "%s"}}}
-			]
+	thresholdUpdatedAt := expiryThreshold.Format(time.RFC3339)
+	var query string
+	if strings.TrimSpace(services[0]) != asset.AllServicesCleanupConfig {
+		servicesJSON, err := json.Marshal(services)
+		if err != nil {
+			return fmt.Errorf("failed to marshal services: %w", err)
 		}
+		query = fmt.Sprintf(`{
+			"query": {
+				"bool": {
+					"must": [
+						{"terms": {"service.keyword": %s}},
+						{"range": {"updated_at": {"lt": "%s"}}}
+					]
+				}
+			}
+			}`, servicesJSON, thresholdUpdatedAt)
+	} else {
+		query = fmt.Sprintf(`{
+			"query": {
+				"range": {"updated_at": {"lt": "%s"}}
+			}
+			}`, thresholdUpdatedAt)
 	}
-	}`, servicesJSON, expiryThreshold.Format(time.RFC3339))
 
 	return repo.deleteWithQuery(ctx, "DeleteByServicesAndUpdatedAt", query)
 }

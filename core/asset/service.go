@@ -269,13 +269,14 @@ func (s *Service) DeleteAssetsByServicesAndUpdatedAt(ctx context.Context, dryRun
 		return 0, err
 	}
 
-	if !dryRun && total > 0 {
+	if !dryRun {
 		s.logger.Info("Running cleanup for services: ", services, " older than ", expiryThreshold)
 		deletedURNs, err := s.assetRepository.DeleteByServicesAndUpdatedAt(ctx, servicesArray, expiryThreshold)
 		if err != nil {
 			s.logger.Error("asset deletion failed, skipping elasticsearch and lineage deletions", "err:", err)
 			return 0, nil
 		}
+		s.logger.Info("Deleted assets", "URNs ", deletedURNs)
 
 		if err := s.lineageRepository.DeleteByURNs(ctx, deletedURNs); err != nil {
 			s.logger.Error("error occurred during lineage deletion", "err:", err)
@@ -286,7 +287,7 @@ func (s *Service) DeleteAssetsByServicesAndUpdatedAt(ctx context.Context, dryRun
 		}
 	}
 
-	s.logger.Info("Cleanup job completed", "total_deleted", total)
+	s.logger.Info("Cleanup job completed", "dry run", dryRun, "total deleted", total)
 	return total, nil
 }
 

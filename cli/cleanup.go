@@ -48,7 +48,7 @@ func cleanupStartCommand(cfg *Config) *cobra.Command {
 				return fmt.Errorf("run cleanup: %w", err)
 			}
 
-			fmt.Println("Compass cleanup completed successfully", term.Yellowf("total deleted assets %v", total))
+			fmt.Println("Compass cleanup completed successfully", term.Yellowf("with total deleted assets %v", total))
 			return nil
 		},
 	}
