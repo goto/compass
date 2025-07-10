@@ -19,7 +19,7 @@ type DiscoveryRepository interface {
 	DeleteByURN(ctx context.Context, assetURN string) error
 	SoftDeleteByURN(ctx context.Context, params asset.SoftDeleteAssetParams) error
 	DeleteByQueryExpr(ctx context.Context, queryExpr queryexpr.ExprStr) error
-	DeleteByServicesAndUpdatedAt(ctx context.Context, services []string, expiryThreshold time.Time) error
+	DeleteByIsDeletedAndServicesAndUpdatedAt(ctx context.Context, isDeleted bool, services []string, expiryThreshold time.Time) error
 	SoftDeleteAssets(ctx context.Context, assets []asset.Asset, doUpdateVersion bool) error
 	SyncAssets(ctx context.Context, indexName string) (cleanupFn func() error, err error)
 }
@@ -218,8 +218,14 @@ func (m *Manager) EnqueueDeleteAssetsByQueryExprJob(ctx context.Context, queryEx
 	return nil
 }
 
-func (m *Manager) EnqueueDeleteAssetsByServicesAndUpdatedAtJob(ctx context.Context, services []string, expiryThreshold time.Time) error {
+func (m *Manager) EnqueueDeleteAssetsByIsDeletedAndServicesAndUpdatedAtJob(
+	ctx context.Context,
+	isDeleted bool,
+	services []string,
+	expiryThreshold time.Time,
+) error {
 	payloadMap := map[string]interface{}{
+		"is_deleted":       isDeleted,
 		"services":         services,
 		"expiry_threshold": expiryThreshold,
 	}
@@ -253,6 +259,7 @@ func (m *Manager) deleteAssetsByServicesAndUpdatedAtHandler() worker.JobHandler 
 
 func (m *Manager) DeleteAssetsByServicesAndUpdatedAt(ctx context.Context, job worker.JobSpec) error {
 	var payload struct {
+		IsDeleted       bool      `json:"is_deleted"`
 		Services        []string  `json:"services"`
 		ExpiryThreshold time.Time `json:"expiry_threshold"`
 	}
@@ -261,7 +268,7 @@ func (m *Manager) DeleteAssetsByServicesAndUpdatedAt(ctx context.Context, job wo
 		return fmt.Errorf("invalid payload: %w", err)
 	}
 
-	if err := m.discoveryRepo.DeleteByServicesAndUpdatedAt(ctx, payload.Services, payload.ExpiryThreshold); err != nil {
+	if err := m.discoveryRepo.DeleteByIsDeletedAndServicesAndUpdatedAt(ctx, payload.IsDeleted, payload.Services, payload.ExpiryThreshold); err != nil {
 		return &worker.RetryableError{
 			Cause: fmt.Errorf("delete assets from discovery repo: %w: services: %v, expiry threshold: %v", err, payload.Services, payload.ExpiryThreshold),
 		}

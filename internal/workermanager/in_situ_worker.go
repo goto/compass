@@ -59,8 +59,13 @@ func (m *InSituWorker) EnqueueDeleteAssetsByQueryExprJob(ctx context.Context, qu
 	return nil
 }
 
-func (m *InSituWorker) EnqueueDeleteAssetsByServicesAndUpdatedAtJob(ctx context.Context, services []string, expiryThreshold time.Time) error {
-	if err := m.discoveryRepo.DeleteByServicesAndUpdatedAt(ctx, services, expiryThreshold); err != nil {
+func (m *InSituWorker) EnqueueDeleteAssetsByIsDeletedAndServicesAndUpdatedAtJob(
+	ctx context.Context,
+	isDeleted bool,
+	services []string,
+	expiryThreshold time.Time,
+) error {
+	if err := m.discoveryRepo.DeleteByIsDeletedAndServicesAndUpdatedAt(ctx, isDeleted, services, expiryThreshold); err != nil {
 		return fmt.Errorf("delete assets from discovery repo: %w: services: %v, expiry threshold: %v", err, services, expiryThreshold)
 	}
 	return nil

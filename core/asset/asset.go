@@ -28,7 +28,7 @@ type Repository interface {
 	SoftDeleteByID(ctx context.Context, executedAt time.Time, id, updatedByID string) (string, string, error)
 	SoftDeleteByURN(ctx context.Context, executedAt time.Time, urn, updatedByID string) (string, error)
 	DeleteByQueryExpr(ctx context.Context, queryExpr queryexpr.ExprStr) ([]string, error)
-	DeleteByServicesAndUpdatedAt(ctx context.Context, services []string, thresholdTime time.Time) (urns []string, err error)
+	DeleteByIsDeletedAndServicesAndUpdatedAt(ctx context.Context, isDeleted bool, services []string, thresholdTime time.Time) (urns []string, err error)
 	SoftDeleteByQueryExpr(ctx context.Context, executedAt time.Time, updatedByID string, queryExpr queryexpr.ExprStr) ([]Asset, error)
 	AddProbe(ctx context.Context, assetURN string, probe *Probe) error
 	GetProbes(ctx context.Context, assetURN string) ([]Probe, error)

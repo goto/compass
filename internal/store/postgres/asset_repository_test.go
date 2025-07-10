@@ -577,6 +577,87 @@ func (r *AssetRepositoryTestSuite) TestGetCount() {
 	})
 }
 
+func (r *AssetRepositoryTestSuite) TestGetCountByIsDeletedAndServicesAndUpdatedAt() {
+	now := time.Now()
+	serviceA := "serviceA"
+	serviceB := "serviceB"
+
+	asset1 := asset.Asset{
+		URN:       "urn:svcA:1",
+		Name:      "Asset 1",
+		Service:   serviceA,
+		IsDeleted: false,
+		UpdatedBy: r.users[0],
+	}
+	asset2 := asset.Asset{
+		URN:       "urn:svcA:2",
+		Name:      "Asset 2",
+		Service:   serviceA,
+		IsDeleted: true,
+		UpdatedBy: r.users[0],
+	}
+	asset3 := asset.Asset{
+		URN:       "urn:svcB:1",
+		Name:      "Asset 3",
+		Service:   serviceB,
+		IsDeleted: false,
+		UpdatedBy: r.users[0],
+	}
+
+	_, err := r.repository.Upsert(r.ctx, &asset1)
+	r.Require().NoError(err)
+	_, err = r.repository.Upsert(r.ctx, &asset2)
+	r.Require().NoError(err)
+	_, err = r.repository.Upsert(r.ctx, &asset3)
+	r.Require().NoError(err)
+
+	thresholdUpdatedAt := now.Add(time.Hour)
+
+	r.Run("should return correct count for isDeleted=false and serviceA", func() {
+		count, err := r.repository.GetCountByIsDeletedAndServicesAndUpdatedAt(r.ctx, false, []string{serviceA}, thresholdUpdatedAt)
+		r.NoError(err)
+		r.Equal(uint32(1), count)
+	})
+
+	r.Run("should return correct count for isDeleted=true and serviceA", func() {
+		count, err := r.repository.GetCountByIsDeletedAndServicesAndUpdatedAt(r.ctx, true, []string{serviceA}, thresholdUpdatedAt)
+		r.NoError(err)
+		r.Equal(uint32(1), count)
+	})
+
+	r.Run("should return correct count for isDeleted=false and serviceB", func() {
+		count, err := r.repository.GetCountByIsDeletedAndServicesAndUpdatedAt(r.ctx, false, []string{serviceB}, thresholdUpdatedAt)
+		r.NoError(err)
+		r.Equal(uint32(1), count)
+	})
+
+	r.Run("should return 0 for isDeleted=true and serviceB", func() {
+		count, err := r.repository.GetCountByIsDeletedAndServicesAndUpdatedAt(r.ctx, true, []string{serviceB}, thresholdUpdatedAt)
+		r.NoError(err)
+		r.Equal(uint32(0), count)
+	})
+
+	r.Run("should return error for empty services", func() {
+		_, err := r.repository.GetCountByIsDeletedAndServicesAndUpdatedAt(r.ctx, false, []string{}, thresholdUpdatedAt)
+		r.ErrorIs(err, asset.ErrEmptyServices)
+	})
+
+	r.Run("should return correct count for all services config", func() {
+		allServices := []string{asset.AllServicesCleanupConfig}
+		count, err := r.repository.GetCountByIsDeletedAndServicesAndUpdatedAt(r.ctx, false, allServices, thresholdUpdatedAt)
+		r.NoError(err)
+		r.GreaterOrEqual(count, uint32(2))
+	})
+
+	// cleanup
+	err = r.repository.DeleteByURN(r.ctx, asset1.URN)
+	r.NoError(err)
+	err = r.repository.DeleteByURN(r.ctx, asset2.URN)
+	r.NoError(err)
+	err = r.repository.DeleteByURN(r.ctx, asset3.URN)
+	r.NoError(err)
+}
+
 func (r *AssetRepositoryTestSuite) TestGetByID() {
 	r.Run("return error from client if asset not an uuid", func() {
 		_, err := r.repository.GetByID(r.ctx, "invalid-uuid")
@@ -1966,6 +2047,79 @@ func (r *AssetRepositoryTestSuite) TestSoftDeleteByURN() {
 		err = r.repository.DeleteByURN(r.ctx, asset2.URN)
 		r.NoError(err)
 	})
+}
+
+func (r *AssetRepositoryTestSuite) TestDeleteByIsDeletedAndServicesAndUpdatedAt() {
+	currentTime := time.Now()
+	serviceA := "serviceA"
+	serviceB := "serviceB"
+
+	// Insert assets with different services and updated_at
+	asset1 := asset.Asset{
+		URN:       "urn-del-service-1",
+		Name:      "Asset 1",
+		Service:   serviceA,
+		IsDeleted: false,
+		UpdatedBy: r.users[0],
+	}
+	asset2 := asset.Asset{
+		URN:       "urn-del-service-2",
+		Name:      "Asset 2",
+		Service:   serviceB,
+		IsDeleted: true,
+		UpdatedBy: r.users[0],
+	}
+	asset3 := asset.Asset{
+		URN:       "urn-del-service-3",
+		Name:      "Asset 3",
+		Service:   serviceA,
+		IsDeleted: true,
+		UpdatedBy: r.users[0],
+	}
+
+	_, err := r.repository.Upsert(r.ctx, &asset1)
+	r.Require().NoError(err)
+	_, err = r.repository.Upsert(r.ctx, &asset2)
+	r.Require().NoError(err)
+	_, err = r.repository.Upsert(r.ctx, &asset3)
+	r.Require().NoError(err)
+
+	thresholdUpdatedAt := currentTime.Add(1 * time.Hour)
+
+	r.Run("should return error if services is empty", func() {
+		urns, err := r.repository.DeleteByIsDeletedAndServicesAndUpdatedAt(r.ctx, true, []string{}, thresholdUpdatedAt)
+		r.Nil(urns)
+		r.ErrorIs(err, asset.ErrEmptyServices)
+	})
+
+	r.Run("should delete assets for given is_deleted, services, and updated_at", func() {
+		urns, err := r.repository.DeleteByIsDeletedAndServicesAndUpdatedAt(r.ctx, false, []string{serviceA}, thresholdUpdatedAt)
+		r.NoError(err)
+		r.ElementsMatch([]string{"urn-del-service-1"}, urns)
+
+		// asset1 should be deleted, asset3 should remain, asset2 should remain
+		_, err = r.repository.GetByURN(r.ctx, asset1.URN)
+		r.ErrorAs(err, &asset.NotFoundError{URN: asset1.URN})
+
+		_, err = r.repository.GetByURN(r.ctx, asset3.URN)
+		r.NoError(err)
+		_, err = r.repository.GetByURN(r.ctx, asset2.URN)
+		r.NoError(err)
+	})
+
+	r.Run("should delete all assets if AllServicesCleanupConfig is set", func() {
+		urns, err := r.repository.DeleteByIsDeletedAndServicesAndUpdatedAt(r.ctx, true, []string{asset.AllServicesCleanupConfig}, thresholdUpdatedAt)
+		r.NoError(err)
+		r.ElementsMatch([]string{"urn-del-service-2", "urn-del-service-3"}, urns)
+
+		_, err = r.repository.GetByURN(r.ctx, asset2.URN)
+		r.ErrorAs(err, &asset.NotFoundError{URN: asset2.URN})
+
+		_, err = r.repository.GetByURN(r.ctx, asset3.URN)
+		r.ErrorAs(err, &asset.NotFoundError{URN: asset2.URN})
+	})
+
+	// cleanup done by the test cases
 }
 
 func (r *AssetRepositoryTestSuite) TestDeleteByQueryExpr() {

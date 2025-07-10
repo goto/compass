@@ -117,6 +117,55 @@ func (_c *Worker_EnqueueDeleteAssetJob_Call) RunAndReturn(run func(context.Conte
 	return _c
 }
 
+// EnqueueDeleteAssetsByIsDeletedAndServicesAndUpdatedAtJob provides a mock function with given fields: ctx, isDeleted, services, expiryThreshold
+func (_m *Worker) EnqueueDeleteAssetsByIsDeletedAndServicesAndUpdatedAtJob(ctx context.Context, isDeleted bool, services []string, expiryThreshold time.Time) error {
+	ret := _m.Called(ctx, isDeleted, services, expiryThreshold)
+
+	if len(ret) == 0 {
+		panic("no return value specified for EnqueueDeleteAssetsByIsDeletedAndServicesAndUpdatedAtJob")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, bool, []string, time.Time) error); ok {
+		r0 = rf(ctx, isDeleted, services, expiryThreshold)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// Worker_EnqueueDeleteAssetsByIsDeletedAndServicesAndUpdatedAtJob_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'EnqueueDeleteAssetsByIsDeletedAndServicesAndUpdatedAtJob'
+type Worker_EnqueueDeleteAssetsByIsDeletedAndServicesAndUpdatedAtJob_Call struct {
+	*mock.Call
+}
+
+// EnqueueDeleteAssetsByIsDeletedAndServicesAndUpdatedAtJob is a helper method to define mock.On call
+//   - ctx context.Context
+//   - isDeleted bool
+//   - services []string
+//   - expiryThreshold time.Time
+func (_e *Worker_Expecter) EnqueueDeleteAssetsByIsDeletedAndServicesAndUpdatedAtJob(ctx interface{}, isDeleted interface{}, services interface{}, expiryThreshold interface{}) *Worker_EnqueueDeleteAssetsByIsDeletedAndServicesAndUpdatedAtJob_Call {
+	return &Worker_EnqueueDeleteAssetsByIsDeletedAndServicesAndUpdatedAtJob_Call{Call: _e.mock.On("EnqueueDeleteAssetsByIsDeletedAndServicesAndUpdatedAtJob", ctx, isDeleted, services, expiryThreshold)}
+}
+
+func (_c *Worker_EnqueueDeleteAssetsByIsDeletedAndServicesAndUpdatedAtJob_Call) Run(run func(ctx context.Context, isDeleted bool, services []string, expiryThreshold time.Time)) *Worker_EnqueueDeleteAssetsByIsDeletedAndServicesAndUpdatedAtJob_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(bool), args[2].([]string), args[3].(time.Time))
+	})
+	return _c
+}
+
+func (_c *Worker_EnqueueDeleteAssetsByIsDeletedAndServicesAndUpdatedAtJob_Call) Return(_a0 error) *Worker_EnqueueDeleteAssetsByIsDeletedAndServicesAndUpdatedAtJob_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *Worker_EnqueueDeleteAssetsByIsDeletedAndServicesAndUpdatedAtJob_Call) RunAndReturn(run func(context.Context, bool, []string, time.Time) error) *Worker_EnqueueDeleteAssetsByIsDeletedAndServicesAndUpdatedAtJob_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // EnqueueDeleteAssetsByQueryExprJob provides a mock function with given fields: ctx, queryExpr
 func (_m *Worker) EnqueueDeleteAssetsByQueryExprJob(ctx context.Context, queryExpr string) error {
 	ret := _m.Called(ctx, queryExpr)
@@ -160,54 +209,6 @@ func (_c *Worker_EnqueueDeleteAssetsByQueryExprJob_Call) Return(_a0 error) *Work
 }
 
 func (_c *Worker_EnqueueDeleteAssetsByQueryExprJob_Call) RunAndReturn(run func(context.Context, string) error) *Worker_EnqueueDeleteAssetsByQueryExprJob_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// EnqueueDeleteAssetsByServicesAndUpdatedAtJob provides a mock function with given fields: ctx, services, expiryThreshold
-func (_m *Worker) EnqueueDeleteAssetsByServicesAndUpdatedAtJob(ctx context.Context, services []string, expiryThreshold time.Time) error {
-	ret := _m.Called(ctx, services, expiryThreshold)
-
-	if len(ret) == 0 {
-		panic("no return value specified for EnqueueDeleteAssetsByServicesAndUpdatedAtJob")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, []string, time.Time) error); ok {
-		r0 = rf(ctx, services, expiryThreshold)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// Worker_EnqueueDeleteAssetsByServicesAndUpdatedAtJob_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'EnqueueDeleteAssetsByServicesAndUpdatedAtJob'
-type Worker_EnqueueDeleteAssetsByServicesAndUpdatedAtJob_Call struct {
-	*mock.Call
-}
-
-// EnqueueDeleteAssetsByServicesAndUpdatedAtJob is a helper method to define mock.On call
-//   - ctx context.Context
-//   - services []string
-//   - expiryThreshold time.Time
-func (_e *Worker_Expecter) EnqueueDeleteAssetsByServicesAndUpdatedAtJob(ctx interface{}, services interface{}, expiryThreshold interface{}) *Worker_EnqueueDeleteAssetsByServicesAndUpdatedAtJob_Call {
-	return &Worker_EnqueueDeleteAssetsByServicesAndUpdatedAtJob_Call{Call: _e.mock.On("EnqueueDeleteAssetsByServicesAndUpdatedAtJob", ctx, services, expiryThreshold)}
-}
-
-func (_c *Worker_EnqueueDeleteAssetsByServicesAndUpdatedAtJob_Call) Run(run func(ctx context.Context, services []string, expiryThreshold time.Time)) *Worker_EnqueueDeleteAssetsByServicesAndUpdatedAtJob_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].([]string), args[2].(time.Time))
-	})
-	return _c
-}
-
-func (_c *Worker_EnqueueDeleteAssetsByServicesAndUpdatedAtJob_Call) Return(_a0 error) *Worker_EnqueueDeleteAssetsByServicesAndUpdatedAtJob_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *Worker_EnqueueDeleteAssetsByServicesAndUpdatedAtJob_Call) RunAndReturn(run func(context.Context, []string, time.Time) error) *Worker_EnqueueDeleteAssetsByServicesAndUpdatedAtJob_Call {
 	_c.Call.Return(run)
 	return _c
 }

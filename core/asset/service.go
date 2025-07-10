@@ -34,7 +34,7 @@ type Worker interface {
 	EnqueueDeleteAssetJob(ctx context.Context, urn string) error
 	EnqueueSoftDeleteAssetJob(ctx context.Context, params SoftDeleteAssetParams) error
 	EnqueueDeleteAssetsByQueryExprJob(ctx context.Context, queryExpr string) error
-	EnqueueDeleteAssetsByServicesAndUpdatedAtJob(ctx context.Context, services []string, expiryThreshold time.Time) error
+	EnqueueDeleteAssetsByIsDeletedAndServicesAndUpdatedAtJob(ctx context.Context, isDeleted bool, services []string, expiryThreshold time.Time) error
 	EnqueueSoftDeleteAssetsJob(ctx context.Context, assets []Asset) error
 	EnqueueSyncAssetJob(ctx context.Context, service string) error
 	Close() error
@@ -269,26 +269,32 @@ func (s *Service) DeleteAssetsByServicesAndUpdatedAt(ctx context.Context, dryRun
 		return 0, err
 	}
 
-	if !dryRun {
-		s.logger.Info("Running cleanup for services: ", services, " older than ", expiryThreshold)
-		deletedURNs, err := s.assetRepository.DeleteByServicesAndUpdatedAt(ctx, servicesArray, expiryThreshold)
-		if err != nil {
-			s.logger.Error("asset deletion failed, skipping elasticsearch and lineage deletions", "err:", err)
-			return 0, nil
-		}
-		s.logger.Info("Deleted assets", "URNs ", deletedURNs)
-
-		if err := s.lineageRepository.DeleteByURNs(ctx, deletedURNs); err != nil {
-			s.logger.Error("error occurred during lineage deletion", "err:", err)
-		}
-
-		if err := s.worker.EnqueueDeleteAssetsByServicesAndUpdatedAtJob(ctx, servicesArray, expiryThreshold); err != nil {
-			s.logger.Error("error occurred during elasticsearch deletion", "err:", err)
+	if !dryRun && total > 0 {
+		if err := s.executeDeleteAssetsByServicesAndUpdatedAt(ctx, services, expiryThreshold, servicesArray); err != nil {
+			return 0, fmt.Errorf("error occurred during executing %w", err)
 		}
 	}
 
 	s.logger.Info("Cleanup job completed", "dry run", dryRun, "total deleted", total)
 	return total, nil
+}
+
+func (s *Service) executeDeleteAssetsByServicesAndUpdatedAt(ctx context.Context, services string, expiryThreshold time.Time, servicesArray []string) error {
+	s.logger.Info("Running cleanup for services: ", services, " older than ", expiryThreshold)
+	deletedURNs, err := s.assetRepository.DeleteByIsDeletedAndServicesAndUpdatedAt(ctx, true, servicesArray, expiryThreshold)
+	if err != nil {
+		return fmt.Errorf("database deletion: %w", err)
+	}
+	s.logger.Info("Deleted assets", "URNs ", deletedURNs)
+
+	if err := s.lineageRepository.DeleteByURNs(ctx, deletedURNs); err != nil {
+		return fmt.Errorf("lineage deletion: %w", err)
+	}
+
+	if err := s.worker.EnqueueDeleteAssetsByIsDeletedAndServicesAndUpdatedAtJob(ctx, true, servicesArray, expiryThreshold); err != nil {
+		return fmt.Errorf("elasticsearch deletion: %w", err)
+	}
+	return nil
 }
 
 func (s *Service) SoftDeleteAssets(ctx context.Context, request DeleteAssetsRequest, updatedBy string) (affectedRows uint32, err error) {

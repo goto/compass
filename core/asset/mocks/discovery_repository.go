@@ -74,6 +74,55 @@ func (_c *DiscoveryRepository_DeleteByID_Call) RunAndReturn(run func(context.Con
 	return _c
 }
 
+// DeleteByIsDeletedAndServicesAndUpdatedAt provides a mock function with given fields: ctx, isDeleted, services, expiryThreshold
+func (_m *DiscoveryRepository) DeleteByIsDeletedAndServicesAndUpdatedAt(ctx context.Context, isDeleted bool, services []string, expiryThreshold time.Time) error {
+	ret := _m.Called(ctx, isDeleted, services, expiryThreshold)
+
+	if len(ret) == 0 {
+		panic("no return value specified for DeleteByIsDeletedAndServicesAndUpdatedAt")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context, bool, []string, time.Time) error); ok {
+		r0 = rf(ctx, isDeleted, services, expiryThreshold)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// DiscoveryRepository_DeleteByIsDeletedAndServicesAndUpdatedAt_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteByIsDeletedAndServicesAndUpdatedAt'
+type DiscoveryRepository_DeleteByIsDeletedAndServicesAndUpdatedAt_Call struct {
+	*mock.Call
+}
+
+// DeleteByIsDeletedAndServicesAndUpdatedAt is a helper method to define mock.On call
+//   - ctx context.Context
+//   - isDeleted bool
+//   - services []string
+//   - expiryThreshold time.Time
+func (_e *DiscoveryRepository_Expecter) DeleteByIsDeletedAndServicesAndUpdatedAt(ctx interface{}, isDeleted interface{}, services interface{}, expiryThreshold interface{}) *DiscoveryRepository_DeleteByIsDeletedAndServicesAndUpdatedAt_Call {
+	return &DiscoveryRepository_DeleteByIsDeletedAndServicesAndUpdatedAt_Call{Call: _e.mock.On("DeleteByIsDeletedAndServicesAndUpdatedAt", ctx, isDeleted, services, expiryThreshold)}
+}
+
+func (_c *DiscoveryRepository_DeleteByIsDeletedAndServicesAndUpdatedAt_Call) Run(run func(ctx context.Context, isDeleted bool, services []string, expiryThreshold time.Time)) *DiscoveryRepository_DeleteByIsDeletedAndServicesAndUpdatedAt_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run(args[0].(context.Context), args[1].(bool), args[2].([]string), args[3].(time.Time))
+	})
+	return _c
+}
+
+func (_c *DiscoveryRepository_DeleteByIsDeletedAndServicesAndUpdatedAt_Call) Return(_a0 error) *DiscoveryRepository_DeleteByIsDeletedAndServicesAndUpdatedAt_Call {
+	_c.Call.Return(_a0)
+	return _c
+}
+
+func (_c *DiscoveryRepository_DeleteByIsDeletedAndServicesAndUpdatedAt_Call) RunAndReturn(run func(context.Context, bool, []string, time.Time) error) *DiscoveryRepository_DeleteByIsDeletedAndServicesAndUpdatedAt_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // DeleteByQueryExpr provides a mock function with given fields: ctx, queryExpr
 func (_m *DiscoveryRepository) DeleteByQueryExpr(ctx context.Context, queryExpr queryexpr.ExprStr) error {
 	ret := _m.Called(ctx, queryExpr)
@@ -117,54 +166,6 @@ func (_c *DiscoveryRepository_DeleteByQueryExpr_Call) Return(_a0 error) *Discove
 }
 
 func (_c *DiscoveryRepository_DeleteByQueryExpr_Call) RunAndReturn(run func(context.Context, queryexpr.ExprStr) error) *DiscoveryRepository_DeleteByQueryExpr_Call {
-	_c.Call.Return(run)
-	return _c
-}
-
-// DeleteByServicesAndUpdatedAt provides a mock function with given fields: ctx, services, expiryThreshold
-func (_m *DiscoveryRepository) DeleteByServicesAndUpdatedAt(ctx context.Context, services []string, expiryThreshold time.Time) error {
-	ret := _m.Called(ctx, services, expiryThreshold)
-
-	if len(ret) == 0 {
-		panic("no return value specified for DeleteByServicesAndUpdatedAt")
-	}
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, []string, time.Time) error); ok {
-		r0 = rf(ctx, services, expiryThreshold)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
-// DiscoveryRepository_DeleteByServicesAndUpdatedAt_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'DeleteByServicesAndUpdatedAt'
-type DiscoveryRepository_DeleteByServicesAndUpdatedAt_Call struct {
-	*mock.Call
-}
-
-// DeleteByServicesAndUpdatedAt is a helper method to define mock.On call
-//   - ctx context.Context
-//   - services []string
-//   - expiryThreshold time.Time
-func (_e *DiscoveryRepository_Expecter) DeleteByServicesAndUpdatedAt(ctx interface{}, services interface{}, expiryThreshold interface{}) *DiscoveryRepository_DeleteByServicesAndUpdatedAt_Call {
-	return &DiscoveryRepository_DeleteByServicesAndUpdatedAt_Call{Call: _e.mock.On("DeleteByServicesAndUpdatedAt", ctx, services, expiryThreshold)}
-}
-
-func (_c *DiscoveryRepository_DeleteByServicesAndUpdatedAt_Call) Run(run func(ctx context.Context, services []string, expiryThreshold time.Time)) *DiscoveryRepository_DeleteByServicesAndUpdatedAt_Call {
-	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].([]string), args[2].(time.Time))
-	})
-	return _c
-}
-
-func (_c *DiscoveryRepository_DeleteByServicesAndUpdatedAt_Call) Return(_a0 error) *DiscoveryRepository_DeleteByServicesAndUpdatedAt_Call {
-	_c.Call.Return(_a0)
-	return _c
-}
-
-func (_c *DiscoveryRepository_DeleteByServicesAndUpdatedAt_Call) RunAndReturn(run func(context.Context, []string, time.Time) error) *DiscoveryRepository_DeleteByServicesAndUpdatedAt_Call {
 	_c.Call.Return(run)
 	return _c
 }

@@ -661,13 +661,18 @@ func (r *AssetRepository) SoftDeleteByURN(ctx context.Context, executedAt time.T
 	return newVersion, nil
 }
 
-func (r *AssetRepository) DeleteByServicesAndUpdatedAt(ctx context.Context, services []string, thresholdTime time.Time) (urns []string, err error) {
+func (r *AssetRepository) DeleteByIsDeletedAndServicesAndUpdatedAt(
+	ctx context.Context,
+	isDeleted bool,
+	services []string,
+	thresholdTime time.Time,
+) (urns []string, err error) {
 	if len(services) == 0 {
 		return nil, asset.ErrEmptyServices
 	}
 	err = r.client.RunWithinTx(ctx, func(*sqlx.Tx) error {
 		builder := sq.Delete("assets").
-			Where(sq.Eq{"is_deleted": true}).
+			Where(sq.Eq{"is_deleted": isDeleted}).
 			Where(sq.Lt{"updated_at": thresholdTime}).
 			Suffix("RETURNING urn")
 
@@ -944,9 +949,9 @@ func (r *AssetRepository) insert(ctx context.Context, tx *sqlx.Tx, ast *asset.As
 	ast.UpdatedAt = currentTime
 	insertCTE := sq.Insert("assets").
 		Columns("urn", "type", "service", "name", "description", "data", "url", "labels",
-			"created_at", "updated_by", "updated_at", "refreshed_at", "version").
+			"created_at", "updated_by", "updated_at", "refreshed_at", "version", "is_deleted").
 		Values(ast.URN, ast.Type, ast.Service, ast.Name, ast.Description, ast.Data, ast.URL, ast.Labels,
-			ast.CreatedAt, ast.UpdatedBy.ID, ast.UpdatedAt, currentTime, asset.BaseVersion).
+			ast.CreatedAt, ast.UpdatedBy.ID, ast.UpdatedAt, currentTime, asset.BaseVersion, ast.IsDeleted).
 		Suffix("RETURNING *").
 		Prefix("WITH assets AS (").
 		Suffix(")")
