@@ -80,3 +80,8 @@ asset:
     additional_types:
         - fact_source
     delete_assets_timeout: 5m
+
+cleanup:
+    dry_run: true
+    expiry_time: 720h0m0s
+    services: ""
