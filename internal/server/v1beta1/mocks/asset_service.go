@@ -177,9 +177,9 @@ func (_c *AssetService_DeleteAssets_Call) RunAndReturn(run func(context.Context,
 	return _c
 }
 
-// DeleteAssetsByServicesAndUpdatedAt provides a mock function with given fields: ctx, dryRun, services, expiryTime
-func (_m *AssetService) DeleteAssetsByServicesAndUpdatedAt(ctx context.Context, dryRun bool, services string, expiryTime time.Duration) (uint32, error) {
-	ret := _m.Called(ctx, dryRun, services, expiryTime)
+// DeleteAssetsByServicesAndUpdatedAt provides a mock function with given fields: ctx, dryRun, services, expiryDuration
+func (_m *AssetService) DeleteAssetsByServicesAndUpdatedAt(ctx context.Context, dryRun bool, services string, expiryDuration time.Duration) (uint32, error) {
+	ret := _m.Called(ctx, dryRun, services, expiryDuration)
 
 	if len(ret) == 0 {
 		panic("no return value specified for DeleteAssetsByServicesAndUpdatedAt")
@@ -188,16 +188,16 @@ func (_m *AssetService) DeleteAssetsByServicesAndUpdatedAt(ctx context.Context, 
 	var r0 uint32
 	var r1 error
 	if rf, ok := ret.Get(0).(func(context.Context, bool, string, time.Duration) (uint32, error)); ok {
-		return rf(ctx, dryRun, services, expiryTime)
+		return rf(ctx, dryRun, services, expiryDuration)
 	}
 	if rf, ok := ret.Get(0).(func(context.Context, bool, string, time.Duration) uint32); ok {
-		r0 = rf(ctx, dryRun, services, expiryTime)
+		r0 = rf(ctx, dryRun, services, expiryDuration)
 	} else {
 		r0 = ret.Get(0).(uint32)
 	}
 
 	if rf, ok := ret.Get(1).(func(context.Context, bool, string, time.Duration) error); ok {
-		r1 = rf(ctx, dryRun, services, expiryTime)
+		r1 = rf(ctx, dryRun, services, expiryDuration)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -214,12 +214,12 @@ type AssetService_DeleteAssetsByServicesAndUpdatedAt_Call struct {
 //   - ctx context.Context
 //   - dryRun bool
 //   - services string
-//   - expiryTime time.Duration
-func (_e *AssetService_Expecter) DeleteAssetsByServicesAndUpdatedAt(ctx interface{}, dryRun interface{}, services interface{}, expiryTime interface{}) *AssetService_DeleteAssetsByServicesAndUpdatedAt_Call {
-	return &AssetService_DeleteAssetsByServicesAndUpdatedAt_Call{Call: _e.mock.On("DeleteAssetsByServicesAndUpdatedAt", ctx, dryRun, services, expiryTime)}
+//   - expiryDuration time.Duration
+func (_e *AssetService_Expecter) DeleteAssetsByServicesAndUpdatedAt(ctx interface{}, dryRun interface{}, services interface{}, expiryDuration interface{}) *AssetService_DeleteAssetsByServicesAndUpdatedAt_Call {
+	return &AssetService_DeleteAssetsByServicesAndUpdatedAt_Call{Call: _e.mock.On("DeleteAssetsByServicesAndUpdatedAt", ctx, dryRun, services, expiryDuration)}
 }
 
-func (_c *AssetService_DeleteAssetsByServicesAndUpdatedAt_Call) Run(run func(ctx context.Context, dryRun bool, services string, expiryTime time.Duration)) *AssetService_DeleteAssetsByServicesAndUpdatedAt_Call {
+func (_c *AssetService_DeleteAssetsByServicesAndUpdatedAt_Call) Run(run func(ctx context.Context, dryRun bool, services string, expiryDuration time.Duration)) *AssetService_DeleteAssetsByServicesAndUpdatedAt_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		run(args[0].(context.Context), args[1].(bool), args[2].(string), args[3].(time.Duration))
 	})

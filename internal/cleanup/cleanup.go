@@ -8,7 +8,7 @@ import (
 )
 
 func Run(ctx context.Context, cfg Config, assetService handlersv1beta1.AssetService) (uint32, error) {
-	deletedCount, err := assetService.DeleteAssetsByServicesAndUpdatedAt(ctx, cfg.DryRun, cfg.Services, cfg.ExpiryTime)
+	deletedCount, err := assetService.DeleteAssetsByServicesAndUpdatedAt(ctx, cfg.DryRun, cfg.Services, cfg.ExpiryDuration)
 	if err != nil {
 		return 0, fmt.Errorf("failed to cleanup assets: %w", err)
 	}

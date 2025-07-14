@@ -83,5 +83,5 @@ asset:
 
 cleanup:
     dry_run: true
-    expiry_time: 720h0m0s
+    expiry_duration: 720h0m0s
     services: ""

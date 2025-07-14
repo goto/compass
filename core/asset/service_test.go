@@ -884,26 +884,26 @@ func TestService_SoftDeleteAssets(t *testing.T) {
 
 func TestService_DeleteAssetsByServicesAndUpdatedAt(t *testing.T) {
 	type testCase struct {
-		Description   string
-		DryRun        bool
-		Services      string
-		ExpiryTime    time.Duration
-		Setup         func(context.Context, *mocks.AssetRepository, *mocks.LineageRepository, *mocks.Worker)
-		ExpectedTotal uint32
-		ExpectedErr   error
+		Description    string
+		DryRun         bool
+		Services       string
+		ExpiryDuration time.Duration
+		Setup          func(context.Context, *mocks.AssetRepository, *mocks.LineageRepository, *mocks.Worker)
+		ExpectedTotal  uint32
+		ExpectedErr    error
 	}
 
 	services := "svc1,svc2"
 	servicesArray := []string{"svc1", "svc2"}
-	expiryTime := 24 * time.Hour
+	expiryDuration := 24 * time.Hour
 	deletedURNs := []string{"urn1", "urn2"}
 
 	testCases := []testCase{
 		{
-			Description: "should return error if GetCountByIsDeletedAndServicesAndUpdatedAt returns error",
-			DryRun:      true,
-			Services:    services,
-			ExpiryTime:  expiryTime,
+			Description:    "should return error if GetCountByIsDeletedAndServicesAndUpdatedAt returns error",
+			DryRun:         true,
+			Services:       services,
+			ExpiryDuration: expiryDuration,
 			Setup: func(ctx context.Context, ar *mocks.AssetRepository, _ *mocks.LineageRepository, _ *mocks.Worker) {
 				ar.EXPECT().GetCountByIsDeletedAndServicesAndUpdatedAt(ctx, true, servicesArray, mock.Anything).Return(uint32(0), errors.New("count error"))
 			},
@@ -911,10 +911,10 @@ func TestService_DeleteAssetsByServicesAndUpdatedAt(t *testing.T) {
 			ExpectedErr:   errors.New("count error"),
 		},
 		{
-			Description: "should only return total if dryRun is true",
-			DryRun:      true,
-			Services:    services,
-			ExpiryTime:  expiryTime,
+			Description:    "should only return total if dryRun is true",
+			DryRun:         true,
+			Services:       services,
+			ExpiryDuration: expiryDuration,
 			Setup: func(ctx context.Context, ar *mocks.AssetRepository, _ *mocks.LineageRepository, _ *mocks.Worker) {
 				ar.EXPECT().GetCountByIsDeletedAndServicesAndUpdatedAt(ctx, true, servicesArray, mock.Anything).Return(uint32(5), nil)
 			},
@@ -922,10 +922,10 @@ func TestService_DeleteAssetsByServicesAndUpdatedAt(t *testing.T) {
 			ExpectedErr:   nil,
 		},
 		{
-			Description: "should return 0 and error if DeleteByIsDeletedAndServicesAndUpdatedAt returns error",
-			DryRun:      false,
-			Services:    services,
-			ExpiryTime:  expiryTime,
+			Description:    "should return 0 and error if DeleteByIsDeletedAndServicesAndUpdatedAt returns error",
+			DryRun:         false,
+			Services:       services,
+			ExpiryDuration: expiryDuration,
 			Setup: func(ctx context.Context, ar *mocks.AssetRepository, _ *mocks.LineageRepository, _ *mocks.Worker) {
 				ar.EXPECT().GetCountByIsDeletedAndServicesAndUpdatedAt(ctx, true, servicesArray, mock.Anything).Return(uint32(3), nil)
 				ar.EXPECT().DeleteByIsDeletedAndServicesAndUpdatedAt(ctx, true, servicesArray, mock.Anything).Return(nil, errors.New("delete error"))
@@ -934,10 +934,10 @@ func TestService_DeleteAssetsByServicesAndUpdatedAt(t *testing.T) {
 			ExpectedErr:   errors.New("delete error"),
 		},
 		{
-			Description: "should return 0 and error if DeleteByURNs returns error",
-			DryRun:      false,
-			Services:    services,
-			ExpiryTime:  expiryTime,
+			Description:    "should return 0 and error if DeleteByURNs returns error",
+			DryRun:         false,
+			Services:       services,
+			ExpiryDuration: expiryDuration,
 			Setup: func(ctx context.Context, ar *mocks.AssetRepository, lr *mocks.LineageRepository, _ *mocks.Worker) {
 				ar.EXPECT().GetCountByIsDeletedAndServicesAndUpdatedAt(ctx, true, servicesArray, mock.Anything).Return(uint32(3), nil)
 				ar.EXPECT().DeleteByIsDeletedAndServicesAndUpdatedAt(ctx, true, servicesArray, mock.Anything).Return([]string{"urn"}, nil)
@@ -947,10 +947,10 @@ func TestService_DeleteAssetsByServicesAndUpdatedAt(t *testing.T) {
 			ExpectedErr:   errors.New("lineage error"),
 		},
 		{
-			Description: "should return 0 and error if EnqueueDeleteAssetsByIsDeletedAndServicesAndUpdatedAtJob returns error",
-			DryRun:      false,
-			Services:    services,
-			ExpiryTime:  expiryTime,
+			Description:    "should return 0 and error if EnqueueDeleteAssetsByIsDeletedAndServicesAndUpdatedAtJob returns error",
+			DryRun:         false,
+			Services:       services,
+			ExpiryDuration: expiryDuration,
 			Setup: func(ctx context.Context, ar *mocks.AssetRepository, lr *mocks.LineageRepository, w *mocks.Worker) {
 				ar.EXPECT().GetCountByIsDeletedAndServicesAndUpdatedAt(ctx, true, servicesArray, mock.Anything).Return(uint32(3), nil)
 				ar.EXPECT().DeleteByIsDeletedAndServicesAndUpdatedAt(ctx, true, servicesArray, mock.Anything).Return([]string{"urn"}, nil)
@@ -961,10 +961,10 @@ func TestService_DeleteAssetsByServicesAndUpdatedAt(t *testing.T) {
 			ExpectedErr:   errors.New("worker error"),
 		},
 		{
-			Description: "should call lineage and worker if not dryRun and deletion succeeds",
-			DryRun:      false,
-			Services:    services,
-			ExpiryTime:  expiryTime,
+			Description:    "should call lineage and worker if not dryRun and deletion succeeds",
+			DryRun:         false,
+			Services:       services,
+			ExpiryDuration: expiryDuration,
 			Setup: func(ctx context.Context, ar *mocks.AssetRepository, lr *mocks.LineageRepository, w *mocks.Worker) {
 				ar.EXPECT().GetCountByIsDeletedAndServicesAndUpdatedAt(ctx, true, servicesArray, mock.Anything).Return(uint32(2), nil)
 				ar.EXPECT().DeleteByIsDeletedAndServicesAndUpdatedAt(ctx, true, servicesArray, mock.Anything).Return(deletedURNs, nil)
@@ -996,7 +996,7 @@ func TestService_DeleteAssetsByServicesAndUpdatedAt(t *testing.T) {
 			})
 			defer cancel()
 
-			total, err := svc.DeleteAssetsByServicesAndUpdatedAt(ctx, tc.DryRun, tc.Services, tc.ExpiryTime)
+			total, err := svc.DeleteAssetsByServicesAndUpdatedAt(ctx, tc.DryRun, tc.Services, tc.ExpiryDuration)
 			if tc.ExpectedErr != nil {
 				assert.ErrorContains(t, err, tc.ExpectedErr.Error())
 			} else {

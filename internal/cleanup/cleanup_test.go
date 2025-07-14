@@ -15,9 +15,9 @@ import (
 func TestRun(t *testing.T) {
 	ctx := context.Background()
 	cfg := cleanup.Config{
-		DryRun:     true,
-		Services:   "svc1,svc2",
-		ExpiryTime: 24 * time.Hour,
+		DryRun:         true,
+		Services:       "svc1,svc2",
+		ExpiryDuration: 24 * time.Hour,
 	}
 
 	tests := []struct {
@@ -29,7 +29,7 @@ func TestRun(t *testing.T) {
 		{
 			name: "success",
 			mockSetup: func(mockSvc *mocks.AssetService) {
-				mockSvc.On("DeleteAssetsByServicesAndUpdatedAt", mock.Anything, cfg.DryRun, cfg.Services, cfg.ExpiryTime).Return(uint32(5), nil)
+				mockSvc.On("DeleteAssetsByServicesAndUpdatedAt", mock.Anything, cfg.DryRun, cfg.Services, cfg.ExpiryDuration).Return(uint32(5), nil)
 			},
 			expectCount: 5,
 			expectErr:   "",
@@ -38,7 +38,7 @@ func TestRun(t *testing.T) {
 			name: "error from service",
 			mockSetup: func(mockSvc *mocks.AssetService) {
 				errExpected := errors.New("service error")
-				mockSvc.On("DeleteAssetsByServicesAndUpdatedAt", mock.Anything, cfg.DryRun, cfg.Services, cfg.ExpiryTime).Return(uint32(0), errExpected)
+				mockSvc.On("DeleteAssetsByServicesAndUpdatedAt", mock.Anything, cfg.DryRun, cfg.Services, cfg.ExpiryDuration).Return(uint32(0), errExpected)
 			},
 			expectCount: 0,
 			expectErr:   "failed to cleanup assets",

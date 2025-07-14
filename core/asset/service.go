@@ -260,9 +260,9 @@ func (s *Service) executeDeleteAssets(ctx context.Context, deleteSQLExpr queryex
 	}
 }
 
-func (s *Service) DeleteAssetsByServicesAndUpdatedAt(ctx context.Context, dryRun bool, services string, expiryTime time.Duration) (uint32, error) {
+func (s *Service) DeleteAssetsByServicesAndUpdatedAt(ctx context.Context, dryRun bool, services string, expiryDuration time.Duration) (uint32, error) {
 	servicesArray := strings.Split(services, ",")
-	expiryThreshold := time.Now().Add(-1 * expiryTime)
+	expiryThreshold := time.Now().Add(-1 * expiryDuration)
 
 	total, err := s.assetRepository.GetCountByIsDeletedAndServicesAndUpdatedAt(ctx, true, servicesArray, expiryThreshold)
 	if err != nil {
