@@ -809,6 +809,111 @@ func TestDiscoveryRepository_SyncAssets(t *testing.T) {
 	})
 }
 
+func TestDiscoveryRepository_DeleteByIsDeletedAndServicesAndUpdatedAt(t *testing.T) {
+	ctx := context.Background()
+	bigqueryService := "bigquery-test"
+	kafkaService := "kafka-test"
+	currentTime := time.Now().UTC()
+
+	cli, err := esTestServer.NewClient()
+	require.NoError(t, err)
+
+	esClient, err := store.NewClient(
+		log.NewNoop(), store.Config{}, store.WithClient(cli),
+	)
+	require.NoError(t, err)
+
+	repo := store.NewDiscoveryRepository(esClient, log.NewNoop(), time.Second*10, []string{"number", "id"})
+
+	t.Run("should return error if services is empty", func(t *testing.T) {
+		err := repo.DeleteByIsDeletedAndServicesAndUpdatedAt(ctx, true, []string{}, currentTime)
+		assert.ErrorIs(t, err, asset.ErrEmptyServices)
+	})
+
+	t.Run("should return error if expiryThreshold is zero", func(t *testing.T) {
+		err := repo.DeleteByIsDeletedAndServicesAndUpdatedAt(ctx, true, []string{bigqueryService}, time.Time{})
+		assert.ErrorIs(t, err, asset.ErrExpiryThresholdTimeIsZero)
+	})
+
+	t.Run("should delete assets for specific services", func(t *testing.T) {
+		ast := asset.Asset{
+			ID:        "delete-id-service",
+			Type:      asset.Type("table"),
+			Service:   bigqueryService,
+			URN:       "urn-delete-service",
+			UpdatedAt: currentTime.Add(-48 * time.Hour),
+			IsDeleted: true,
+		}
+		err := repo.Upsert(ctx, ast)
+		require.NoError(t, err)
+
+		err = repo.DeleteByIsDeletedAndServicesAndUpdatedAt(ctx, true, []string{bigqueryService}, currentTime.Add(-24*time.Hour))
+		assert.NoError(t, err)
+
+		// Should not find the asset after deletion
+		hits, total := searchByURN(t, cli, ast.URN)
+		assert.Equal(t, int64(0), total)
+		assert.Len(t, hits, 0)
+	})
+
+	t.Run("should delete assets for all services", func(t *testing.T) {
+		ast := asset.Asset{
+			ID:        "delete-id-all",
+			Type:      asset.Type("table"),
+			Service:   bigqueryService,
+			URN:       "urn-delete-all",
+			UpdatedAt: currentTime.Add(-48 * time.Hour),
+			IsDeleted: true,
+		}
+		err := repo.Upsert(ctx, ast)
+		require.NoError(t, err)
+
+		err = repo.DeleteByIsDeletedAndServicesAndUpdatedAt(ctx, true, []string{asset.AllServicesCleanupConfig}, currentTime.Add(-24*time.Hour))
+		assert.NoError(t, err)
+
+		hits, total := searchByURN(t, cli, ast.URN)
+		assert.Equal(t, int64(0), total)
+		assert.Len(t, hits, 0)
+	})
+
+	t.Run("should ignore unavailable indices", func(t *testing.T) {
+		ast1 := asset.Asset{
+			ID:        "id1-delete-service",
+			Type:      asset.Type("table"),
+			Service:   bigqueryService,
+			URN:       "urn1-delete-service",
+			UpdatedAt: currentTime.Add(-48 * time.Hour),
+			IsDeleted: true,
+		}
+		ast2 := asset.Asset{
+			ID:        "id2-delete-service",
+			Type:      asset.Type("topic"),
+			Service:   kafkaService,
+			URN:       "urn2-delete-service",
+			UpdatedAt: currentTime.Add(-48 * time.Hour),
+			IsDeleted: true,
+		}
+		cli, err := esTestServer.NewClient()
+		require.NoError(t, err)
+		esClient, err := store.NewClient(
+			log.NewNoop(), store.Config{}, store.WithClient(cli),
+		)
+		require.NoError(t, err)
+		repo := store.NewDiscoveryRepository(esClient, log.NewNoop(), time.Second*10, []string{"number", "id"})
+
+		err = repo.Upsert(ctx, ast1)
+		require.NoError(t, err)
+		err = repo.Upsert(ctx, ast2)
+		require.NoError(t, err)
+
+		_, err = cli.Indices.Close([]string{kafkaService})
+		require.NoError(t, err)
+
+		err = repo.DeleteByIsDeletedAndServicesAndUpdatedAt(ctx, true, []string{bigqueryService, kafkaService}, currentTime.Add(-24*time.Hour))
+		assert.NoError(t, err)
+	})
+}
+
 func searchByURN(t *testing.T, cli *elasticsearch.Client, urn string) ([]searchByUrnFields, int64) {
 	t.Helper()
 

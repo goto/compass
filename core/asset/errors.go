@@ -6,15 +6,19 @@ import (
 	"strings"
 )
 
+const AllServicesCleanupConfig = "all"
+
 var (
-	ErrEmptyID             = errors.New("asset does not have ID")
-	ErrProbeExists         = errors.New("asset probe already exists")
-	ErrEmptyURN            = errors.New("asset does not have URN")
-	ErrEmptyQuery          = errors.New("query is empty")
-	ErrUnknownType         = errors.New("unknown type")
-	ErrNilAsset            = errors.New("nil asset")
-	ErrURNExist            = errors.New("urn asset is already exist")
-	ErrAssetAlreadyDeleted = errors.New("asset already deleted")
+	ErrEmptyID                   = errors.New("asset does not have ID")
+	ErrProbeExists               = errors.New("asset probe already exists")
+	ErrEmptyURN                  = errors.New("asset does not have URN")
+	ErrEmptyQuery                = errors.New("query is empty")
+	ErrEmptyServices             = errors.New("services is empty")
+	ErrUnknownType               = errors.New("unknown type")
+	ErrNilAsset                  = errors.New("nil asset")
+	ErrURNExist                  = errors.New("urn asset is already exist")
+	ErrAssetAlreadyDeleted       = errors.New("asset already deleted")
+	ErrExpiryThresholdTimeIsZero = errors.New("expiry threshold time is zero")
 )
 
 type NotFoundError struct {

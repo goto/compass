@@ -34,6 +34,7 @@ type AssetService interface {
 	DeleteAsset(ctx context.Context, id string) error
 	SoftDeleteAsset(ctx context.Context, id, updatedBy string) error
 	DeleteAssets(ctx context.Context, request asset.DeleteAssetsRequest) (uint32, error)
+	DeleteAssetsByServicesAndUpdatedAt(ctx context.Context, dryRun bool, services string, expiryDuration time.Duration) (uint32, error)
 	SoftDeleteAssets(ctx context.Context, request asset.DeleteAssetsRequest, updatedBy string) (uint32, error)
 
 	GetLineage(ctx context.Context, urn string, query asset.LineageQuery) (asset.Lineage, error)

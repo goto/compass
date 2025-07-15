@@ -882,6 +882,131 @@ func TestService_SoftDeleteAssets(t *testing.T) {
 	}
 }
 
+func TestService_DeleteAssetsByServicesAndUpdatedAt(t *testing.T) {
+	type testCase struct {
+		Description    string
+		DryRun         bool
+		Services       string
+		ExpiryDuration time.Duration
+		Setup          func(context.Context, *mocks.AssetRepository, *mocks.LineageRepository, *mocks.Worker)
+		ExpectedTotal  uint32
+		ExpectedErr    error
+	}
+
+	services := "svc1,svc2"
+	servicesArray := []string{"svc1", "svc2"}
+	expiryDuration := 24 * time.Hour
+	deletedURNs := []string{"urn1", "urn2"}
+
+	testCases := []testCase{
+		{
+			Description:    "should return error if GetCountByIsDeletedAndServicesAndUpdatedAt returns error",
+			DryRun:         true,
+			Services:       services,
+			ExpiryDuration: expiryDuration,
+			Setup: func(ctx context.Context, ar *mocks.AssetRepository, _ *mocks.LineageRepository, _ *mocks.Worker) {
+				ar.EXPECT().GetCountByIsDeletedAndServicesAndUpdatedAt(ctx, true, servicesArray, mock.Anything).Return(uint32(0), errors.New("count error"))
+			},
+			ExpectedTotal: 0,
+			ExpectedErr:   errors.New("count error"),
+		},
+		{
+			Description:    "should only return total if dryRun is true",
+			DryRun:         true,
+			Services:       services,
+			ExpiryDuration: expiryDuration,
+			Setup: func(ctx context.Context, ar *mocks.AssetRepository, _ *mocks.LineageRepository, _ *mocks.Worker) {
+				ar.EXPECT().GetCountByIsDeletedAndServicesAndUpdatedAt(ctx, true, servicesArray, mock.Anything).Return(uint32(5), nil)
+			},
+			ExpectedTotal: 5,
+			ExpectedErr:   nil,
+		},
+		{
+			Description:    "should return 0 and error if DeleteByIsDeletedAndServicesAndUpdatedAt returns error",
+			DryRun:         false,
+			Services:       services,
+			ExpiryDuration: expiryDuration,
+			Setup: func(ctx context.Context, ar *mocks.AssetRepository, _ *mocks.LineageRepository, _ *mocks.Worker) {
+				ar.EXPECT().GetCountByIsDeletedAndServicesAndUpdatedAt(ctx, true, servicesArray, mock.Anything).Return(uint32(3), nil)
+				ar.EXPECT().DeleteByIsDeletedAndServicesAndUpdatedAt(ctx, true, servicesArray, mock.Anything).Return(nil, errors.New("delete error"))
+			},
+			ExpectedTotal: 0,
+			ExpectedErr:   errors.New("delete error"),
+		},
+		{
+			Description:    "should return 0 and error if DeleteByURNs returns error",
+			DryRun:         false,
+			Services:       services,
+			ExpiryDuration: expiryDuration,
+			Setup: func(ctx context.Context, ar *mocks.AssetRepository, lr *mocks.LineageRepository, _ *mocks.Worker) {
+				ar.EXPECT().GetCountByIsDeletedAndServicesAndUpdatedAt(ctx, true, servicesArray, mock.Anything).Return(uint32(3), nil)
+				ar.EXPECT().DeleteByIsDeletedAndServicesAndUpdatedAt(ctx, true, servicesArray, mock.Anything).Return([]string{"urn"}, nil)
+				lr.EXPECT().DeleteByURNs(mock.Anything, mock.Anything).Return(errors.New("lineage error"))
+			},
+			ExpectedTotal: 0,
+			ExpectedErr:   errors.New("lineage error"),
+		},
+		{
+			Description:    "should return 0 and error if EnqueueDeleteAssetsByIsDeletedAndServicesAndUpdatedAtJob returns error",
+			DryRun:         false,
+			Services:       services,
+			ExpiryDuration: expiryDuration,
+			Setup: func(ctx context.Context, ar *mocks.AssetRepository, lr *mocks.LineageRepository, w *mocks.Worker) {
+				ar.EXPECT().GetCountByIsDeletedAndServicesAndUpdatedAt(ctx, true, servicesArray, mock.Anything).Return(uint32(3), nil)
+				ar.EXPECT().DeleteByIsDeletedAndServicesAndUpdatedAt(ctx, true, servicesArray, mock.Anything).Return([]string{"urn"}, nil)
+				lr.EXPECT().DeleteByURNs(mock.Anything, mock.Anything).Return(nil)
+				w.EXPECT().EnqueueDeleteAssetsByIsDeletedAndServicesAndUpdatedAtJob(ctx, true, servicesArray, mock.Anything).Return(errors.New("worker error"))
+			},
+			ExpectedTotal: 0,
+			ExpectedErr:   errors.New("worker error"),
+		},
+		{
+			Description:    "should call lineage and worker if not dryRun and deletion succeeds",
+			DryRun:         false,
+			Services:       services,
+			ExpiryDuration: expiryDuration,
+			Setup: func(ctx context.Context, ar *mocks.AssetRepository, lr *mocks.LineageRepository, w *mocks.Worker) {
+				ar.EXPECT().GetCountByIsDeletedAndServicesAndUpdatedAt(ctx, true, servicesArray, mock.Anything).Return(uint32(2), nil)
+				ar.EXPECT().DeleteByIsDeletedAndServicesAndUpdatedAt(ctx, true, servicesArray, mock.Anything).Return(deletedURNs, nil)
+				lr.EXPECT().DeleteByURNs(ctx, deletedURNs).Return(nil)
+				w.EXPECT().EnqueueDeleteAssetsByIsDeletedAndServicesAndUpdatedAtJob(ctx, true, servicesArray, mock.Anything).Return(nil)
+			},
+			ExpectedTotal: 2,
+			ExpectedErr:   nil,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.Description, func(t *testing.T) {
+			ctx := context.Background()
+			assetRepo := mocks.NewAssetRepository(t)
+			discoveryRepo := mocks.NewDiscoveryRepository(t)
+			worker := mocks.NewWorker(t)
+			lineageRepo := mocks.NewLineageRepository(t)
+			if tc.Setup != nil {
+				tc.Setup(ctx, assetRepo, lineageRepo, worker)
+			}
+
+			svc, cancel := asset.NewService(asset.ServiceDeps{
+				AssetRepo:     assetRepo,
+				DiscoveryRepo: discoveryRepo,
+				LineageRepo:   lineageRepo,
+				Worker:        worker,
+				Logger:        mocks.LoggerMock{},
+			})
+			defer cancel()
+
+			total, err := svc.DeleteAssetsByServicesAndUpdatedAt(ctx, tc.DryRun, tc.Services, tc.ExpiryDuration)
+			if tc.ExpectedErr != nil {
+				assert.ErrorContains(t, err, tc.ExpectedErr.Error())
+			} else {
+				assert.NoError(t, err)
+			}
+			assert.Equal(t, tc.ExpectedTotal, total)
+		})
+	}
+}
+
 func TestService_GetAssetByID(t *testing.T) {
 	assetID := "f742aa61-1100-445c-8d72-355a42e2fb59"
 	urn := "my-test-urn"

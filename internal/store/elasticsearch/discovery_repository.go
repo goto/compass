@@ -167,6 +167,52 @@ func (repo *DiscoveryRepository) DeleteByQueryExpr(ctx context.Context, queryExp
 	return repo.deleteWithQuery(ctx, "DeleteByQueryExpr", esQuery)
 }
 
+func (repo *DiscoveryRepository) DeleteByIsDeletedAndServicesAndUpdatedAt(
+	ctx context.Context,
+	isDeleted bool,
+	services []string,
+	expiryThreshold time.Time,
+) error {
+	if len(services) == 0 {
+		return asset.ErrEmptyServices
+	}
+	if expiryThreshold.IsZero() {
+		return asset.ErrExpiryThresholdTimeIsZero
+	}
+
+	thresholdUpdatedAt := expiryThreshold.Format(time.RFC3339)
+	var query string
+	if strings.TrimSpace(services[0]) != asset.AllServicesCleanupConfig {
+		servicesJSON, err := json.Marshal(services)
+		if err != nil {
+			return fmt.Errorf("failed to marshal services: %w", err)
+		}
+		query = fmt.Sprintf(`{
+			"query": {
+				"bool": {
+					"must": [
+						{"terms": {"service.keyword": %s}},
+						{"range": {"updated_at": {"lt": "%s"}}},
+						{"term": {"is_deleted": %t}}
+					]
+				}
+			}
+		}`, servicesJSON, thresholdUpdatedAt, isDeleted)
+	} else {
+		query = fmt.Sprintf(`{
+			"query": {
+				"bool": {
+					"must": [
+						{"range": {"updated_at": {"lt": "%s"}}},
+						{"term": {"is_deleted": %t}}
+					]
+				}
+			}
+		}`, thresholdUpdatedAt, isDeleted)
+	}
+	return repo.deleteWithQuery(ctx, "DeleteByIsDeletedAndServicesAndUpdatedAt", query)
+}
+
 func (repo *DiscoveryRepository) SoftDeleteAssets(ctx context.Context, assets []asset.Asset, doUpdateVersion bool) error {
 	return repo.bulkSoftDeleteAssets(ctx, "SoftDeleteAssets", assets, doUpdateVersion)
 }
