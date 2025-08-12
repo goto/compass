@@ -103,6 +103,10 @@ func TestGetTypes(t *testing.T) {
 							Name:  "metric",
 							Count: 0,
 						},
+						{
+							Name:  "experiment",
+							Count: 0,
+						},
 					},
 				}
 
