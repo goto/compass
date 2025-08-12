@@ -27,6 +27,7 @@ const (
 	typeModel        Type = "model"
 	typeQuery        Type = "query"
 	typeMetric       Type = "metric"
+	typeExperiment   Type = "experiment"
 )
 
 var supportedTypeMap = map[Type]bool{
@@ -39,6 +40,7 @@ var supportedTypeMap = map[Type]bool{
 	typeModel:        true,
 	typeQuery:        true,
 	typeMetric:       true,
+	typeExperiment:   true,
 }
 
 func GetSupportedTypes() []Type {
