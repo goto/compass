@@ -102,6 +102,7 @@ func TestGetSupportedTypes(t *testing.T) {
 			asset.Type("model"),
 			asset.Type("query"),
 			asset.Type("metric"),
+			asset.Type("experiment"),
 		}
 
 		actualTypes := asset.GetSupportedTypes()
@@ -164,6 +165,7 @@ func TestRegisterSupportedTypes(t *testing.T) {
 			asset.Type("model"),
 			asset.Type("query"),
 			asset.Type("metric"),
+			asset.Type("experiment"),
 		}
 
 		inputTypes := []asset.Type{
@@ -189,6 +191,7 @@ func TestRegisterSupportedTypes(t *testing.T) {
 			asset.Type("model"),
 			asset.Type("query"),
 			asset.Type("metric"),
+			asset.Type("experiment"),
 			asset.Type("fact_source"),
 			asset.Type("dimension_01a"),
 		}
