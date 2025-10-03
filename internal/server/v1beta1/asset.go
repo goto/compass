@@ -430,8 +430,8 @@ func (server *APIServer) upsertAsset(
 		switch {
 		case errors.As(err, new(asset.InvalidError)):
 			return "", status.Error(codes.InvalidArgument, err.Error())
-		case errors.As(err, new(asset.NotFoundError)):
-			return "", status.Error(codes.NotFound, err.Error())
+		case errors.As(err, new(asset.NotFoundError)): // only possible when updateOnly is true
+			return "", nil
 		}
 		return "", internalServerError(server.logger, err.Error())
 	}
@@ -460,8 +460,8 @@ func (server *APIServer) upsertPatchAssetWithoutLineage(
 		switch {
 		case errors.As(err, new(asset.InvalidError)):
 			return "", status.Error(codes.InvalidArgument, err.Error())
-		case errors.As(err, new(asset.NotFoundError)):
-			return "", status.Error(codes.NotFound, err.Error())
+		case errors.As(err, new(asset.NotFoundError)): // only possible when updateOnly is true
+			return "", nil
 		}
 
 		return "", internalServerError(server.logger, err.Error())

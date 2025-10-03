@@ -498,7 +498,7 @@ func TestUpsertAsset(t *testing.T) {
 			ExpectStatus: codes.Internal,
 		},
 		{
-			Description: "should return not found error if the asset does not exist and isUpdateOnly is true",
+			Description: "should return OK but empty asset id if the asset does not exist and isUpdateOnly is true",
 			Setup: func(ctx context.Context, as *mocks.AssetService, _ *mocks.UserService) {
 				ast := asset.Asset{
 					URN:       "test dagger",
@@ -515,10 +515,10 @@ func TestUpsertAsset(t *testing.T) {
 				assetWithID.ID = assetID
 
 				as.EXPECT().UpsertAsset(ctx, &ast, []string{}, []string{}, true).
-					Return("", asset.NotFoundError{URN: ast.URN})
+					Return("", nil)
 			},
 			Request:      validPayloadUpdateOnlyTrue,
-			ExpectStatus: codes.NotFound,
+			ExpectStatus: codes.OK,
 		},
 
 		{
@@ -772,7 +772,7 @@ func TestUpsertPatchAsset(t *testing.T) {
 			ExpectStatus: codes.Internal,
 		},
 		{
-			Description: "should return not found error when the asset does not exist and isUpdateOnly is true",
+			Description: "should return OK but empty asset id when the asset does not exist and isUpdateOnly is true",
 			Setup: func(ctx context.Context, as *mocks.AssetService, _ *mocks.UserService) {
 				patchedAsset := asset.Asset{
 					URN:       "test dagger",
@@ -788,10 +788,10 @@ func TestUpsertPatchAsset(t *testing.T) {
 				assetWithID.ID = assetID
 
 				as.EXPECT().UpsertPatchAssetWithoutLineage(ctx, &patchedAsset, mock.Anything, true).
-					Return("", asset.NotFoundError{URN: patchedAsset.URN})
+					Return("", nil)
 			},
 			Request:      validPayloadUpdateOnlyTrue,
-			ExpectStatus: codes.NotFound,
+			ExpectStatus: codes.OK,
 		},
 		{
 			Description: "should return OK and asset's ID if the asset is successfully created/patched",
