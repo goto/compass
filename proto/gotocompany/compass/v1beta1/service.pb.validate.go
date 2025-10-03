@@ -4770,6 +4770,8 @@ func (m *UpsertAssetRequest) validate(all bool) error {
 
 	}
 
+	// no validation rules for UpdateOnly
+
 	if len(errors) > 0 {
 		return UpsertAssetRequestMultiError(errors)
 	}
@@ -5074,6 +5076,8 @@ func (m *UpsertPatchAssetRequest) validate(all bool) error {
 	}
 
 	// no validation rules for OverwriteLineage
+
+	// no validation rules for UpdateOnly
 
 	if len(errors) > 0 {
 		return UpsertPatchAssetRequestMultiError(errors)

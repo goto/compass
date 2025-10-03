@@ -395,10 +395,14 @@ func (r *AssetRepository) getByVersion(
 // Upsert creates a new asset if it does not exist yet.
 // It updates if asset does exist.
 // Checking existence is done using "urn", "type", "name", "data", and "service" fields.
-func (r *AssetRepository) Upsert(ctx context.Context, ast *asset.Asset) (upsertedAsset *asset.Asset, err error) {
+func (r *AssetRepository) Upsert(ctx context.Context, ast *asset.Asset, isUpdateOnly bool) (upsertedAsset *asset.Asset, err error) {
 	err = r.client.RunWithinTx(ctx, func(tx *sqlx.Tx) (err error) {
 		fetchedAsset, err := r.GetByURNWithTx(ctx, tx, ast.URN)
 		if errors.As(err, new(asset.NotFoundError)) {
+			if isUpdateOnly {
+				return asset.NotFoundError{URN: ast.URN}
+			}
+
 			// insert flow
 			upsertedAsset, err = r.insert(ctx, tx, ast)
 			if err != nil {
@@ -442,10 +446,15 @@ func (r *AssetRepository) UpsertPatch( //nolint:gocognit
 	ctx context.Context,
 	ast *asset.Asset,
 	patchData map[string]interface{},
+	isUpdateOnly bool,
 ) (upsertedAsset *asset.Asset, err error) {
 	err = r.client.RunWithinTx(ctx, func(tx *sqlx.Tx) (err error) {
 		fetchedAsset, err := r.GetByURNWithTx(ctx, tx, ast.URN)
 		if errors.As(err, new(asset.NotFoundError)) {
+			if isUpdateOnly {
+				return asset.NotFoundError{URN: ast.URN}
+			}
+
 			// insert flow
 			if err := r.validateAsset(*ast); err != nil {
 				return err
