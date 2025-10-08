@@ -359,24 +359,25 @@ func TestGetAssetByID(t *testing.T) {
 
 func TestUpsertAsset(t *testing.T) {
 	var (
-		userID       = uuid.NewString()
-		userEmail    = uuid.NewString()
-		assetID      = uuid.NewString()
-		validPayload = &compassv1beta1.UpsertAssetRequest{
-			Asset: &compassv1beta1.UpsertAssetRequest_Asset{
-				Urn:     "test dagger",
-				Type:    "table",
-				Name:    "new-name",
-				Service: "kafka",
-				Data:    &structpb.Struct{},
-				Url:     "https://sample-url.com",
-				Owners: []*compassv1beta1.User{
-					{Id: "id", Email: "email@email.com", Provider: "provider"},
-					// the following users should get de-duplicated.
-					{Id: "id"},
-					{Email: "email@email.com"},
-				},
+		userID    = uuid.NewString()
+		userEmail = uuid.NewString()
+		assetID   = uuid.NewString()
+		assetr    = &compassv1beta1.UpsertAssetRequest_Asset{
+			Urn:     "test dagger",
+			Type:    "table",
+			Name:    "new-name",
+			Service: "kafka",
+			Data:    &structpb.Struct{},
+			Url:     "https://sample-url.com",
+			Owners: []*compassv1beta1.User{
+				{Id: "id", Email: "email@email.com", Provider: "provider"},
+				// the following users should get de-duplicated.
+				{Id: "id"},
+				{Email: "email@email.com"},
 			},
+		}
+		validPayload = &compassv1beta1.UpsertAssetRequest{
+			Asset: assetr,
 			Upstreams: []*compassv1beta1.LineageNode{
 				{
 					Urn:     "upstream-1",
@@ -396,6 +397,10 @@ func TestUpsertAsset(t *testing.T) {
 					Service: "tableau",
 				},
 			},
+		}
+		validPayloadUpdateOnlyTrue = &compassv1beta1.UpsertAssetRequest{
+			Asset:      assetr,
+			UpdateOnly: true,
 		}
 	)
 	type testCase struct {
@@ -486,11 +491,36 @@ func TestUpsertAsset(t *testing.T) {
 					mock.AnythingOfType("*asset.Asset"),
 					mock.AnythingOfType("[]string"),
 					mock.AnythingOfType("[]string"),
+					mock.AnythingOfType("bool"),
 				).Return("", expectedErr)
 			},
 			Request:      validPayload,
 			ExpectStatus: codes.Internal,
 		},
+		{
+			Description: "should return OK but empty asset id if the asset does not exist and isUpdateOnly is true",
+			Setup: func(ctx context.Context, as *mocks.AssetService, _ *mocks.UserService) {
+				ast := asset.Asset{
+					URN:       "test dagger",
+					Type:      asset.Type("table"),
+					Name:      "new-name",
+					Service:   "kafka",
+					UpdatedBy: user.User{ID: userID},
+					Data:      map[string]interface{}{},
+					URL:       "https://sample-url.com",
+					Owners:    []user.User{{ID: "id", Email: "email@email.com", Provider: "provider"}},
+				}
+
+				assetWithID := ast
+				assetWithID.ID = assetID
+
+				as.EXPECT().UpsertAsset(ctx, &ast, []string{}, []string{}, true).
+					Return("", nil)
+			},
+			Request:      validPayloadUpdateOnlyTrue,
+			ExpectStatus: codes.OK,
+		},
+
 		{
 			Description: "should return OK and asset's ID if the asset is successfully created/updated",
 			Setup: func(ctx context.Context, as *mocks.AssetService, _ *mocks.UserService) {
@@ -510,9 +540,11 @@ func TestUpsertAsset(t *testing.T) {
 				assetWithID := ast
 				assetWithID.ID = assetID
 
-				as.EXPECT().UpsertAsset(ctx, &ast, upstreams, downstreams).Return(assetWithID.ID, nil).Run(func(ctx context.Context, ast *asset.Asset, upstreams, downstreams []string) {
-					ast.ID = assetWithID.ID
-				})
+				as.EXPECT().UpsertAsset(ctx, &ast, upstreams, downstreams, false).
+					Return(assetWithID.ID, nil).
+					Run(func(_ context.Context, ast *asset.Asset, _, _ []string, _ bool) {
+						ast.ID = assetWithID.ID
+					})
 			},
 			Request:      validPayload,
 			ExpectStatus: codes.OK,
@@ -520,7 +552,7 @@ func TestUpsertAsset(t *testing.T) {
 				expected := &compassv1beta1.UpsertAssetResponse{
 					Id: assetID,
 				}
-				if diff := cmp.Diff(resp, expected, protocmp.Transform()); diff != "" {
+				if cdiff := cmp.Diff(resp, expected, protocmp.Transform()); cdiff != "" {
 					return fmt.Errorf("expected response to be %+v, was %+v", expected, resp)
 				}
 				return nil
@@ -562,24 +594,25 @@ func TestUpsertAsset(t *testing.T) {
 
 func TestUpsertPatchAsset(t *testing.T) {
 	var (
-		userID       = uuid.NewString()
-		userEmail    = uuid.NewString()
-		assetID      = uuid.NewString()
-		validPayload = &compassv1beta1.UpsertPatchAssetRequest{
-			Asset: &compassv1beta1.UpsertPatchAssetRequest_Asset{
-				Urn:     "test dagger",
-				Type:    "table",
-				Name:    wrapperspb.String("new-name"),
-				Service: "kafka",
-				Data:    &structpb.Struct{},
-				Url:     "https://sample-url.com",
-				Owners: []*compassv1beta1.User{
-					{Id: "id", Email: "email@email.com", Provider: "provider"},
-					// the following users should get de-duplicated.
-					{Id: "id"},
-					{Email: "email@email.com"},
-				},
+		userID    = uuid.NewString()
+		userEmail = uuid.NewString()
+		assetID   = uuid.NewString()
+		assetr    = &compassv1beta1.UpsertPatchAssetRequest_Asset{
+			Urn:     "test dagger",
+			Type:    "table",
+			Name:    wrapperspb.String("new-name"),
+			Service: "kafka",
+			Data:    &structpb.Struct{},
+			Url:     "https://sample-url.com",
+			Owners: []*compassv1beta1.User{
+				{Id: "id", Email: "email@email.com", Provider: "provider"},
+				// the following users should get de-duplicated.
+				{Id: "id"},
+				{Email: "email@email.com"},
 			},
+		}
+		validPayload = &compassv1beta1.UpsertPatchAssetRequest{
+			Asset: assetr,
 			Upstreams: []*compassv1beta1.LineageNode{
 				{
 					Urn:     "upstream-1",
@@ -599,6 +632,10 @@ func TestUpsertPatchAsset(t *testing.T) {
 					Service: "tableau",
 				},
 			},
+		}
+		validPayloadUpdateOnlyTrue = &compassv1beta1.UpsertPatchAssetRequest{
+			Asset:      assetr,
+			UpdateOnly: true,
 		}
 		validPayloadWithoutStreams = &compassv1beta1.UpsertPatchAssetRequest{
 			Asset: &compassv1beta1.UpsertPatchAssetRequest_Asset{
@@ -709,7 +746,8 @@ func TestUpsertPatchAsset(t *testing.T) {
 					mock.AnythingOfType("*asset.Asset"),
 					mock.AnythingOfType("[]string"),
 					mock.AnythingOfType("[]string"),
-					mock.Anything).
+					mock.Anything,
+					mock.AnythingOfType("bool")).
 					Return("1234-5678", expectedErr)
 			},
 			Request:      validPayload,
@@ -718,7 +756,7 @@ func TestUpsertPatchAsset(t *testing.T) {
 		{
 			Description: "should return invalid argument error when upserting asset without lineage failed, with invalid error",
 			Setup: func(ctx context.Context, as *mocks.AssetService, _ *mocks.UserService) {
-				as.EXPECT().UpsertPatchAssetWithoutLineage(ctx, &mappedAsset, mock.Anything).
+				as.EXPECT().UpsertPatchAssetWithoutLineage(ctx, &mappedAsset, mock.Anything, false).
 					Return("", asset.InvalidError{})
 			},
 			Request:      validPayloadWithoutStreams,
@@ -727,11 +765,33 @@ func TestUpsertPatchAsset(t *testing.T) {
 		{
 			Description: "should return internal server error when upserting asset without asset failed, with discovery error ",
 			Setup: func(ctx context.Context, as *mocks.AssetService, _ *mocks.UserService) {
-				as.EXPECT().UpsertPatchAssetWithoutLineage(ctx, &mappedAsset, mock.Anything).
+				as.EXPECT().UpsertPatchAssetWithoutLineage(ctx, &mappedAsset, mock.Anything, false).
 					Return("", asset.DiscoveryError{Err: errors.New("discovery error")})
 			},
 			Request:      validPayloadWithoutStreams,
 			ExpectStatus: codes.Internal,
+		},
+		{
+			Description: "should return OK but empty asset id when the asset does not exist and isUpdateOnly is true",
+			Setup: func(ctx context.Context, as *mocks.AssetService, _ *mocks.UserService) {
+				patchedAsset := asset.Asset{
+					URN:       "test dagger",
+					Type:      asset.Type("table"),
+					Name:      "new-name",
+					Service:   "kafka",
+					UpdatedBy: user.User{ID: userID},
+					Data:      map[string]interface{}{},
+					URL:       "https://sample-url.com",
+					Owners:    []user.User{{ID: "id", Email: "email@email.com", Provider: "provider"}},
+				}
+				assetWithID := patchedAsset
+				assetWithID.ID = assetID
+
+				as.EXPECT().UpsertPatchAssetWithoutLineage(ctx, &patchedAsset, mock.Anything, true).
+					Return("", nil)
+			},
+			Request:      validPayloadUpdateOnlyTrue,
+			ExpectStatus: codes.OK,
 		},
 		{
 			Description: "should return OK and asset's ID if the asset is successfully created/patched",
@@ -752,10 +812,11 @@ func TestUpsertPatchAsset(t *testing.T) {
 				assetWithID := patchedAsset
 				assetWithID.ID = assetID
 
-				as.EXPECT().UpsertPatchAsset(ctx, &patchedAsset, upstreams, downstreams, mock.Anything).
-					Return(assetWithID.ID, nil).Run(func(_ context.Context, _ *asset.Asset, _, _ []string, _ map[string]interface{}) {
-					patchedAsset.ID = assetWithID.ID
-				})
+				as.EXPECT().UpsertPatchAsset(ctx, &patchedAsset, upstreams, downstreams, mock.Anything, false).
+					Return(assetWithID.ID, nil).
+					Run(func(_ context.Context, _ *asset.Asset, _, _ []string, _ map[string]interface{}, _ bool) {
+						patchedAsset.ID = assetWithID.ID
+					})
 			},
 			Request:      validPayload,
 			ExpectStatus: codes.OK,
@@ -785,9 +846,9 @@ func TestUpsertPatchAsset(t *testing.T) {
 				assetWithID := patchedAsset
 				assetWithID.ID = assetID
 
-				as.EXPECT().UpsertPatchAssetWithoutLineage(ctx, &patchedAsset, mock.Anything).
+				as.EXPECT().UpsertPatchAssetWithoutLineage(ctx, &patchedAsset, mock.Anything, false).
 					Return(assetWithID.ID, nil).
-					Run(func(_ context.Context, _ *asset.Asset, _ map[string]interface{}) {
+					Run(func(_ context.Context, _ *asset.Asset, _ map[string]interface{}, _ bool) {
 						patchedAsset.ID = assetWithID.ID
 					})
 			},
@@ -828,9 +889,9 @@ func TestUpsertPatchAsset(t *testing.T) {
 				assetWithID := patchedAsset
 				assetWithID.ID = assetID
 
-				as.EXPECT().UpsertPatchAsset(ctx, &patchedAsset, []string{}, []string{}, mock.Anything).
+				as.EXPECT().UpsertPatchAsset(ctx, &patchedAsset, []string{}, []string{}, mock.Anything, false).
 					Return(assetWithID.ID, nil).
-					Run(func(_ context.Context, _ *asset.Asset, _, _ []string, _ map[string]interface{}) {
+					Run(func(_ context.Context, _ *asset.Asset, _, _ []string, _ map[string]interface{}, _ bool) {
 						patchedAsset.ID = assetWithID.ID
 					})
 			},

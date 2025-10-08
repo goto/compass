@@ -21,8 +21,8 @@ type Repository interface {
 	GetByVersionWithID(ctx context.Context, id, version string) (Asset, error)
 	GetByVersionWithURN(ctx context.Context, urn, version string) (Asset, error)
 	GetTypes(ctx context.Context, flt Filter) (map[Type]int, error)
-	Upsert(ctx context.Context, ast *Asset) (*Asset, error)
-	UpsertPatch(ctx context.Context, ast *Asset, patchData map[string]interface{}) (*Asset, error)
+	Upsert(ctx context.Context, ast *Asset, isUpdateOnly bool) (*Asset, error)
+	UpsertPatch(ctx context.Context, ast *Asset, patchData map[string]interface{}, isUpdateOnly bool) (*Asset, error)
 	DeleteByID(ctx context.Context, id string) (string, error)
 	DeleteByURN(ctx context.Context, urn string) error
 	SoftDeleteByID(ctx context.Context, executedAt time.Time, id, updatedByID string) (string, string, error)

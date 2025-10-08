@@ -94,8 +94,8 @@ func (s *Service) GetAllAssets(ctx context.Context, flt Filter, withTotal bool) 
 	return assets, totalCount, nil
 }
 
-func (s *Service) UpsertAsset(ctx context.Context, ast *Asset, upstreams, downstreams []string) (string, error) {
-	assetID, err := s.UpsertAssetWithoutLineage(ctx, ast)
+func (s *Service) UpsertAsset(ctx context.Context, ast *Asset, upstreams, downstreams []string, isUpdateOnly bool) (string, error) {
+	assetID, err := s.UpsertAssetWithoutLineage(ctx, ast, isUpdateOnly)
 	if err != nil {
 		return "", err
 	}
@@ -107,14 +107,14 @@ func (s *Service) UpsertAsset(ctx context.Context, ast *Asset, upstreams, downst
 	return assetID, nil
 }
 
-func (s *Service) UpsertAssetWithoutLineage(ctx context.Context, ast *Asset) (string, error) {
+func (s *Service) UpsertAssetWithoutLineage(ctx context.Context, ast *Asset, isUpdateOnly bool) (string, error) {
 	currentTime := time.Now()
 	ast.RefreshedAt = &currentTime
 
-	asset, err := s.assetRepository.Upsert(ctx, ast)
+	asset, err := s.assetRepository.Upsert(ctx, ast, isUpdateOnly)
 	// retry due to race condition possibility on insert
 	if errors.Is(err, ErrURNExist) {
-		asset, err = s.assetRepository.Upsert(ctx, ast)
+		asset, err = s.assetRepository.Upsert(ctx, ast, isUpdateOnly)
 	}
 	if err != nil {
 		return "", err
@@ -127,8 +127,14 @@ func (s *Service) UpsertAssetWithoutLineage(ctx context.Context, ast *Asset) (st
 	return asset.ID, nil
 }
 
-func (s *Service) UpsertPatchAsset(ctx context.Context, ast *Asset, upstreams, downstreams []string, patchData map[string]interface{}) (string, error) {
-	assetID, err := s.UpsertPatchAssetWithoutLineage(ctx, ast, patchData)
+func (s *Service) UpsertPatchAsset( //nolint:revive
+	ctx context.Context,
+	ast *Asset, upstreams,
+	downstreams []string,
+	patchData map[string]interface{},
+	isUpdateOnly bool,
+) (string, error) {
+	assetID, err := s.UpsertPatchAssetWithoutLineage(ctx, ast, patchData, isUpdateOnly)
 	if err != nil {
 		return "", err
 	}
@@ -140,14 +146,14 @@ func (s *Service) UpsertPatchAsset(ctx context.Context, ast *Asset, upstreams, d
 	return assetID, nil
 }
 
-func (s *Service) UpsertPatchAssetWithoutLineage(ctx context.Context, ast *Asset, patchData map[string]interface{}) (string, error) {
+func (s *Service) UpsertPatchAssetWithoutLineage(ctx context.Context, ast *Asset, patchData map[string]interface{}, isUpdateOnly bool) (string, error) {
 	currentTime := time.Now()
 	ast.RefreshedAt = &currentTime
 
-	asset, err := s.assetRepository.UpsertPatch(ctx, ast, patchData)
+	asset, err := s.assetRepository.UpsertPatch(ctx, ast, patchData, isUpdateOnly)
 	// retry due to race condition possibility on insert
 	if errors.Is(err, ErrURNExist) {
-		asset, err = s.assetRepository.UpsertPatch(ctx, ast, patchData)
+		asset, err = s.assetRepository.UpsertPatch(ctx, ast, patchData, isUpdateOnly)
 	}
 	if err != nil {
 		return "", err

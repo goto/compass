@@ -1184,9 +1184,9 @@ func (_c *AssetRepository_SoftDeleteByURN_Call) RunAndReturn(run func(context.Co
 	return _c
 }
 
-// Upsert provides a mock function with given fields: ctx, ast
-func (_m *AssetRepository) Upsert(ctx context.Context, ast *asset.Asset) (*asset.Asset, error) {
-	ret := _m.Called(ctx, ast)
+// Upsert provides a mock function with given fields: ctx, ast, isUpdateOnly
+func (_m *AssetRepository) Upsert(ctx context.Context, ast *asset.Asset, isUpdateOnly bool) (*asset.Asset, error) {
+	ret := _m.Called(ctx, ast, isUpdateOnly)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Upsert")
@@ -1194,19 +1194,19 @@ func (_m *AssetRepository) Upsert(ctx context.Context, ast *asset.Asset) (*asset
 
 	var r0 *asset.Asset
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *asset.Asset) (*asset.Asset, error)); ok {
-		return rf(ctx, ast)
+	if rf, ok := ret.Get(0).(func(context.Context, *asset.Asset, bool) (*asset.Asset, error)); ok {
+		return rf(ctx, ast, isUpdateOnly)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *asset.Asset) *asset.Asset); ok {
-		r0 = rf(ctx, ast)
+	if rf, ok := ret.Get(0).(func(context.Context, *asset.Asset, bool) *asset.Asset); ok {
+		r0 = rf(ctx, ast, isUpdateOnly)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*asset.Asset)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *asset.Asset) error); ok {
-		r1 = rf(ctx, ast)
+	if rf, ok := ret.Get(1).(func(context.Context, *asset.Asset, bool) error); ok {
+		r1 = rf(ctx, ast, isUpdateOnly)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -1222,13 +1222,14 @@ type AssetRepository_Upsert_Call struct {
 // Upsert is a helper method to define mock.On call
 //   - ctx context.Context
 //   - ast *asset.Asset
-func (_e *AssetRepository_Expecter) Upsert(ctx interface{}, ast interface{}) *AssetRepository_Upsert_Call {
-	return &AssetRepository_Upsert_Call{Call: _e.mock.On("Upsert", ctx, ast)}
+//   - isUpdateOnly bool
+func (_e *AssetRepository_Expecter) Upsert(ctx interface{}, ast interface{}, isUpdateOnly interface{}) *AssetRepository_Upsert_Call {
+	return &AssetRepository_Upsert_Call{Call: _e.mock.On("Upsert", ctx, ast, isUpdateOnly)}
 }
 
-func (_c *AssetRepository_Upsert_Call) Run(run func(ctx context.Context, ast *asset.Asset)) *AssetRepository_Upsert_Call {
+func (_c *AssetRepository_Upsert_Call) Run(run func(ctx context.Context, ast *asset.Asset, isUpdateOnly bool)) *AssetRepository_Upsert_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(*asset.Asset))
+		run(args[0].(context.Context), args[1].(*asset.Asset), args[2].(bool))
 	})
 	return _c
 }
@@ -1238,14 +1239,14 @@ func (_c *AssetRepository_Upsert_Call) Return(_a0 *asset.Asset, _a1 error) *Asse
 	return _c
 }
 
-func (_c *AssetRepository_Upsert_Call) RunAndReturn(run func(context.Context, *asset.Asset) (*asset.Asset, error)) *AssetRepository_Upsert_Call {
+func (_c *AssetRepository_Upsert_Call) RunAndReturn(run func(context.Context, *asset.Asset, bool) (*asset.Asset, error)) *AssetRepository_Upsert_Call {
 	_c.Call.Return(run)
 	return _c
 }
 
-// UpsertPatch provides a mock function with given fields: ctx, ast, patchData
-func (_m *AssetRepository) UpsertPatch(ctx context.Context, ast *asset.Asset, patchData map[string]interface{}) (*asset.Asset, error) {
-	ret := _m.Called(ctx, ast, patchData)
+// UpsertPatch provides a mock function with given fields: ctx, ast, patchData, isUpdateOnly
+func (_m *AssetRepository) UpsertPatch(ctx context.Context, ast *asset.Asset, patchData map[string]interface{}, isUpdateOnly bool) (*asset.Asset, error) {
+	ret := _m.Called(ctx, ast, patchData, isUpdateOnly)
 
 	if len(ret) == 0 {
 		panic("no return value specified for UpsertPatch")
@@ -1253,19 +1254,19 @@ func (_m *AssetRepository) UpsertPatch(ctx context.Context, ast *asset.Asset, pa
 
 	var r0 *asset.Asset
 	var r1 error
-	if rf, ok := ret.Get(0).(func(context.Context, *asset.Asset, map[string]interface{}) (*asset.Asset, error)); ok {
-		return rf(ctx, ast, patchData)
+	if rf, ok := ret.Get(0).(func(context.Context, *asset.Asset, map[string]interface{}, bool) (*asset.Asset, error)); ok {
+		return rf(ctx, ast, patchData, isUpdateOnly)
 	}
-	if rf, ok := ret.Get(0).(func(context.Context, *asset.Asset, map[string]interface{}) *asset.Asset); ok {
-		r0 = rf(ctx, ast, patchData)
+	if rf, ok := ret.Get(0).(func(context.Context, *asset.Asset, map[string]interface{}, bool) *asset.Asset); ok {
+		r0 = rf(ctx, ast, patchData, isUpdateOnly)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*asset.Asset)
 		}
 	}
 
-	if rf, ok := ret.Get(1).(func(context.Context, *asset.Asset, map[string]interface{}) error); ok {
-		r1 = rf(ctx, ast, patchData)
+	if rf, ok := ret.Get(1).(func(context.Context, *asset.Asset, map[string]interface{}, bool) error); ok {
+		r1 = rf(ctx, ast, patchData, isUpdateOnly)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -1282,13 +1283,14 @@ type AssetRepository_UpsertPatch_Call struct {
 //   - ctx context.Context
 //   - ast *asset.Asset
 //   - patchData map[string]interface{}
-func (_e *AssetRepository_Expecter) UpsertPatch(ctx interface{}, ast interface{}, patchData interface{}) *AssetRepository_UpsertPatch_Call {
-	return &AssetRepository_UpsertPatch_Call{Call: _e.mock.On("UpsertPatch", ctx, ast, patchData)}
+//   - isUpdateOnly bool
+func (_e *AssetRepository_Expecter) UpsertPatch(ctx interface{}, ast interface{}, patchData interface{}, isUpdateOnly interface{}) *AssetRepository_UpsertPatch_Call {
+	return &AssetRepository_UpsertPatch_Call{Call: _e.mock.On("UpsertPatch", ctx, ast, patchData, isUpdateOnly)}
 }
 
-func (_c *AssetRepository_UpsertPatch_Call) Run(run func(ctx context.Context, ast *asset.Asset, patchData map[string]interface{})) *AssetRepository_UpsertPatch_Call {
+func (_c *AssetRepository_UpsertPatch_Call) Run(run func(ctx context.Context, ast *asset.Asset, patchData map[string]interface{}, isUpdateOnly bool)) *AssetRepository_UpsertPatch_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run(args[0].(context.Context), args[1].(*asset.Asset), args[2].(map[string]interface{}))
+		run(args[0].(context.Context), args[1].(*asset.Asset), args[2].(map[string]interface{}), args[3].(bool))
 	})
 	return _c
 }
@@ -1298,7 +1300,7 @@ func (_c *AssetRepository_UpsertPatch_Call) Return(_a0 *asset.Asset, _a1 error) 
 	return _c
 }
 
-func (_c *AssetRepository_UpsertPatch_Call) RunAndReturn(run func(context.Context, *asset.Asset, map[string]interface{}) (*asset.Asset, error)) *AssetRepository_UpsertPatch_Call {
+func (_c *AssetRepository_UpsertPatch_Call) RunAndReturn(run func(context.Context, *asset.Asset, map[string]interface{}, bool) (*asset.Asset, error)) *AssetRepository_UpsertPatch_Call {
 	_c.Call.Return(run)
 	return _c
 }

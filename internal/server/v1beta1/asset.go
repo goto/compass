@@ -27,10 +27,10 @@ type AssetService interface {
 	GetAssetByIDWithoutProbes(ctx context.Context, id string) (asset.Asset, error)
 	GetAssetByVersion(ctx context.Context, id, version string) (asset.Asset, error)
 	GetAssetVersionHistory(ctx context.Context, flt asset.Filter, id string) ([]asset.Asset, error)
-	UpsertAsset(ctx context.Context, ast *asset.Asset, upstreams, downstreams []string) (string, error)
-	UpsertAssetWithoutLineage(ctx context.Context, ast *asset.Asset) (string, error)
-	UpsertPatchAsset(ctx context.Context, ast *asset.Asset, upstreams, downstreams []string, patchData map[string]interface{}) (string, error)
-	UpsertPatchAssetWithoutLineage(ctx context.Context, ast *asset.Asset, patchData map[string]interface{}) (string, error)
+	UpsertAsset(ctx context.Context, ast *asset.Asset, upstreams, downstreams []string, isUpdateOnly bool) (string, error)
+	UpsertAssetWithoutLineage(ctx context.Context, ast *asset.Asset, isUpdateOnly bool) (string, error)
+	UpsertPatchAsset(ctx context.Context, ast *asset.Asset, upstreams, downstreams []string, patchData map[string]interface{}, isUpdateOnly bool) (string, error)
+	UpsertPatchAssetWithoutLineage(ctx context.Context, ast *asset.Asset, patchData map[string]interface{}, isUpdateOnly bool) (string, error)
 	DeleteAsset(ctx context.Context, id string) error
 	SoftDeleteAsset(ctx context.Context, id, updatedBy string) error
 	DeleteAssets(ctx context.Context, request asset.DeleteAssetsRequest) (uint32, error)
@@ -247,6 +247,7 @@ func (server *APIServer) UpsertAsset(ctx context.Context, req *compassv1beta1.Up
 		"asset_upsert",
 		req.GetUpstreams(),
 		req.GetDownstreams(),
+		req.GetUpdateOnly(),
 	)
 	if err != nil {
 		return nil, err
@@ -281,10 +282,10 @@ func (server *APIServer) UpsertPatchAsset(ctx context.Context, req *compassv1bet
 	var assetID string
 	if len(req.Upstreams) != 0 || len(req.Downstreams) != 0 || req.OverwriteLineage {
 		assetID, err = server.upsertAsset(
-			ctx, newAsset, patchAssetMap, "asset_upsert_patch", req.GetUpstreams(), req.GetDownstreams(),
+			ctx, newAsset, patchAssetMap, "asset_upsert_patch", req.GetUpstreams(), req.GetDownstreams(), req.GetUpdateOnly(),
 		)
 	} else {
-		assetID, err = server.upsertPatchAssetWithoutLineage(ctx, newAsset, patchAssetMap)
+		assetID, err = server.upsertPatchAssetWithoutLineage(ctx, newAsset, patchAssetMap, req.GetUpdateOnly())
 	}
 	if err != nil {
 		return nil, err
@@ -398,6 +399,7 @@ func (server *APIServer) upsertAsset(
 	mode string,
 	reqUpstreams,
 	reqDownstreams []*compassv1beta1.LineageNode,
+	isUpdateOnly bool,
 ) (id string, err error) {
 	defer func() {
 		server.assetUpdateCounter.Add(ctx, 1, metric.WithAttributes(
@@ -419,15 +421,17 @@ func (server *APIServer) upsertAsset(
 
 	var assetID string
 	if patchData == nil {
-		assetID, err = server.assetService.UpsertAsset(ctx, &ast, upstreams, downstreams)
+		assetID, err = server.assetService.UpsertAsset(ctx, &ast, upstreams, downstreams, isUpdateOnly)
 	} else {
-		assetID, err = server.assetService.UpsertPatchAsset(ctx, &ast, upstreams, downstreams, patchData)
+		assetID, err = server.assetService.UpsertPatchAsset(ctx, &ast, upstreams, downstreams, patchData, isUpdateOnly)
 	}
 
 	if err != nil {
 		switch {
 		case errors.As(err, new(asset.InvalidError)):
 			return "", status.Error(codes.InvalidArgument, err.Error())
+		case errors.As(err, new(asset.NotFoundError)): // only possible when updateOnly is true
+			return "", nil
 		}
 		return "", internalServerError(server.logger, err.Error())
 	}
@@ -435,7 +439,12 @@ func (server *APIServer) upsertAsset(
 	return assetID, nil
 }
 
-func (server *APIServer) upsertPatchAssetWithoutLineage(ctx context.Context, ast asset.Asset, patchData map[string]interface{}) (id string, err error) {
+func (server *APIServer) upsertPatchAssetWithoutLineage(
+	ctx context.Context,
+	ast asset.Asset,
+	patchData map[string]interface{},
+	isUpdateOnly bool,
+) (id string, err error) {
 	const mode = "asset_upsert_patch_without_lineage"
 	defer func() {
 		server.assetUpdateCounter.Add(ctx, 1, metric.WithAttributes(
@@ -446,11 +455,13 @@ func (server *APIServer) upsertPatchAssetWithoutLineage(ctx context.Context, ast
 		))
 	}()
 
-	assetID, err := server.assetService.UpsertPatchAssetWithoutLineage(ctx, &ast, patchData)
+	assetID, err := server.assetService.UpsertPatchAssetWithoutLineage(ctx, &ast, patchData, isUpdateOnly)
 	if err != nil {
 		switch {
 		case errors.As(err, new(asset.InvalidError)):
 			return "", status.Error(codes.InvalidArgument, err.Error())
+		case errors.As(err, new(asset.NotFoundError)): // only possible when updateOnly is true
+			return "", nil
 		}
 
 		return "", internalServerError(server.logger, err.Error())
