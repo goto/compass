@@ -85,19 +85,19 @@ func TestSearcherSearch(t *testing.T) {
 					Filters:       map[string][]string{"service": {"bigquery"}},
 				},
 				Expected: []expectedRow{
-					{Type: "table", AssetID: "bigquery::gcpproject/dataset/tablename-1"},
 					{Type: "table", AssetID: "bigquery::gcpproject/dataset/tablename-common"},
-					{Type: "table", AssetID: "bigquery::gcpproject/dataset/tablename-abc-common-test"},
 					{Type: "table", AssetID: "bigquery::gcpproject/dataset/tablename-mid"},
-					{Type: "table", AssetID: "bigquery::gcpproject/dataset/abc-tablename-mid"},
 					{Type: "table", AssetID: "bigquery::gcpproject/dataset/test"},
+					{Type: "table", AssetID: "bigquery::gcpproject/dataset/tablename-1"},
+					{Type: "table", AssetID: "bigquery::gcpproject/dataset/tablename-abc-common-test"},
+					{Type: "table", AssetID: "bigquery::gcpproject/dataset/abc-tablename-mid"},
 				},
 			},
 			{
 				Description: "should fetch assets with empty text and rank by",
 				Config: asset.SearchConfig{
 					Text:          "",
-					RankBy:        "data.profile.usage_count",
+					RankBy:        "data.stats_metadata.query_count",
 					IncludeFields: []string{"id", "type"},
 					Filters:       map[string][]string{"service": {"bigquery"}},
 				},
@@ -219,10 +219,10 @@ func TestSearcherSearch(t *testing.T) {
 				},
 			},
 			{
-				Description: "should return a descendingly sorted based on usage count in search results if rank by usage in the config",
+				Description: "should return a descendingly sorted based on query count in search results if rank by usage in the config",
 				Config: asset.SearchConfig{
 					Text:          "bigquery",
-					RankBy:        "data.profile.usage_count",
+					RankBy:        "data.stats_metadata.query_count",
 					IncludeFields: []string{"type", "id"},
 				},
 				Expected: []expectedRow{
@@ -298,23 +298,23 @@ func TestSearcherSearch(t *testing.T) {
 				Description: "should return 'bigquery::gcpproject/dataset/tablename-abc-common-test' resource on top if searched for text 'tablename-abc-common-test'",
 				Config: asset.SearchConfig{
 					Text:          "tablename-abc-common-test",
-					RankBy:        "data.profile.usage_count",
+					RankBy:        "data.stats_metadata.query_count",
 					IncludeFields: []string{"type", "id"},
 				},
 				Expected: []expectedRow{
 					{Type: "table", AssetID: "bigquery::gcpproject/dataset/tablename-abc-common-test"},
 					{Type: "table", AssetID: "bigquery::gcpproject/dataset/tablename-common"},
-					{Type: "table", AssetID: "bigquery::gcpproject/dataset/test"},
 					{Type: "table", AssetID: "bigquery::gcpproject/dataset/abc-tablename-mid"},
+					{Type: "table", AssetID: "bigquery::gcpproject/dataset/test"},
 					{Type: "table", AssetID: "bigquery::gcpproject/dataset/tablename-mid"},
 					{Type: "table", AssetID: "bigquery::gcpproject/dataset/tablename-1"},
 				},
 			},
 			{
-				Description: "should return highlighted text in resource if searched highlight text is enabled.",
+				Description: "should return highlighted text in resource if searched highlight text is enabled",
 				Config: asset.SearchConfig{
 					Text:   "order",
-					RankBy: "data.profile.usage_count",
+					RankBy: "data.stats_metadata.query_count",
 					Flags: asset.SearchFlags{
 						EnableHighlight: true,
 					},
@@ -343,7 +343,7 @@ func TestSearcherSearch(t *testing.T) {
 					"searched for text 'abc-test' as it has both the keywords searched",
 				Config: asset.SearchConfig{
 					Text:          "abc-test",
-					RankBy:        "data.profile.usage_count",
+					RankBy:        "data.stats_metadata.query_count",
 					IncludeFields: []string{"type", "id"},
 				},
 				Expected: []expectedRow{
@@ -407,7 +407,7 @@ func TestSearcherSearch(t *testing.T) {
 				},
 			},
 			{
-				Description: "should fetch assets with empty text",
+				Description: "should fetch assets with empty text with column search",
 				Config: asset.SearchConfig{
 					Text:          "",
 					IncludeFields: []string{"id", "type"},
@@ -417,19 +417,19 @@ func TestSearcherSearch(t *testing.T) {
 					},
 				},
 				Expected: []expectedRow{
-					{Type: "table", AssetID: "bigquery::gcpproject/dataset/tablename-1"},
 					{Type: "table", AssetID: "bigquery::gcpproject/dataset/tablename-common"},
-					{Type: "table", AssetID: "bigquery::gcpproject/dataset/tablename-abc-common-test"},
 					{Type: "table", AssetID: "bigquery::gcpproject/dataset/tablename-mid"},
-					{Type: "table", AssetID: "bigquery::gcpproject/dataset/abc-tablename-mid"},
 					{Type: "table", AssetID: "bigquery::gcpproject/dataset/test"},
+					{Type: "table", AssetID: "bigquery::gcpproject/dataset/tablename-1"},
+					{Type: "table", AssetID: "bigquery::gcpproject/dataset/tablename-abc-common-test"},
+					{Type: "table", AssetID: "bigquery::gcpproject/dataset/abc-tablename-mid"},
 				},
 			},
 			{
 				Description: "should fetch assets with empty text and rank by",
 				Config: asset.SearchConfig{
 					Text:          "",
-					RankBy:        "data.profile.usage_count",
+					RankBy:        "data.stats_metadata.query_count",
 					IncludeFields: []string{"id", "type"},
 					Filters:       map[string][]string{"service": {"bigquery"}},
 					Flags: asset.SearchFlags{
@@ -519,10 +519,10 @@ func TestSearcherSearch(t *testing.T) {
 				},
 			},
 			{
-				Description: "should return a descendingly sorted based on usage count in search results if rank by usage in the config",
+				Description: "should return a descendingly sorted based on query count in search results if rank by usage in the config with column search",
 				Config: asset.SearchConfig{
 					Text:          "column3",
-					RankBy:        "data.profile.usage_count",
+					RankBy:        "data.stats_metadata.query_count",
 					IncludeFields: []string{"type", "id"},
 					Flags:         asset.SearchFlags{IsColumnSearch: true},
 				},
@@ -536,13 +536,13 @@ func TestSearcherSearch(t *testing.T) {
 				},
 			},
 			{
-				Description: "should return 5 records with offset of 0",
+				Description: "should return 5 records with offset of 0 and rank by usage",
 				Config: asset.SearchConfig{
 					Text:          "column3",
 					Offset:        0,
 					MaxResults:    5,
 					IncludeFields: []string{"type", "id"},
-					RankBy:        "data.profile.usage_count",
+					RankBy:        "data.stats_metadata.query_count",
 					Flags:         asset.SearchFlags{IsColumnSearch: true},
 				},
 				Expected: []expectedRow{
@@ -560,7 +560,7 @@ func TestSearcherSearch(t *testing.T) {
 					Offset:        2,
 					MaxResults:    5,
 					IncludeFields: []string{"type", "id"},
-					RankBy:        "data.profile.usage_count",
+					RankBy:        "data.stats_metadata.query_count",
 					Flags:         asset.SearchFlags{IsColumnSearch: true},
 				},
 				Expected: []expectedRow{
@@ -571,7 +571,7 @@ func TestSearcherSearch(t *testing.T) {
 				},
 			},
 			{
-				Description: "should return 'bigquery::gcpproject/dataset/test' resource on top if search by column name 'tablename-common-column2",
+				Description: "should return 'bigquery::gcpproject/dataset/test' resource on top if search by column name 'test-column3",
 				Config: asset.SearchConfig{
 					Text:          "test-column3",
 					IncludeFields: []string{"type", "id"},
@@ -580,9 +580,9 @@ func TestSearcherSearch(t *testing.T) {
 				Expected: []expectedRow{
 					{Type: "table", AssetID: "bigquery::gcpproject/dataset/test"},
 					{Type: "table", AssetID: "bigquery::gcpproject/dataset/tablename-abc-common-test"},
-					{Type: "table", AssetID: "bigquery::gcpproject/dataset/tablename-1"},
 					{Type: "table", AssetID: "bigquery::gcpproject/dataset/tablename-common"},
 					{Type: "table", AssetID: "bigquery::gcpproject/dataset/tablename-mid"},
+					{Type: "table", AssetID: "bigquery::gcpproject/dataset/tablename-1"},
 					{Type: "table", AssetID: "bigquery::gcpproject/dataset/abc-tablename-mid"},
 				},
 			},
@@ -626,7 +626,7 @@ func TestSearcherSearch(t *testing.T) {
 				Description: "should return highlighted text in resource if searched highlight text is enabled.",
 				Config: asset.SearchConfig{
 					Text:   "identification",
-					RankBy: "data.profile.usage_count",
+					RankBy: "data.stats_metadata.query_count",
 					Flags: asset.SearchFlags{
 						EnableHighlight: true,
 						IsColumnSearch:  true,
