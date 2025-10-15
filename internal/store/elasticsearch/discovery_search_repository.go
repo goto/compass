@@ -283,6 +283,7 @@ func (repo *DiscoveryRepository) buildQuery(cfg asset.SearchConfig) (io.Reader, 
 		boolQuery.Should(elastic.NewMatchAllQuery())
 		highlightQuery = buildHighlightQuery(cfg)
 	} else {
+		boolQuery.MinimumShouldMatch("1")
 		if cfg.Flags.IsColumnSearch {
 			field = "data.columns.name"
 			highlightQuery = repo.buildColumnQuery(boolQuery, cfg, field)
@@ -453,18 +454,24 @@ func buildFunctionScoreQuery(query elastic.Query, rankBy, text, field string) el
 	ssotFilter := elastic.NewTermQuery("data.attributes.category.keyword", "ssot")
 	fs = fs.Add(ssotFilter, elastic.NewWeightFactorFunction(10)) // tune as needed
 
-	// 3rd rank: higher query_count if explicit field is not provided
-	countField := "data.stats_metadata.query_count"
-	if strings.TrimSpace(rankBy) != "" {
-		countField = rankBy
-	}
+	// 3rd rank: always consider query_count, but rankBy (if provided) should have higher weight
 	fs = fs.AddScoreFunc(
 		elastic.NewFieldValueFactorFunction().
-			Field(countField).
+			Field("data.stats_metadata.query_count").
 			Modifier("log1p").
 			Missing(0).
 			Weight(1.0),
 	)
+	if strings.TrimSpace(rankBy) != "" {
+		// Add rankBy as higher weight
+		fs = fs.AddScoreFunc(
+			elastic.NewFieldValueFactorFunction().
+				Field(rankBy).
+				Modifier("log1p").
+				Missing(0).
+				Weight(2.0), // higher weight for rankBy
+		)
+	}
 
 	return fs
 }
