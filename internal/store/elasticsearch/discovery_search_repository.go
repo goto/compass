@@ -437,26 +437,36 @@ func buildFilterExistsQueries(q *elastic.BoolQuery, fields []string) {
 }
 
 func buildFunctionScoreQuery(query elastic.Query, rankBy, text, field string) elastic.Query {
-	// Added exact match term query here so that exact match gets higher priority.
-	fsQuery := elastic.NewFunctionScoreQuery()
-	if text != "" {
-		fsQuery.Add(
-			elastic.NewTermQuery(fmt.Sprintf("%s.keyword", field), text),
-			elastic.NewWeightFactorFunction(2),
-		)
-	}
-	if rankBy != "" {
-		fsQuery.AddScoreFunc(
-			elastic.NewFieldValueFactorFunction().
-				Field(rankBy).
-				Modifier("log1p").
-				Missing(1.0).
-				Weight(1.0),
-		)
+	fs := elastic.NewFunctionScoreQuery().
+		Query(query).
+		// add scores together (don’t multiply), so bigger query_count can help
+		ScoreMode(defaultFunctionScoreQueryScoreMode).
+		BoostMode(defaultFunctionScoreQueryScoreMode)
+
+	// 1st rank: exact match on the field if provided
+	if strings.TrimSpace(text) != "" && strings.TrimSpace(field) != "" {
+		exactFilter := elastic.NewTermQuery(fmt.Sprintf("%s.keyword", field), text)
+		fs = fs.Add(exactFilter, elastic.NewWeightFactorFunction(50)) // make sure always place on higher score
 	}
 
-	fsQuery.Query(query).ScoreMode(defaultFunctionScoreQueryScoreMode)
-	return fsQuery
+	// 2nd rank: category == "ssot"
+	ssotFilter := elastic.NewTermQuery("data.attributes.category.keyword", "ssot")
+	fs = fs.Add(ssotFilter, elastic.NewWeightFactorFunction(10)) // tune as needed
+
+	// 3rd rank: higher query_count if explicit field is not provided
+	countField := "data.stats_metadata.query_count"
+	if strings.TrimSpace(rankBy) != "" {
+		countField = rankBy
+	}
+	fs = fs.AddScoreFunc(
+		elastic.NewFieldValueFactorFunction().
+			Field(countField).
+			Modifier("log1p").
+			Missing(0).
+			Weight(1.0),
+	)
+
+	return fs
 }
 
 func buildHighlightQuery(cfg asset.SearchConfig) *elastic.Highlight {
