@@ -292,6 +292,8 @@ func (repo *DiscoveryRepository) buildQuery(cfg asset.SearchConfig) (io.Reader, 
 			highlightQuery = buildHighlightQuery(cfg)
 		}
 	}
+	// at least one of the should clauses must match
+	boolQuery.MinimumShouldMatch("1")
 
 	isDeletedQuery, isDeleteQueryExist := cfg.Queries["is_deleted"]
 	isDeletedFilters, isDeletedFilterExist := cfg.Filters["is_deleted"]
@@ -437,26 +439,48 @@ func buildFilterExistsQueries(q *elastic.BoolQuery, fields []string) {
 }
 
 func buildFunctionScoreQuery(query elastic.Query, rankBy, text, field string) elastic.Query {
-	// Added exact match term query here so that exact match gets higher priority.
-	fsQuery := elastic.NewFunctionScoreQuery()
-	if text != "" {
-		fsQuery.Add(
-			elastic.NewTermQuery(fmt.Sprintf("%s.keyword", field), text),
-			elastic.NewWeightFactorFunction(2),
-		)
+	fs := elastic.NewFunctionScoreQuery().
+		Query(query).
+		ScoreMode(defaultFunctionScoreQueryScoreMode).
+		BoostMode(defaultFunctionScoreQueryScoreMode)
+
+	// 1st rank: exact term match
+	if strings.TrimSpace(text) != "" && strings.TrimSpace(field) != "" {
+		exactFilter := elastic.NewTermQuery(fmt.Sprintf("%s.keyword", field), text)
+		fs = fs.Add(exactFilter, elastic.NewWeightFactorFunction(50.0)) // make sure always place on higher score
 	}
-	if rankBy != "" {
-		fsQuery.AddScoreFunc(
+
+	// if rankBy is comma separated, it should be in field,value pairs
+	// e.g. data.attributes.level,significant
+	// otherwise, it should be a single field name with numeric value
+	if strings.Contains(rankBy, ",") {
+		splitRankBy := strings.Split(rankBy, ",")
+		for i := 0; i < len(splitRankBy); i += 2 {
+			rbField := strings.TrimSpace(splitRankBy[i])
+			rbValue := strings.TrimSpace(splitRankBy[i+1])
+			rbQuery := elastic.NewTermQuery(fmt.Sprintf("%s.keyword", rbField), rbValue)
+			fs = fs.Add(rbQuery, elastic.NewWeightFactorFunction(2.0))
+		}
+	} else if rankBy != "" {
+		fs = fs.AddScoreFunc(
 			elastic.NewFieldValueFactorFunction().
 				Field(rankBy).
 				Modifier("log1p").
-				Missing(1.0).
-				Weight(1.0),
+				Missing(0).
+				Weight(2.0),
 		)
 	}
 
-	fsQuery.Query(query).ScoreMode(defaultFunctionScoreQueryScoreMode)
-	return fsQuery
+	// always consider query_count, but rankBy (if provided) should have higher weight
+	fs = fs.AddScoreFunc(
+		elastic.NewFieldValueFactorFunction().
+			Field("data.stats_metadata.query_count").
+			Modifier("log1p").
+			Missing(0).
+			Weight(1.0),
+	)
+
+	return fs
 }
 
 func buildHighlightQuery(cfg asset.SearchConfig) *elastic.Highlight {

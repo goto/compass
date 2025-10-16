@@ -180,20 +180,17 @@
                         ],
                         "filter_conditions": [
                             "WHERE t.column_5 = 'success' AND t.item_id = \"280481a2-2384-4b81-aa3e-214ac60b31db\" AND event_timestamp >= TIMESTAMP(\"2021-10-29\", \"UTC\") AND event_timestamp < TIMESTAMP(\"2021-11-22T02:01:06Z\")"
-                        ],
-                        "usage_count": 1
+                        ]
                     },
-                    "properties": {
-                        "attributes": {
-                            "dataset": "dataset",
-                            "full_qualified_name": "gcpproject:dataset.tablename-1",
-                            "partition_field": "event_timestamp",
-                            "project": "gcpproject",
-                            "type": "TABLE"
-                        },
-                        "labels": {
-                            "owner": "user_1"
-                        }
+                    "attributes": {
+                        "dataset": "dataset",
+                        "full_qualified_name": "gcpproject:dataset.tablename-1",
+                        "partition_field": "event_timestamp",
+                        "project": "gcpproject",
+                        "type": "TABLE"
+                    },
+                    "stats_metadata": {
+                      "query_count": 1
                     },
                     "columns": [
                             {
@@ -233,6 +230,9 @@
                         "urn": "bigquery::gcpproject/dataset/tablename-1"
                     }
                 },
+                "labels": {
+                  "owner": "user_1"
+                },
                 "owners": [
                     {
                         "urn": "owner::bq/unique",
@@ -263,20 +263,17 @@
                         ],
                         "filter_conditions": [
                             "WHERE t.column_5 = 'success' AND t.item_id = \"280481a2-2384-4b81-aa3e-214ac60b31db\" AND event_timestamp >= TIMESTAMP(\"2021-10-29\", \"UTC\") AND event_timestamp < TIMESTAMP(\"2021-11-22T02:01:06Z\")"
-                        ],
-                        "usage_count": 50
+                        ]
                     },
-                    "properties": {
-                        "attributes": {
-                            "dataset": "dataset",
-                            "full_qualified_name": "gcpproject:dataset.tablename-common",
-                            "partition_field": "event_timestamp",
-                            "project": "gcpproject",
-                            "type": "TABLE"
-                        },
-                        "labels": {
-                            "owner": "user_1"
-                        }
+                    "attributes": {
+                        "dataset": "dataset",
+                        "full_qualified_name": "gcpproject:dataset.tablename-common",
+                        "partition_field": "event_timestamp",
+                        "project": "gcpproject",
+                        "type": "TABLE"
+                    },
+                    "stats_metadata": {
+                      "query_count": 50
                     },
                     "columns": [
                             {
@@ -316,6 +313,9 @@
                         "urn": "bigquery::gcpproject/dataset/tablename-common"
                     }
                 },
+                "labels": {
+                  "owner": "user_1"
+                },
                 "owners": [
                     {
                         "urn": "owner::bq/3",
@@ -352,20 +352,18 @@
                         ],
                         "filter_conditions": [
                             "WHERE t.column_5 = 'success' AND t.item_id = \"280481a2-2384-4b81-aa3e-214ac60b31db\" AND event_timestamp >= TIMESTAMP(\"2021-10-29\", \"UTC\") AND event_timestamp < TIMESTAMP(\"2021-11-22T02:01:06Z\")"
-                        ],
-                        "usage_count": 1
+                        ]
                     },
-                    "properties": {
-                        "attributes": {
-                            "dataset": "dataset",
-                            "full_qualified_name": "gcpproject:dataset.tablename-common-test",
-                            "partition_field": "event_timestamp",
-                            "project": "gcpproject",
-                            "type": "TABLE"
-                        },
-                        "labels": {
-                            "owner": "user_1"
-                        }
+                    "attributes": {
+                        "dataset": "dataset",
+                        "full_qualified_name": "gcpproject:dataset.tablename-common-test",
+                        "partition_field": "event_timestamp",
+                        "project": "gcpproject",
+                        "type": "TABLE",
+                        "category": "sales"
+                    },
+                    "stats_metadata": {
+                      "query_count": 1
                     },
                     "columns": [
                             {
@@ -405,6 +403,9 @@
                         "service": "bigquery",
                         "urn": "bigquery::gcpproject/dataset/tablename-common-test"
                     }
+                },
+                "labels": {
+                  "owner": "user_1"
                 },
                 "owners": [
                     {
@@ -449,20 +450,17 @@
                         ],
                         "filter_conditions": [
                             "WHERE t.column_5 = 'success' AND t.item_id = \"280481a2-2384-4b81-aa3e-214ac60b31db\" AND event_timestamp >= TIMESTAMP(\"2021-10-29\", \"UTC\") AND event_timestamp < TIMESTAMP(\"2021-11-22T02:01:06Z\")"
-                        ],
-                        "usage_count": 5
+                        ]
                     },
-                    "properties": {
-                        "attributes": {
-                            "dataset": "dataset",
-                            "full_qualified_name": "gcpproject:dataset.tablename-mid",
-                            "partition_field": "event_timestamp",
-                            "project": "gcpproject",
-                            "type": "TABLE"
-                        },
-                        "labels": {
-                            "owner": "user_1"
-                        }
+                    "attributes": {
+                        "dataset": "dataset",
+                        "full_qualified_name": "gcpproject:dataset.tablename-mid",
+                        "partition_field": "event_timestamp",
+                        "project": "gcpproject",
+                        "type": "TABLE"
+                    },
+                    "stats_metadata": {
+                      "query_count": 5
                     },
                     "columns": [
                             {
@@ -502,6 +500,9 @@
                         "urn": "bigquery::gcpproject/dataset/tablename-mid"
                     }
                 },
+                "labels": {
+                  "owner": "user_1"
+                },
                 "owners": [
                     {
                         "urn": "owner::bq/1",
@@ -538,20 +539,18 @@
                         ],
                         "filter_conditions": [
                             "WHERE t.column_5 = 'success' AND t.item_id = \"280481a2-2384-4b81-aa3e-214ac60b31db\" AND event_timestamp >= TIMESTAMP(\"2021-10-29\", \"UTC\") AND event_timestamp < TIMESTAMP(\"2021-11-22T02:01:06Z\")"
-                        ],
-                        "usage_count": 1
+                        ]
                     },
-                    "properties": {
-                        "attributes": {
-                            "dataset": "dataset",
-                            "full_qualified_name": "gcpproject:dataset.abc-tablename-mid",
-                            "partition_field": "event_timestamp",
-                            "project": "gcpproject",
-                            "type": "TABLE"
-                        },
-                        "labels": {
-                            "owner": "user_1"
-                        }
+                    "attributes": {
+                        "dataset": "dataset",
+                        "full_qualified_name": "gcpproject:dataset.abc-tablename-mid",
+                        "partition_field": "event_timestamp",
+                        "project": "gcpproject",
+                        "type": "TABLE",
+                        "category": "finance"
+                    },
+                    "stats_metadata": {
+                      "query_count": 1
                     },
                     "columns": [
                             {
@@ -590,6 +589,9 @@
                         "service": "bigquery",
                         "urn": "bigquery::gcpproject/dataset/abc-tablename-mid"
                     }
+                },
+                "labels": {
+                  "owner": "user_1"
                 },
                 "owners": [
                     {
@@ -634,20 +636,18 @@
                         ],
                         "filter_conditions": [
                             "WHERE t.column_5 = 'success' AND t.item_id = \"280481a2-2384-4b81-aa3e-214ac60b31db\" AND event_timestamp >= TIMESTAMP(\"2021-10-29\", \"UTC\") AND event_timestamp < TIMESTAMP(\"2021-11-22T02:01:06Z\")"
-                        ],
-                        "usage_count": 2
+                        ]
                     },
-                    "properties": {
-                        "attributes": {
-                            "dataset": "dataset",
-                            "full_qualified_name": "gcpproject:dataset.test",
-                            "partition_field": "event_timestamp",
-                            "project": "gcpproject",
-                            "type": "TABLE"
-                        },
-                        "labels": {
-                            "owner": "user_1"
-                        }
+                    "attributes": {
+                        "dataset": "dataset",
+                        "full_qualified_name": "gcpproject:dataset.test",
+                        "partition_field": "event_timestamp",
+                        "project": "gcpproject",
+                        "type": "TABLE",
+                        "category": "sales"
+                    },
+                    "stats_metadata": {
+                      "query_count": 2
                     },
                     "columns": [
                             {
@@ -686,6 +686,9 @@
                         "service": "bigquery",
                         "urn": "bigquery::gcpproject/dataset/test"
                     }
+                },
+                "labels": {
+                  "owner": "user_1"
                 },
                 "owners": [
                     {
