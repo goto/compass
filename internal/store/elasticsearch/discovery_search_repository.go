@@ -283,7 +283,6 @@ func (repo *DiscoveryRepository) buildQuery(cfg asset.SearchConfig) (io.Reader, 
 		boolQuery.Should(elastic.NewMatchAllQuery())
 		highlightQuery = buildHighlightQuery(cfg)
 	} else {
-		boolQuery.MinimumShouldMatch("1")
 		if cfg.Flags.IsColumnSearch {
 			field = "data.columns.name"
 			highlightQuery = repo.buildColumnQuery(boolQuery, cfg, field)
@@ -293,6 +292,8 @@ func (repo *DiscoveryRepository) buildQuery(cfg asset.SearchConfig) (io.Reader, 
 			highlightQuery = buildHighlightQuery(cfg)
 		}
 	}
+	// at least one of the should clauses must match
+	boolQuery.MinimumShouldMatch("1")
 
 	isDeletedQuery, isDeleteQueryExist := cfg.Queries["is_deleted"]
 	isDeletedFilters, isDeletedFilterExist := cfg.Filters["is_deleted"]
@@ -440,21 +441,37 @@ func buildFilterExistsQueries(q *elastic.BoolQuery, fields []string) {
 func buildFunctionScoreQuery(query elastic.Query, rankBy, text, field string) elastic.Query {
 	fs := elastic.NewFunctionScoreQuery().
 		Query(query).
-		// add scores together (don’t multiply), so bigger query_count can help
 		ScoreMode(defaultFunctionScoreQueryScoreMode).
 		BoostMode(defaultFunctionScoreQueryScoreMode)
 
-	// 1st rank: exact match on the field if provided
+	// 1st rank: exact term match
 	if strings.TrimSpace(text) != "" && strings.TrimSpace(field) != "" {
 		exactFilter := elastic.NewTermQuery(fmt.Sprintf("%s.keyword", field), text)
-		fs = fs.Add(exactFilter, elastic.NewWeightFactorFunction(50)) // make sure always place on higher score
+		fs = fs.Add(exactFilter, elastic.NewWeightFactorFunction(50.0)) // make sure always place on higher score
 	}
 
-	// 2nd rank: category == "ssot"
-	ssotFilter := elastic.NewTermQuery("data.attributes.category.keyword", "ssot")
-	fs = fs.Add(ssotFilter, elastic.NewWeightFactorFunction(10)) // tune as needed
+	// if rankBy is comma separated, it should be in field,value pairs
+	// e.g. data.attributes.level,significant
+	// otherwise, it should be a single field name with numeric value
+	if strings.Contains(rankBy, ",") {
+		splitRankBy := strings.Split(rankBy, ",")
+		for i := 0; i < len(splitRankBy); i += 2 {
+			rbField := strings.TrimSpace(splitRankBy[i])
+			rbValue := strings.TrimSpace(splitRankBy[i+1])
+			rbQuery := elastic.NewTermQuery(fmt.Sprintf("%s.keyword", rbField), rbValue)
+			fs = fs.Add(rbQuery, elastic.NewWeightFactorFunction(2.0))
+		}
+	} else if rankBy != "" {
+		fs = fs.AddScoreFunc(
+			elastic.NewFieldValueFactorFunction().
+				Field(rankBy).
+				Modifier("log1p").
+				Missing(0).
+				Weight(2.0),
+		)
+	}
 
-	// 3rd rank: always consider query_count, but rankBy (if provided) should have higher weight
+	// always consider query_count, but rankBy (if provided) should have higher weight
 	fs = fs.AddScoreFunc(
 		elastic.NewFieldValueFactorFunction().
 			Field("data.stats_metadata.query_count").
@@ -462,16 +479,6 @@ func buildFunctionScoreQuery(query elastic.Query, rankBy, text, field string) el
 			Missing(0).
 			Weight(1.0),
 	)
-	if strings.TrimSpace(rankBy) != "" {
-		// Add rankBy as higher weight
-		fs = fs.AddScoreFunc(
-			elastic.NewFieldValueFactorFunction().
-				Field(rankBy).
-				Modifier("log1p").
-				Missing(0).
-				Weight(2.0), // higher weight for rankBy
-		)
-	}
 
 	return fs
 }

@@ -295,19 +295,42 @@ func TestSearcherSearch(t *testing.T) {
 				},
 			},
 			{
-				Description: "should return 'bigquery::gcpproject/dataset/tablename-abc-common-test' resource on top if searched for text 'tablename-abc-common-test'",
+				Description: "should return exact term match first then ranking by query count",
 				Config: asset.SearchConfig{
 					Text:          "tablename-abc-common-test",
-					RankBy:        "data.stats_metadata.query_count",
-					IncludeFields: []string{"type", "id"},
+					IncludeFields: []string{"type", "id", "data.stats_metadata.query_count"},
 				},
 				Expected: []expectedRow{
-					{Type: "table", AssetID: "bigquery::gcpproject/dataset/tablename-abc-common-test"},
-					{Type: "table", AssetID: "bigquery::gcpproject/dataset/tablename-common"},
-					{Type: "table", AssetID: "bigquery::gcpproject/dataset/abc-tablename-mid"},
-					{Type: "table", AssetID: "bigquery::gcpproject/dataset/test"},
-					{Type: "table", AssetID: "bigquery::gcpproject/dataset/tablename-mid"},
-					{Type: "table", AssetID: "bigquery::gcpproject/dataset/tablename-1"},
+					{Type: "table", AssetID: "bigquery::gcpproject/dataset/tablename-abc-common-test", Data: map[string]interface{}{
+						"stats_metadata": map[string]interface{}{
+							"query_count": float64(1),
+						},
+					}},
+					{Type: "table", AssetID: "bigquery::gcpproject/dataset/tablename-common", Data: map[string]interface{}{
+						"stats_metadata": map[string]interface{}{
+							"query_count": float64(50),
+						},
+					}},
+					{Type: "table", AssetID: "bigquery::gcpproject/dataset/abc-tablename-mid", Data: map[string]interface{}{
+						"stats_metadata": map[string]interface{}{
+							"query_count": float64(1),
+						},
+					}},
+					{Type: "table", AssetID: "bigquery::gcpproject/dataset/test", Data: map[string]interface{}{
+						"stats_metadata": map[string]interface{}{
+							"query_count": float64(2),
+						},
+					}},
+					{Type: "table", AssetID: "bigquery::gcpproject/dataset/tablename-mid", Data: map[string]interface{}{
+						"stats_metadata": map[string]interface{}{
+							"query_count": float64(5),
+						},
+					}},
+					{Type: "table", AssetID: "bigquery::gcpproject/dataset/tablename-1", Data: map[string]interface{}{
+						"stats_metadata": map[string]interface{}{
+							"query_count": float64(1),
+						},
+					}},
 				},
 			},
 			{
@@ -350,6 +373,34 @@ func TestSearcherSearch(t *testing.T) {
 					{Type: "table", AssetID: "bigquery::gcpproject/dataset/tablename-abc-common-test"},
 					{Type: "table", AssetID: "bigquery::gcpproject/dataset/test"},
 					{Type: "table", AssetID: "bigquery::gcpproject/dataset/abc-tablename-mid"},
+				},
+			},
+			{
+				Description: "should return exact term match first, rank by, then query count",
+				Config: asset.SearchConfig{
+					Text:          "abc-test",
+					RankBy:        "data.attributes.category,finance",
+					IncludeFields: []string{"type", "id", "data.attributes.category", "data.stats_metadata.query_count"},
+				},
+				Expected: []expectedRow{
+					{Type: "table", AssetID: "bigquery::gcpproject/dataset/tablename-abc-common-test", Data: map[string]interface{}{
+						"attributes": map[string]interface{}{"category": "sales"},
+						"stats_metadata": map[string]interface{}{
+							"query_count": float64(1),
+						},
+					}},
+					{Type: "table", AssetID: "bigquery::gcpproject/dataset/abc-tablename-mid", Data: map[string]interface{}{
+						"attributes": map[string]interface{}{"category": "finance"},
+						"stats_metadata": map[string]interface{}{
+							"query_count": float64(1),
+						},
+					}},
+					{Type: "table", AssetID: "bigquery::gcpproject/dataset/test", Data: map[string]interface{}{
+						"attributes": map[string]interface{}{"category": "sales"},
+						"stats_metadata": map[string]interface{}{
+							"query_count": float64(2),
+						},
+					}},
 				},
 			},
 			{

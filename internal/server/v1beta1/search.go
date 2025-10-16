@@ -18,12 +18,13 @@ func (server *APIServer) SearchAssets(ctx context.Context, req *compassv1beta1.S
 	}
 
 	text := strings.TrimSpace(req.GetText())
+	rankBy := strings.TrimSpace(req.GetRankby())
 
 	cfg := asset.SearchConfig{
 		Text:          text,
 		MaxResults:    int(req.GetSize()),
 		Filters:       filterConfigFromValues(req.GetFilter()),
-		RankBy:        req.GetRankby(),
+		RankBy:        rankBy,
 		Queries:       req.GetQuery(),
 		Flags:         getSearchFlagsFromFlags(req.GetFlags()),
 		Offset:        int(req.GetOffset()),
