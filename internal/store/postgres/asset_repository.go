@@ -12,6 +12,7 @@ import (
 	sq "github.com/Masterminds/squirrel"
 	"github.com/goto/compass/core/asset"
 	"github.com/goto/compass/core/user"
+	"github.com/goto/compass/pkg/generichelper"
 	"github.com/goto/compass/pkg/queryexpr"
 	"github.com/jinzhu/copier"
 	"github.com/jmoiron/sqlx"
@@ -1183,12 +1184,28 @@ func (r *AssetRepository) insertAssetVersions(
 		return nil // nothing to insert
 	}
 
+	// PostgreSQL has a limit of 65535 parameters per query
+	// With 15 columns per asset, we can safely insert 4000 assets per batch
+	// (4000 * 15 = 60000 parameters, well below the limit)
+	const chunkSize = 4000
+
+	return generichelper.ProcessInChunksConcurrently(ctx, newAssets, chunkSize, 3, func(chunk []asset.Asset) error {
+		return r.insertAssetVersionsChunk(ctx, execer, chunk, clog)
+	})
+}
+
+func (r *AssetRepository) insertAssetVersionsChunk(
+	ctx context.Context,
+	execer sqlx.ExecerContext,
+	assets []asset.Asset,
+	clog diff.Changelog,
+) error {
 	builder := sq.Insert("assets_versions").
 		Columns("asset_id", "urn", "type", "service", "name", "description", "data", "labels",
 			"created_at", "updated_at", "updated_by", "version", "owners", "is_deleted", "changelog").
 		PlaceholderFormat(sq.Dollar)
 
-	for _, newAsset := range newAssets {
+	for _, newAsset := range assets {
 		if newAsset.ID == "" {
 			return asset.ErrNilAsset
 		}
@@ -1267,6 +1284,17 @@ func (r *AssetRepository) insertOwners(ctx context.Context, execer sqlx.ExecerCo
 		return asset.InvalidError{AssetID: assetID}
 	}
 
+	// PostgreSQL has a limit of 65535 parameters per query
+	// With 2 columns per owner (asset_id, user_id), we can safely insert 30000 owners per batch
+	// (30000 * 2 = 60000 parameters, well below the limit)
+	const chunkSize = 30000
+
+	return generichelper.ProcessInChunksConcurrently(ctx, owners, chunkSize, 3, func(chunk []user.User) error {
+		return r.insertOwnersChunk(ctx, execer, assetID, chunk)
+	})
+}
+
+func (r *AssetRepository) insertOwnersChunk(ctx context.Context, execer sqlx.ExecerContext, assetID string, owners []user.User) error {
 	sqlb := sq.Insert("asset_owners").
 		Columns("asset_id", "user_id")
 	for _, o := range owners {
