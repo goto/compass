@@ -8,6 +8,7 @@ import (
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/goto/compass/core/asset"
+	"github.com/goto/compass/pkg/generichelper"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -229,6 +230,17 @@ func (*LineageRepository) insertGraph(ctx context.Context, execer sqlx.ExecerCon
 		return nil
 	}
 
+	// PostgreSQL has a limit of 65535 parameters per query
+	// With 3 columns per edge (source, target, prop), we can safely insert 20000 edges per batch
+	// (20000 * 3 = 60000 parameters, well below the limit)
+	const chunkSize = 20000
+
+	return generichelper.ProcessInChunksConcurrently(ctx, graph, chunkSize, 3, func(chunk []asset.LineageEdge) error {
+		return insertGraphChunk(ctx, execer, chunk)
+	})
+}
+
+func insertGraphChunk(ctx context.Context, execer sqlx.ExecerContext, graph asset.LineageGraph) error {
 	builder := sq.Insert("lineage_graph").Columns("source", "target", "prop").PlaceholderFormat(sq.Dollar)
 	for _, edge := range graph {
 		builder = builder.Values(edge.Source, edge.Target, edge.Prop)
@@ -253,6 +265,17 @@ func (*LineageRepository) removeGraph(ctx context.Context, execer sqlx.ExecerCon
 		return nil
 	}
 
+	// PostgreSQL has a limit of 65535 parameters per query
+	// With 2 conditions per edge (source, target), we can safely delete 30000 edges per batch
+	// (30000 * 2 = 60000 parameters, well below the limit)
+	const chunkSize = 30000
+
+	return generichelper.ProcessInChunksConcurrently(ctx, graph, chunkSize, 3, func(chunk []asset.LineageEdge) error {
+		return removeGraphChunk(ctx, execer, chunk)
+	})
+}
+
+func removeGraphChunk(ctx context.Context, execer sqlx.ExecerContext, graph asset.LineageGraph) error {
 	builder := sq.Delete("lineage_graph").PlaceholderFormat(sq.Dollar)
 	conditions := sq.Or{}
 	for _, edge := range graph {
