@@ -3592,6 +3592,8 @@ func (m *GetGraphRequest) validate(all bool) error {
 		errors = append(errors, err)
 	}
 
+	// no validation rules for IncludeDeleted
+
 	if m.WithAttributes != nil {
 		// no validation rules for WithAttributes
 	}

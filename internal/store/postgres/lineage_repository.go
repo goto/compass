@@ -31,7 +31,7 @@ func (repo *LineageRepository) GetGraph(ctx context.Context, urn string, query a
 	var graph asset.LineageGraph
 
 	if query.Direction == "" || query.Direction == asset.LineageDirectionUpstream {
-		upstreams, err := repo.getUpstreamsGraph(ctx, urn, query.Level)
+		upstreams, err := repo.getUpstreamsGraph(ctx, urn, query.Level, query.IncludeDeleted)
 		if err != nil {
 			return graph, fmt.Errorf("error fetching upstreams graph: %w", err)
 		}
@@ -39,7 +39,7 @@ func (repo *LineageRepository) GetGraph(ctx context.Context, urn string, query a
 	}
 
 	if query.Direction == "" || query.Direction == asset.LineageDirectionDownstream {
-		downstreams, err := repo.getDownstreamsGraph(ctx, urn, query.Level)
+		downstreams, err := repo.getDownstreamsGraph(ctx, urn, query.Level, query.IncludeDeleted)
 		if err != nil {
 			return graph, fmt.Errorf("error fetching upstreams graph: %w", err)
 		}
@@ -329,10 +329,10 @@ func (*LineageRepository) compareGraph(current, new asset.LineageGraph) (toInser
 	return toInserts, toRemoves
 }
 
-func (repo *LineageRepository) getUpstreamsGraph(ctx context.Context, urn string, level int) (asset.LineageGraph, error) {
+func (repo *LineageRepository) getUpstreamsGraph(ctx context.Context, urn string, level int, includeDeleted bool) (asset.LineageGraph, error) {
 	var graph asset.LineageGraph
 
-	query, args, err := repo.buildUpstreamQuery(urn, level)
+	query, args, err := repo.buildUpstreamQuery(urn, level, includeDeleted)
 	if err != nil {
 		return graph, fmt.Errorf("error building upstream query: %w", err)
 	}
@@ -348,10 +348,10 @@ func (repo *LineageRepository) getUpstreamsGraph(ctx context.Context, urn string
 	return graph, nil
 }
 
-func (repo *LineageRepository) getDownstreamsGraph(ctx context.Context, urn string, level int) (asset.LineageGraph, error) {
+func (repo *LineageRepository) getDownstreamsGraph(ctx context.Context, urn string, level int, includeDeleted bool) (asset.LineageGraph, error) {
 	var graph asset.LineageGraph
 
-	query, args, err := repo.buildDownstreamQuery(urn, level)
+	query, args, err := repo.buildDownstreamQuery(urn, level, includeDeleted)
 	if err != nil {
 		return graph, fmt.Errorf("error building downstream query: %w", err)
 	}
@@ -367,7 +367,7 @@ func (repo *LineageRepository) getDownstreamsGraph(ctx context.Context, urn stri
 	return graph, nil
 }
 
-func (repo *LineageRepository) buildUpstreamQuery(urn string, level int) (query string, args []interface{}, err error) {
+func (repo *LineageRepository) buildUpstreamQuery(urn string, level int, includeDeleted bool) (query string, args []interface{}, err error) {
 	alias := "search_graph"
 	nonRecursiveBuilder := sq.
 		Select("source", "target", "prop", "1 as depth", "ARRAY[target] as path").
@@ -382,10 +382,21 @@ func (repo *LineageRepository) buildUpstreamQuery(urn string, level int) (query 
 		recursiveBuilder = recursiveBuilder.Where("sg.depth < ?", level)
 	}
 
+	if !includeDeleted {
+		nonRecursiveBuilder = nonRecursiveBuilder.Where(sq.And{
+			sq.Eq{"prop->>'source_is_deleted'": "false"},
+			sq.Eq{"prop->>'target_is_deleted'": "false"},
+		})
+		recursiveBuilder = recursiveBuilder.Where(sq.And{
+			sq.Eq{"lg.prop->>'source_is_deleted'": "false"},
+			sq.Eq{"lg.prop->>'target_is_deleted'": "false"},
+		})
+	}
+
 	return repo.buildRecursiveQuery(alias, nonRecursiveBuilder, recursiveBuilder)
 }
 
-func (repo *LineageRepository) buildDownstreamQuery(urn string, level int) (query string, args []interface{}, err error) {
+func (repo *LineageRepository) buildDownstreamQuery(urn string, level int, includeDeleted bool) (query string, args []interface{}, err error) {
 	alias := "search_graph"
 	nonRecursiveBuilder := sq.
 		Select("source", "target", "prop", "1 as depth", "ARRAY[source] as path").
@@ -398,6 +409,17 @@ func (repo *LineageRepository) buildDownstreamQuery(urn string, level int) (quer
 		Where("lg.source = sg.target")
 	if level > 0 {
 		recursiveBuilder = recursiveBuilder.Where("sg.depth < ?", level)
+	}
+
+	if !includeDeleted {
+		nonRecursiveBuilder = nonRecursiveBuilder.Where(sq.And{
+			sq.Eq{"prop->>'source_is_deleted'": "false"},
+			sq.Eq{"prop->>'target_is_deleted'": "false"},
+		})
+		recursiveBuilder = recursiveBuilder.Where(sq.And{
+			sq.Eq{"lg.prop->>'source_is_deleted'": "false"},
+			sq.Eq{"lg.prop->>'target_is_deleted'": "false"},
+		})
 	}
 
 	return repo.buildRecursiveQuery(alias, nonRecursiveBuilder, recursiveBuilder)

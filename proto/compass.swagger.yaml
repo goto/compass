@@ -1041,6 +1041,11 @@ paths:
           in: query
           required: false
           type: boolean
+        - name: include_deleted
+          description: If true, include soft deleted assets in the lineage graph result
+          in: query
+          required: false
+          type: boolean
       tags:
         - Lineage
         - Asset
@@ -2508,7 +2513,7 @@ definitions:
           $ref: '#/definitions/LineageNode'
       update_only:
         type: boolean
-        description: If true, it return error if the asset does not exist
+        description: If true, it return empty id and nil error if the asset does not exist
   UpsertAssetRequest.Asset:
     type: object
     properties:
@@ -2567,7 +2572,7 @@ definitions:
           empty/not specified.
       update_only:
         type: boolean
-        description: If true, it return error if the asset does not exist
+        description: If true, it return empty id and nil error if the asset does not exist
   UpsertPatchAssetRequest.Asset:
     type: object
     properties:

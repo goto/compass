@@ -26,7 +26,7 @@ help:           ##@help show this help
 NAME="github.com/goto/compass"
 VERSION=$(shell git describe --always --tags 2>/dev/null)
 COVERFILE="/tmp/compass.coverprofile"
-PROTON_COMMIT := "db4ee43fd6f9a8d5999e157b9d938ad9593eee15"
+PROTON_COMMIT := "5639ee3e7dcb5055b038040b62df6b6fcb2a85a1"
 
 TOOLS_MOD_DIR = ./tools
 TOOLS_DIR = $(abspath ./.tools)
