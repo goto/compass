@@ -332,7 +332,7 @@ func (*LineageRepository) compareGraph(current, new asset.LineageGraph) (toInser
 func (repo *LineageRepository) getUpstreamsGraph(ctx context.Context, urn string, level int, includeDeleted bool) (asset.LineageGraph, error) {
 	var graph asset.LineageGraph
 
-	query, args, err := repo.buildUpstreamQuery(urn, level, includeDeleted)
+	query, args, err := repo.buildQuery(urn, true, level, includeDeleted)
 	if err != nil {
 		return graph, fmt.Errorf("error building upstream query: %w", err)
 	}
@@ -351,7 +351,7 @@ func (repo *LineageRepository) getUpstreamsGraph(ctx context.Context, urn string
 func (repo *LineageRepository) getDownstreamsGraph(ctx context.Context, urn string, level int, includeDeleted bool) (asset.LineageGraph, error) {
 	var graph asset.LineageGraph
 
-	query, args, err := repo.buildDownstreamQuery(urn, level, includeDeleted)
+	query, args, err := repo.buildQuery(urn, false, level, includeDeleted)
 	if err != nil {
 		return graph, fmt.Errorf("error building downstream query: %w", err)
 	}
@@ -367,46 +367,26 @@ func (repo *LineageRepository) getDownstreamsGraph(ctx context.Context, urn stri
 	return graph, nil
 }
 
-func (repo *LineageRepository) buildUpstreamQuery(urn string, level int, includeDeleted bool) (query string, args []interface{}, err error) {
+func (repo *LineageRepository) buildQuery(urn string, isUpstream bool, level int, includeDeleted bool) (query string, args []interface{}, err error) {
 	alias := "search_graph"
+	base := "source"
+	if isUpstream {
+		base = "target"
+	}
 	nonRecursiveBuilder := sq.
-		Select("source", "target", "prop", "1 as depth", "ARRAY[target] as path").
+		Select("source", "target", "prop", "1 as depth", fmt.Sprintf("ARRAY[%s] as path", base)).
 		From("lineage_graph").
-		Where("target = ?", urn)
+		Where(fmt.Sprintf("%s = ?", base), urn)
 	recursiveBuilder := sq.
-		Select("lg.source", "lg.target", "lg.prop", "sg.depth + 1", "sg.path || lg.target").
+		Select("lg.source", "lg.target", "lg.prop", "sg.depth + 1", fmt.Sprintf("sg.path || lg.%s", base)).
 		From(fmt.Sprintf("lineage_graph lg, %s sg", alias)).
-		Where("lg.target <> ALL(sg.path)").
-		Where("lg.target = sg.source")
-	if level > 0 {
-		recursiveBuilder = recursiveBuilder.Where("sg.depth < ?", level)
+		Where(fmt.Sprintf("lg.%s <> ALL(sg.path)", base))
+	if isUpstream {
+		recursiveBuilder = recursiveBuilder.Where("lg.target = sg.source")
+	} else {
+		recursiveBuilder = recursiveBuilder.Where("lg.source = sg.target")
 	}
 
-	if !includeDeleted {
-		nonRecursiveBuilder = nonRecursiveBuilder.Where(sq.And{
-			sq.Eq{"prop->>'source_is_deleted'": "false"},
-			sq.Eq{"prop->>'target_is_deleted'": "false"},
-		})
-		recursiveBuilder = recursiveBuilder.Where(sq.And{
-			sq.Eq{"lg.prop->>'source_is_deleted'": "false"},
-			sq.Eq{"lg.prop->>'target_is_deleted'": "false"},
-		})
-	}
-
-	return repo.buildRecursiveQuery(alias, nonRecursiveBuilder, recursiveBuilder)
-}
-
-func (repo *LineageRepository) buildDownstreamQuery(urn string, level int, includeDeleted bool) (query string, args []interface{}, err error) {
-	alias := "search_graph"
-	nonRecursiveBuilder := sq.
-		Select("source", "target", "prop", "1 as depth", "ARRAY[source] as path").
-		From("lineage_graph").
-		Where("source = ?", urn)
-	recursiveBuilder := sq.
-		Select("lg.source", "lg.target", "lg.prop", "sg.depth + 1", "sg.path || lg.source").
-		From(fmt.Sprintf("lineage_graph lg, %s sg", alias)).
-		Where("lg.source <> ALL(sg.path)").
-		Where("lg.source = sg.target")
 	if level > 0 {
 		recursiveBuilder = recursiveBuilder.Where("sg.depth < ?", level)
 	}
