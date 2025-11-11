@@ -94,6 +94,38 @@ func (r *LineageRepositoryTestSuite) TestGetGraph() {
 		r.Require().NoError(err)
 		r.compareGraphs(expected, graph)
 	})
+
+	r.Run("should be able control soft deleted assets inclusiveness in lineage with includeDeleted config", func() {
+		nodeURN := "table-1"
+
+		// create initial
+		err := r.repository.Upsert(r.ctx, nodeURN, []string{"table-2"}, []string{"table-3"})
+		r.NoError(err)
+
+		err = r.repository.SoftDeleteByURN(r.ctx, nodeURN)
+		r.NoError(err)
+
+		// fetch without include soft deleted result
+		graph, err := r.repository.GetGraph(r.ctx, nodeURN, asset.LineageQuery{})
+		r.Require().NoError(err)
+		r.compareGraphs(asset.LineageGraph{}, graph)
+
+		// fetch with include soft deleted result
+		graph, err = r.repository.GetGraph(r.ctx, nodeURN, asset.LineageQuery{IncludeDeleted: true})
+		r.Require().NoError(err)
+		r.compareGraphsWithProp(asset.LineageGraph{
+			{Source: "table-2", Target: nodeURN, Prop: map[string]interface{}{
+				"root":              nodeURN,
+				"source_is_deleted": false,
+				"target_is_deleted": true,
+			}},
+			{Source: nodeURN, Target: "table-3", Prop: map[string]interface{}{
+				"root":              nodeURN,
+				"source_is_deleted": true,
+				"target_is_deleted": false,
+			}},
+		}, graph)
+	})
 }
 
 func (r *LineageRepositoryTestSuite) TestDeleteByURN() {
@@ -130,7 +162,7 @@ func (r *LineageRepositoryTestSuite) TestSoftDeleteByURN() {
 		err = r.repository.SoftDeleteByURN(r.ctx, nodeURN)
 		r.NoError(err)
 
-		graph, err := r.repository.GetGraph(r.ctx, nodeURN, asset.LineageQuery{})
+		graph, err := r.repository.GetGraph(r.ctx, nodeURN, asset.LineageQuery{IncludeDeleted: true})
 		r.Require().NoError(err)
 		r.compareGraphsWithProp(asset.LineageGraph{
 			{Source: "table-2", Target: nodeURN, Prop: map[string]interface{}{
@@ -202,7 +234,7 @@ func (r *LineageRepositoryTestSuite) TestSoftDeleteByURNs() {
 		err = r.repository.SoftDeleteByURNs(r.ctx, nodeURNs)
 		r.NoError(err)
 
-		graph, err := r.repository.GetGraph(r.ctx, nodeURN1a, asset.LineageQuery{})
+		graph, err := r.repository.GetGraph(r.ctx, nodeURN1a, asset.LineageQuery{IncludeDeleted: true})
 		r.Require().NoError(err)
 		r.compareGraphsWithProp(asset.LineageGraph{
 			{Source: "table-2", Target: nodeURN1a, Prop: map[string]interface{}{
@@ -217,7 +249,7 @@ func (r *LineageRepositoryTestSuite) TestSoftDeleteByURNs() {
 			}},
 		}, graph)
 
-		graph, err = r.repository.GetGraph(r.ctx, nodeURN1b, asset.LineageQuery{})
+		graph, err = r.repository.GetGraph(r.ctx, nodeURN1b, asset.LineageQuery{IncludeDeleted: true})
 		r.Require().NoError(err)
 		r.compareGraphsWithProp(asset.LineageGraph{
 			{Source: "table-2", Target: nodeURN1b, Prop: map[string]interface{}{
@@ -286,7 +318,7 @@ func (r *LineageRepositoryTestSuite) TestUpsert() {
 		// create initial
 		err := r.repository.Upsert(r.ctx, nodeURN, []string{"job-restore"}, []string{"dashboard-restore"})
 		r.NoError(err)
-		graph, err := r.repository.GetGraph(r.ctx, nodeURN, asset.LineageQuery{})
+		graph, err := r.repository.GetGraph(r.ctx, nodeURN, asset.LineageQuery{IncludeDeleted: true})
 		r.Require().NoError(err)
 		r.compareGraphsWithProp(asset.LineageGraph{
 			{Source: "job-restore", Target: nodeURN, Prop: map[string]interface{}{
@@ -304,7 +336,7 @@ func (r *LineageRepositoryTestSuite) TestUpsert() {
 		// soft delete
 		err = r.repository.SoftDeleteByURN(r.ctx, nodeURN)
 		r.NoError(err)
-		graph, err = r.repository.GetGraph(r.ctx, nodeURN, asset.LineageQuery{})
+		graph, err = r.repository.GetGraph(r.ctx, nodeURN, asset.LineageQuery{IncludeDeleted: true})
 		r.Require().NoError(err)
 		r.compareGraphsWithProp(asset.LineageGraph{
 			{Source: "job-restore", Target: nodeURN, Prop: map[string]interface{}{
@@ -322,7 +354,7 @@ func (r *LineageRepositoryTestSuite) TestUpsert() {
 		// re-sync
 		err = r.repository.Upsert(r.ctx, nodeURN, []string{"job-restore"}, []string{"dashboard-restore"})
 		r.NoError(err)
-		graph, err = r.repository.GetGraph(r.ctx, nodeURN, asset.LineageQuery{})
+		graph, err = r.repository.GetGraph(r.ctx, nodeURN, asset.LineageQuery{IncludeDeleted: true})
 		r.Require().NoError(err)
 		r.compareGraphsWithProp(asset.LineageGraph{
 			{Source: "job-restore", Target: nodeURN, Prop: map[string]interface{}{

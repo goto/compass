@@ -31,6 +31,7 @@ func (server *APIServer) GetGraph(ctx context.Context, req *compassv1beta1.GetGr
 		Level:          int(req.GetLevel()),
 		Direction:      direction,
 		WithAttributes: withAttributes,
+		IncludeDeleted: req.GetIncludeDeleted(),
 	})
 	if err != nil {
 		return nil, internalServerError(server.logger, err.Error())
