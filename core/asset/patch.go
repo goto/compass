@@ -2,7 +2,7 @@ package asset
 
 import (
 	"github.com/goto/compass/core/user"
-	"github.com/peterbourgon/mergemap"
+	"github.com/goto/compass/pkg/mergemap"
 )
 
 // patch appends asset with data from map. It mutates the asset itself.
