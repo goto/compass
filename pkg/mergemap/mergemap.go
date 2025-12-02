@@ -4,9 +4,7 @@ import (
 	"reflect"
 )
 
-var (
-	MaxDepth = 32
-)
+var MaxDepth = 32
 
 // Merge recursively merges the src and dst maps. Key conflicts are resolved by
 // preferring src, or recursively descending, if both src and dst are maps.
