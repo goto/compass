@@ -2,7 +2,7 @@ package asset
 
 import (
 	"github.com/goto/compass/core/user"
-	"github.com/peterbourgon/mergemap"
+	"github.com/goto/compass/pkg/mergemap"
 )
 
 // patch appends asset with data from map. It mutates the asset itself.
@@ -96,7 +96,12 @@ func patchAssetData(a *Asset, data interface{}) {
 		return
 	}
 
-	a.Data = mergemap.Merge(a.Data, dataMap)
+	// Configure array merge behavior for data.columns
+	arrayMergeConfig := map[string]string{
+		"data.columns": "name",
+	}
+
+	a.Data = mergemap.Merge(a.Data, dataMap, arrayMergeConfig)
 }
 
 func patchString(key string, data map[string]interface{}, defaultVal string) string {

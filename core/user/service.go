@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+
 	"github.com/goto/salt/log"
 )
 
