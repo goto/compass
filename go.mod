@@ -32,7 +32,6 @@ require (
 	github.com/oklog/ulid/v2 v2.1.0
 	github.com/olivere/elastic/v7 v7.0.31
 	github.com/ory/dockertest/v3 v3.9.1
-	github.com/peterbourgon/mergemap v0.0.1
 	github.com/r3labs/diff/v2 v2.15.0
 	github.com/spf13/cobra v1.4.0
 	github.com/stretchr/testify v1.8.4

@@ -2,18 +2,21 @@ package mergemap
 
 import (
 	"reflect"
+	"strings"
 )
 
-const MaxDepth = 32
+var (
+	MaxDepth = 32
+)
 
 // Merge recursively merges the src and dst maps. Key conflicts are resolved by
 // preferring src, or recursively descending, if both src and dst are maps.
-// Special handling: data.columns arrays are merged by name field.
-func Merge(dst, src map[string]interface{}) map[string]interface{} {
-	return merge(dst, src, 0, []string{})
+// Arrays specified in arrayMergeConfig are merged by their identifier field.
+func Merge(dst, src map[string]interface{}, arrayMergeConfig map[string]string) map[string]interface{} {
+	return merge(dst, src, 0, []string{}, arrayMergeConfig)
 }
 
-func merge(dst, src map[string]interface{}, depth int, path []string) map[string]interface{} {
+func merge(dst, src map[string]interface{}, depth int, path []string, arrayMergeConfig map[string]string) map[string]interface{} {
 	if depth > MaxDepth {
 		panic("too deep!")
 	}
@@ -21,9 +24,9 @@ func merge(dst, src map[string]interface{}, depth int, path []string) map[string
 		currentPath := append(path, key)
 
 		if dstVal, ok := dst[key]; ok {
-			// Special handling for data.columns - merge by name
-			if shouldMergeByName(currentPath, key) {
-				if merged := mergeArraysByName(dstVal, srcVal); merged != nil {
+			// Check if this array should be merged by identifier
+			if identifierField := getIdentifierField(currentPath, arrayMergeConfig); identifierField != "" {
+				if merged := mergeArraysByIdentifier(dstVal, srcVal, identifierField, arrayMergeConfig); merged != nil {
 					dst[key] = merged
 					continue
 				}
@@ -32,7 +35,7 @@ func merge(dst, src map[string]interface{}, depth int, path []string) map[string
 			srcMap, srcMapOk := mapify(srcVal)
 			dstMap, dstMapOk := mapify(dstVal)
 			if srcMapOk && dstMapOk {
-				srcVal = merge(dstMap, srcMap, depth+1, currentPath)
+				srcVal = merge(dstMap, srcMap, depth+1, currentPath, arrayMergeConfig)
 			}
 		}
 		dst[key] = srcVal
@@ -40,20 +43,26 @@ func merge(dst, src map[string]interface{}, depth int, path []string) map[string
 	return dst
 }
 
-// shouldMergeByName checks if the current path matches data.columns
-func shouldMergeByName(path []string, key string) bool {
-	if key != "columns" {
-		return false
+// getIdentifierField checks if the current path matches any configured array merge path
+// and returns the identifier field to use for merging, or empty string if not configured
+func getIdentifierField(path []string, arrayMergeConfig map[string]string) string {
+	if len(path) == 0 || arrayMergeConfig == nil {
+		return ""
 	}
-	// Check if this is data.columns (path would be ["data", "columns"])
-	if len(path) >= 2 && path[len(path)-2] == "data" && path[len(path)-1] == "columns" {
-		return true
+
+	// Build the dot-separated path
+	pathStr := strings.Join(path, ".")
+
+	// Check if this path is configured for merge-by-identifier
+	if identifierField, exists := arrayMergeConfig[pathStr]; exists {
+		return identifierField
 	}
-	return false
+
+	return ""
 }
 
-// mergeArraysByName merges two arrays by matching items with the same "name" field
-func mergeArraysByName(dst, src interface{}) interface{} {
+// mergeArraysByIdentifier merges two arrays by matching items with the same identifier field
+func mergeArraysByIdentifier(dst, src interface{}, identifierField string, arrayMergeConfig map[string]string) interface{} {
 	dstSlice, dstOk := dst.([]interface{})
 	srcSlice, srcOk := src.([]interface{})
 
@@ -61,7 +70,7 @@ func mergeArraysByName(dst, src interface{}) interface{} {
 		return nil
 	}
 
-	// Build a map of dst items by name
+	// Build a map of dst items by identifier field
 	dstMap := make(map[string]map[string]interface{})
 	dstOrder := []string{}
 
@@ -70,12 +79,12 @@ func mergeArraysByName(dst, src interface{}) interface{} {
 		if !ok {
 			continue
 		}
-		name, ok := itemMap["name"].(string)
-		if !ok || name == "" {
+		identifier, ok := itemMap[identifierField].(string)
+		if !ok || identifier == "" {
 			continue
 		}
-		dstMap[name] = itemMap
-		dstOrder = append(dstOrder, name)
+		dstMap[identifier] = itemMap
+		dstOrder = append(dstOrder, identifier)
 	}
 
 	// Merge or add src items
@@ -84,25 +93,25 @@ func mergeArraysByName(dst, src interface{}) interface{} {
 		if !ok {
 			continue
 		}
-		name, ok := itemMap["name"].(string)
-		if !ok || name == "" {
+		identifier, ok := itemMap[identifierField].(string)
+		if !ok || identifier == "" {
 			continue
 		}
 
-		if existingItem, exists := dstMap[name]; exists {
+		if existingItem, exists := dstMap[identifier]; exists {
 			// Merge the existing item with new data
-			dstMap[name] = merge(existingItem, itemMap, 0, []string{})
+			dstMap[identifier] = merge(existingItem, itemMap, 0, []string{}, arrayMergeConfig)
 		} else {
 			// Add new item
-			dstMap[name] = itemMap
-			dstOrder = append(dstOrder, name)
+			dstMap[identifier] = itemMap
+			dstOrder = append(dstOrder, identifier)
 		}
 	}
 
 	// Rebuild the array maintaining order
 	result := make([]interface{}, 0, len(dstMap))
-	for _, name := range dstOrder {
-		if item, exists := dstMap[name]; exists {
+	for _, identifier := range dstOrder {
+		if item, exists := dstMap[identifier]; exists {
 			result = append(result, item)
 		}
 	}

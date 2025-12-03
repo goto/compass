@@ -15,7 +15,7 @@ func TestMerge_BasicMerge(t *testing.T) {
 		"city": "NYC",
 	}
 
-	result := Merge(dst, src)
+	result := Merge(dst, src, nil)
 
 	expected := map[string]interface{}{
 		"name": "old",
@@ -29,6 +29,10 @@ func TestMerge_BasicMerge(t *testing.T) {
 }
 
 func TestMerge_ColumnsArrayByName(t *testing.T) {
+	arrayMergeConfig := map[string]string{
+		"data.columns": "name",
+	}
+
 	dst := map[string]interface{}{
 		"data": map[string]interface{}{
 			"columns": []interface{}{
@@ -65,7 +69,7 @@ func TestMerge_ColumnsArrayByName(t *testing.T) {
 		},
 	}
 
-	result := Merge(dst, src)
+	result := Merge(dst, src, arrayMergeConfig)
 
 	data, ok := result["data"].(map[string]interface{})
 	if !ok {
@@ -107,6 +111,10 @@ func TestMerge_ColumnsArrayByName(t *testing.T) {
 }
 
 func TestMerge_ColumnsArrayPreservesOrder(t *testing.T) {
+	arrayMergeConfig := map[string]string{
+		"data.columns": "name",
+	}
+
 	dst := map[string]interface{}{
 		"data": map[string]interface{}{
 			"columns": []interface{}{
@@ -125,7 +133,7 @@ func TestMerge_ColumnsArrayPreservesOrder(t *testing.T) {
 		},
 	}
 
-	result := Merge(dst, src)
+	result := Merge(dst, src, arrayMergeConfig)
 
 	columns := result["data"].(map[string]interface{})["columns"].([]interface{})
 
@@ -150,6 +158,10 @@ func TestMerge_ColumnsArrayPreservesOrder(t *testing.T) {
 }
 
 func TestMerge_NonDataColumnsArrayReplacedNormally(t *testing.T) {
+	arrayMergeConfig := map[string]string{
+		"data.columns": "name",
+	}
+
 	dst := map[string]interface{}{
 		"other": map[string]interface{}{
 			"columns": []interface{}{
@@ -166,7 +178,7 @@ func TestMerge_NonDataColumnsArrayReplacedNormally(t *testing.T) {
 		},
 	}
 
-	result := Merge(dst, src)
+	result := Merge(dst, src, arrayMergeConfig)
 
 	columns := result["other"].(map[string]interface{})["columns"].([]interface{})
 
@@ -199,7 +211,7 @@ func TestMerge_NestedMapsStillWork(t *testing.T) {
 		},
 	}
 
-	result := Merge(dst, src)
+	result := Merge(dst, src, nil)
 
 	attrs := result["data"].(map[string]interface{})["attributes"].(map[string]interface{})
 
@@ -215,6 +227,10 @@ func TestMerge_NestedMapsStillWork(t *testing.T) {
 }
 
 func TestMerge_ColumnAttributesMerged(t *testing.T) {
+	arrayMergeConfig := map[string]string{
+		"data.columns": "name",
+	}
+
 	dst := map[string]interface{}{
 		"data": map[string]interface{}{
 			"columns": []interface{}{
@@ -264,17 +280,15 @@ func TestMerge_ColumnAttributesMerged(t *testing.T) {
 		},
 	}
 
-	result := Merge(dst, src)
+	result := Merge(dst, src, arrayMergeConfig)
 
 	data := result["data"].(map[string]interface{})
 	columns := data["columns"].([]interface{})
 
-	// Check that we still have 3 columns
 	if len(columns) != 3 {
 		t.Fatalf("Expected 3 columns, got %d", len(columns))
 	}
 
-	// Find entity_type column
 	var entityTypeCol map[string]interface{}
 	for _, col := range columns {
 		colMap := col.(map[string]interface{})
@@ -306,5 +320,65 @@ func TestMerge_ColumnAttributesMerged(t *testing.T) {
 	maskingPolicy := attrs["masking_policy"].([]interface{})
 	if len(maskingPolicy) != 2 {
 		t.Errorf("Expected masking_policy to have 2 items, got %d", len(maskingPolicy))
+	}
+}
+
+func TestMerge_CustomArrayMergeConfig(t *testing.T) {
+	arrayMergeConfig := map[string]string{
+		"data.columns": "name",
+		"owners":       "email",
+	}
+
+	dst := map[string]interface{}{
+		"owners": []interface{}{
+			map[string]interface{}{
+				"email": "alice@example.com",
+				"role":  "admin",
+			},
+			map[string]interface{}{
+				"email": "bob@example.com",
+				"role":  "viewer",
+			},
+		},
+	}
+
+	src := map[string]interface{}{
+		"owners": []interface{}{
+			map[string]interface{}{
+				"email":  "bob@example.com",
+				"role":   "editor",
+				"active": true,
+			},
+			map[string]interface{}{
+				"email": "charlie@example.com",
+				"role":  "viewer",
+			},
+		},
+	}
+
+	result := Merge(dst, src, arrayMergeConfig)
+
+	owners := result["owners"].([]interface{})
+
+	if len(owners) != 3 {
+		t.Fatalf("Expected 3 owners, got %d", len(owners))
+	}
+
+	alice := owners[0].(map[string]interface{})
+	if alice["email"] != "alice@example.com" || alice["role"] != "admin" {
+		t.Error("Alice should be unchanged")
+	}
+
+	bob := owners[1].(map[string]interface{})
+	if bob["email"] != "bob@example.com" || bob["role"] != "editor" {
+		t.Error("Bob should be updated to editor")
+	}
+	if active, ok := bob["active"].(bool); !ok || !active {
+		t.Error("Bob should have active=true")
+	}
+
+	charlie := owners[2].(map[string]interface{})
+	if charlie["email"] != "charlie@example.com" || charlie["role"] != "viewer" {
+		t.Error("Charlie should be added")
 	}
 }
