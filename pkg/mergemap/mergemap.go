@@ -5,19 +5,17 @@ import (
 	"strings"
 )
 
-var (
-	MaxDepth = 32
-)
+const maxDepth = 32
 
 // Merge recursively merges the src and dst maps. Key conflicts are resolved by
 // preferring src, or recursively descending, if both src and dst are maps.
 // Arrays specified in arrayMergeConfig are merged by their identifier field.
 func Merge(dst, src map[string]interface{}, arrayMergeConfig map[string]string) map[string]interface{} {
-	return merge(dst, src, 0, []string{}, arrayMergeConfig)
+	return mergeRecursive(dst, src, 0, []string{}, arrayMergeConfig)
 }
 
-func merge(dst, src map[string]interface{}, depth int, path []string, arrayMergeConfig map[string]string) map[string]interface{} {
-	if depth > MaxDepth {
+func mergeRecursive(dst, src map[string]interface{}, depth int, path []string, arrayMergeConfig map[string]string) map[string]interface{} {
+	if depth > maxDepth {
 		panic("too deep!")
 	}
 	for key, srcVal := range src {
@@ -35,7 +33,7 @@ func merge(dst, src map[string]interface{}, depth int, path []string, arrayMerge
 			srcMap, srcMapOk := mapify(srcVal)
 			dstMap, dstMapOk := mapify(dstVal)
 			if srcMapOk && dstMapOk {
-				srcVal = merge(dstMap, srcMap, depth+1, currentPath, arrayMergeConfig)
+				srcVal = mergeRecursive(dstMap, srcMap, depth+1, currentPath, arrayMergeConfig)
 			}
 		}
 		dst[key] = srcVal
@@ -63,59 +61,92 @@ func getIdentifierField(path []string, arrayMergeConfig map[string]string) strin
 
 // mergeArraysByIdentifier merges two arrays by matching items with the same identifier field
 func mergeArraysByIdentifier(dst, src interface{}, identifierField string, arrayMergeConfig map[string]string) interface{} {
+	dstSlice, srcSlice := convertToSlices(dst, src)
+	if dstSlice == nil || srcSlice == nil {
+		return nil
+	}
+
+	dstMap, dstOrder := buildDestinationMap(dstSlice, identifierField)
+	updateMapWithSource(dstMap, &dstOrder, srcSlice, identifierField, arrayMergeConfig)
+
+	return rebuildArray(dstMap, dstOrder)
+}
+
+// convertToSlices validates and converts interfaces to slices
+func convertToSlices(dst, src interface{}) ([]interface{}, []interface{}) {
 	dstSlice, dstOk := dst.([]interface{})
 	srcSlice, srcOk := src.([]interface{})
 
 	if !dstOk || !srcOk {
-		return nil
+		return nil, nil
 	}
 
-	// Build a map of dst items by identifier field
+	return dstSlice, srcSlice
+}
+
+// buildDestinationMap creates a map and order slice from destination items
+func buildDestinationMap(dstSlice []interface{}, identifierField string) (map[string]map[string]interface{}, []string) {
 	dstMap := make(map[string]map[string]interface{})
 	dstOrder := []string{}
 
 	for _, item := range dstSlice {
-		itemMap, ok := item.(map[string]interface{})
-		if !ok {
-			continue
-		}
-		identifier, ok := itemMap[identifierField].(string)
-		if !ok || identifier == "" {
+		itemMap, identifier := extractItemData(item, identifierField)
+		if itemMap == nil || identifier == "" {
 			continue
 		}
 		dstMap[identifier] = itemMap
 		dstOrder = append(dstOrder, identifier)
 	}
 
-	// Merge or add src items
+	return dstMap, dstOrder
+}
+
+// updateMapWithSource merges or adds source items to the destination map
+func updateMapWithSource(
+	dstMap map[string]map[string]interface{},
+	dstOrder *[]string,
+	srcSlice []interface{},
+	identifierField string,
+	arrayMergeConfig map[string]string,
+) {
 	for _, item := range srcSlice {
-		itemMap, ok := item.(map[string]interface{})
-		if !ok {
-			continue
-		}
-		identifier, ok := itemMap[identifierField].(string)
-		if !ok || identifier == "" {
+		itemMap, identifier := extractItemData(item, identifierField)
+		if itemMap == nil || identifier == "" {
 			continue
 		}
 
 		if existingItem, exists := dstMap[identifier]; exists {
-			// Merge the existing item with new data
-			dstMap[identifier] = merge(existingItem, itemMap, 0, []string{}, arrayMergeConfig)
+			dstMap[identifier] = mergeRecursive(existingItem, itemMap, 0, []string{}, arrayMergeConfig)
 		} else {
-			// Add new item
 			dstMap[identifier] = itemMap
-			dstOrder = append(dstOrder, identifier)
+			*dstOrder = append(*dstOrder, identifier)
 		}
 	}
+}
 
-	// Rebuild the array maintaining order
+// extractItemData extracts and validates item data and identifier
+func extractItemData(item interface{}, identifierField string) (map[string]interface{}, string) {
+	itemMap, ok := item.(map[string]interface{})
+	if !ok {
+		return nil, ""
+	}
+
+	identifier, ok := itemMap[identifierField].(string)
+	if !ok || identifier == "" {
+		return nil, ""
+	}
+
+	return itemMap, identifier
+}
+
+// rebuildArray reconstructs the array from the map while maintaining order
+func rebuildArray(dstMap map[string]map[string]interface{}, dstOrder []string) []interface{} {
 	result := make([]interface{}, 0, len(dstMap))
 	for _, identifier := range dstOrder {
 		if item, exists := dstMap[identifier]; exists {
 			result = append(result, item)
 		}
 	}
-
 	return result
 }
 
