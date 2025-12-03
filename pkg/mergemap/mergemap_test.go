@@ -81,8 +81,9 @@ func TestMerge_ColumnsArrayByName(t *testing.T) {
 		t.Fatal("columns field is not an array")
 	}
 
-	if len(columns) != 3 {
-		t.Errorf("Expected 3 columns, got %d", len(columns))
+	// Result should have 2 columns (from src), not 3
+	if len(columns) != 2 {
+		t.Errorf("Expected 2 columns (from src), got %d", len(columns))
 	}
 
 	calcColumn := columns[0].(map[string]interface{})
@@ -92,22 +93,20 @@ func TestMerge_ColumnsArrayByName(t *testing.T) {
 	if calcColumn["description"] != "updated description" {
 		t.Errorf("Expected description to be updated, got %s", calcColumn["description"])
 	}
+	// data_type should be preserved from dst during merge
 	if calcColumn["data_type"] != "STRING" {
 		t.Errorf("Expected data_type to be preserved, got %s", calcColumn["data_type"])
 	}
 
-	entityColumn := columns[1].(map[string]interface{})
-	if entityColumn["name"] != "entity_type" {
-		t.Errorf("Expected second column to be entity_type, got %s", entityColumn["name"])
-	}
-
-	signalColumn := columns[2].(map[string]interface{})
+	signalColumn := columns[1].(map[string]interface{})
 	if signalColumn["name"] != "signal_name" {
-		t.Errorf("Expected third column to be signal_name, got %s", signalColumn["name"])
+		t.Errorf("Expected second column to be signal_name, got %s", signalColumn["name"])
 	}
 	if signalColumn["description"] != "new column" {
 		t.Errorf("Expected description to be 'new column', got %s", signalColumn["description"])
 	}
+
+	// entity_type column should NOT be present as it's not in src
 }
 
 func TestMerge_ColumnsArrayPreservesOrder(t *testing.T) {
@@ -118,9 +117,9 @@ func TestMerge_ColumnsArrayPreservesOrder(t *testing.T) {
 	dst := map[string]interface{}{
 		"data": map[string]interface{}{
 			"columns": []interface{}{
-				map[string]interface{}{"name": "col1"},
-				map[string]interface{}{"name": "col2"},
-				map[string]interface{}{"name": "col3"},
+				map[string]interface{}{"name": "col1", "type": "string"},
+				map[string]interface{}{"name": "col2", "type": "int"},
+				map[string]interface{}{"name": "col3", "type": "bool"},
 			},
 		},
 	}
@@ -137,23 +136,24 @@ func TestMerge_ColumnsArrayPreservesOrder(t *testing.T) {
 
 	columns := result["data"].(map[string]interface{})["columns"].([]interface{})
 
-	if len(columns) != 3 {
-		t.Errorf("Expected 3 columns, got %d", len(columns))
+	// Since src only has 1 column (col2), result should only have 1 column
+	if len(columns) != 1 {
+		t.Errorf("Expected 1 column (only col2 from src), got %d", len(columns))
 	}
 
-	names := []string{}
-	for _, col := range columns {
-		names = append(names, col.(map[string]interface{})["name"].(string))
+	col2 := columns[0].(map[string]interface{})
+	if col2["name"] != "col2" {
+		t.Errorf("Expected col2, got %s", col2["name"])
 	}
 
-	expectedNames := []string{"col1", "col2", "col3"}
-	if !reflect.DeepEqual(names, expectedNames) {
-		t.Errorf("Expected order %v, got %v", expectedNames, names)
-	}
-
-	col2 := columns[1].(map[string]interface{})
+	// The updated field from src should be present
 	if updated, ok := col2["updated"].(bool); !ok || !updated {
-		t.Error("Expected col2 to be updated")
+		t.Error("Expected col2 to have updated=true from src")
+	}
+
+	// The type field from dst should be preserved through merge
+	if col2["type"] != "int" {
+		t.Errorf("Expected col2 type to be preserved as 'int', got %v", col2["type"])
 	}
 }
 
@@ -323,6 +323,118 @@ func TestMerge_ColumnAttributesMerged(t *testing.T) {
 	}
 }
 
+func TestMerge_ColumnArrayReplace_FewerColumns(t *testing.T) {
+	arrayMergeConfig := map[string]string{
+		"data.columns": "name",
+	}
+
+	// dst has 4 columns
+	dst := map[string]interface{}{
+		"data": map[string]interface{}{
+			"columns": []interface{}{
+				map[string]interface{}{"name": "col1", "type": "string"},
+				map[string]interface{}{"name": "col2", "type": "int", "nullable": true},
+				map[string]interface{}{"name": "col3", "type": "bool"},
+				map[string]interface{}{"name": "col4", "type": "float"},
+			},
+		},
+	}
+
+	// src has only 1 column (col2)
+	src := map[string]interface{}{
+		"data": map[string]interface{}{
+			"columns": []interface{}{
+				map[string]interface{}{"name": "col2", "description": "updated column"},
+			},
+		},
+	}
+
+	result := Merge(dst, src, arrayMergeConfig)
+
+	columns := result["data"].(map[string]interface{})["columns"].([]interface{})
+
+	// Result should only have 1 column (col2 from src)
+	if len(columns) != 1 {
+		t.Errorf("Expected 1 column (only col2), got %d", len(columns))
+	}
+
+	col := columns[0].(map[string]interface{})
+	if col["name"] != "col2" {
+		t.Errorf("Expected col2, got %s", col["name"])
+	}
+
+	// Should have the new description from src
+	if col["description"] != "updated column" {
+		t.Errorf("Expected description from src, got %v", col["description"])
+	}
+
+	// Should preserve existing fields from dst
+	if col["type"] != "int" {
+		t.Errorf("Expected type preserved from dst, got %v", col["type"])
+	}
+	if nullable, ok := col["nullable"].(bool); !ok || !nullable {
+		t.Error("Expected nullable field preserved from dst")
+	}
+}
+
+func TestMerge_ColumnArrayReplace_MoreColumns(t *testing.T) {
+	arrayMergeConfig := map[string]string{
+		"data.columns": "name",
+	}
+
+	// dst has 2 columns
+	dst := map[string]interface{}{
+		"data": map[string]interface{}{
+			"columns": []interface{}{
+				map[string]interface{}{"name": "col1", "type": "string"},
+				map[string]interface{}{"name": "col2", "type": "int"},
+			},
+		},
+	}
+
+	// src has 4 columns
+	src := map[string]interface{}{
+		"data": map[string]interface{}{
+			"columns": []interface{}{
+				map[string]interface{}{"name": "col1", "description": "updated"},
+				map[string]interface{}{"name": "col2", "description": "also updated"},
+				map[string]interface{}{"name": "col3", "type": "bool", "description": "new column"},
+				map[string]interface{}{"name": "col4", "type": "float", "description": "another new column"},
+			},
+		},
+	}
+
+	result := Merge(dst, src, arrayMergeConfig)
+
+	columns := result["data"].(map[string]interface{})["columns"].([]interface{})
+
+	// Result should have 4 columns (all from src)
+	if len(columns) != 4 {
+		t.Errorf("Expected 4 columns, got %d", len(columns))
+	}
+
+	// Check col1 - should be merged
+	col1 := columns[0].(map[string]interface{})
+	if col1["name"] != "col1" {
+		t.Errorf("Expected col1, got %s", col1["name"])
+	}
+	if col1["description"] != "updated" {
+		t.Error("Expected description from src")
+	}
+	if col1["type"] != "string" {
+		t.Error("Expected type preserved from dst")
+	}
+
+	// Check col3 - should be new
+	col3 := columns[2].(map[string]interface{})
+	if col3["name"] != "col3" {
+		t.Errorf("Expected col3, got %s", col3["name"])
+	}
+	if col3["description"] != "new column" {
+		t.Error("Expected description from src")
+	}
+}
+
 func TestMerge_CustomArrayMergeConfig(t *testing.T) {
 	arrayMergeConfig := map[string]string{
 		"data.columns": "name",
@@ -360,16 +472,12 @@ func TestMerge_CustomArrayMergeConfig(t *testing.T) {
 
 	owners := result["owners"].([]interface{})
 
-	if len(owners) != 3 {
-		t.Fatalf("Expected 3 owners, got %d", len(owners))
+	// Result should have 2 owners (from src), not 3
+	if len(owners) != 2 {
+		t.Fatalf("Expected 2 owners (from src), got %d", len(owners))
 	}
 
-	alice := owners[0].(map[string]interface{})
-	if alice["email"] != "alice@example.com" || alice["role"] != "admin" {
-		t.Error("Alice should be unchanged")
-	}
-
-	bob := owners[1].(map[string]interface{})
+	bob := owners[0].(map[string]interface{})
 	if bob["email"] != "bob@example.com" || bob["role"] != "editor" {
 		t.Error("Bob should be updated to editor")
 	}
@@ -377,8 +485,10 @@ func TestMerge_CustomArrayMergeConfig(t *testing.T) {
 		t.Error("Bob should have active=true")
 	}
 
-	charlie := owners[2].(map[string]interface{})
+	charlie := owners[1].(map[string]interface{})
 	if charlie["email"] != "charlie@example.com" || charlie["role"] != "viewer" {
 		t.Error("Charlie should be added")
 	}
+
+	// Alice should NOT be present as she's not in src
 }

@@ -60,16 +60,15 @@ func getIdentifierField(path []string, arrayMergeConfig map[string]string) strin
 }
 
 // mergeArraysByIdentifier merges two arrays by matching items with the same identifier field
+// The source array becomes the final result, with matching destination items merged in
 func mergeArraysByIdentifier(dst, src interface{}, identifierField string, arrayMergeConfig map[string]string) interface{} {
 	dstSlice, srcSlice := convertToSlices(dst, src)
 	if dstSlice == nil || srcSlice == nil {
 		return nil
 	}
 
-	dstMap, dstOrder := buildDestinationMap(dstSlice, identifierField)
-	updateMapWithSource(dstMap, &dstOrder, srcSlice, identifierField, arrayMergeConfig)
-
-	return rebuildArray(dstMap, dstOrder)
+	dstMap := buildDestinationMap(dstSlice, identifierField)
+	return buildResultFromSource(srcSlice, dstMap, identifierField, arrayMergeConfig)
 }
 
 // convertToSlices validates and converts interfaces to slices
@@ -84,10 +83,9 @@ func convertToSlices(dst, src interface{}) ([]interface{}, []interface{}) {
 	return dstSlice, srcSlice
 }
 
-// buildDestinationMap creates a map and order slice from destination items
-func buildDestinationMap(dstSlice []interface{}, identifierField string) (map[string]map[string]interface{}, []string) {
+// buildDestinationMap creates a map from destination items for lookup
+func buildDestinationMap(dstSlice []interface{}, identifierField string) map[string]map[string]interface{} {
 	dstMap := make(map[string]map[string]interface{})
-	dstOrder := []string{}
 
 	for _, item := range dstSlice {
 		itemMap, identifier := extractItemData(item, identifierField)
@@ -95,33 +93,39 @@ func buildDestinationMap(dstSlice []interface{}, identifierField string) (map[st
 			continue
 		}
 		dstMap[identifier] = itemMap
-		dstOrder = append(dstOrder, identifier)
 	}
 
-	return dstMap, dstOrder
+	return dstMap
 }
 
-// updateMapWithSource merges or adds source items to the destination map
-func updateMapWithSource(
-	dstMap map[string]map[string]interface{},
-	dstOrder *[]string,
+// buildResultFromSource creates the final array using source items as the base,
+func buildResultFromSource(
 	srcSlice []interface{},
+	dstMap map[string]map[string]interface{},
 	identifierField string,
 	arrayMergeConfig map[string]string,
-) {
+) []interface{} {
+	result := make([]interface{}, 0, len(srcSlice))
+
 	for _, item := range srcSlice {
-		itemMap, identifier := extractItemData(item, identifierField)
-		if itemMap == nil || identifier == "" {
+		srcItemMap, identifier := extractItemData(item, identifierField)
+		if srcItemMap == nil || identifier == "" {
+			// If source item is invalid, skip it
 			continue
 		}
 
-		if existingItem, exists := dstMap[identifier]; exists {
-			dstMap[identifier] = mergeRecursive(existingItem, itemMap, 0, []string{}, arrayMergeConfig)
+		// Check if there's a matching destination item to merge with
+		if dstItem, exists := dstMap[identifier]; exists {
+			// Merge destination data into source data
+			mergedItem := mergeRecursive(dstItem, srcItemMap, 0, []string{}, arrayMergeConfig)
+			result = append(result, mergedItem)
 		} else {
-			dstMap[identifier] = itemMap
-			*dstOrder = append(*dstOrder, identifier)
+			// No matching destination item, use source item as-is
+			result = append(result, srcItemMap)
 		}
 	}
+
+	return result
 }
 
 // extractItemData extracts and validates item data and identifier
@@ -137,17 +141,6 @@ func extractItemData(item interface{}, identifierField string) (map[string]inter
 	}
 
 	return itemMap, identifier
-}
-
-// rebuildArray reconstructs the array from the map while maintaining order
-func rebuildArray(dstMap map[string]map[string]interface{}, dstOrder []string) []interface{} {
-	result := make([]interface{}, 0, len(dstMap))
-	for _, identifier := range dstOrder {
-		if item, exists := dstMap[identifier]; exists {
-			result = append(result, item)
-		}
-	}
-	return result
 }
 
 func mapify(i interface{}) (map[string]interface{}, bool) {
