@@ -98,7 +98,7 @@ func patchAssetData(a *Asset, data interface{}) {
 
 	// Configure array merge behavior for data.columns
 	arrayMergeConfig := map[string]string{
-		"asset.data.columns": "name",
+		"columns": "name",
 	}
 
 	a.Data = mergemap.Merge(a.Data, dataMap, arrayMergeConfig)
