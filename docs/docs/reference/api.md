@@ -22,17 +22,19 @@ Returns list of assets, optionally filtered by types, services, sorting, fields 
 
 ##### Parameters
 
-| Name | Located in | Description | Required | Schema |
-| ---- | ---------- | ----------- | -------- | ------ |
-| q | query | filter by specific query | No | string |
-| q_fields | query | filter by multiple query fields | No | string |
-| types | query | filter by multiple types | No | string |
-| services | query | filter by multiple services | No | string |
-| sort | query | sorting based on fields | No | string |
-| direction | query | sorting direction can either be asc or desc  | No | string |
-| size | query | maximum size to fetch | No | long |
-| offset | query | offset to fetch from | No | long |
-| with_total | query | if set include total field in response | No | boolean |
+| Name | Located in | Description                                                | Required | Schema |
+| ---- | ---------- |------------------------------------------------------------| -------- | ------ |
+| q | query | filter by specific query                                   | No | string |
+| q_fields | query | filter by multiple query fields                            | No | string |
+| types | query | filter by multiple types                                   | No | string |
+| services | query | filter by multiple services                                | No | string |
+| sort | query | sorting based on fields                                    | No | string |
+| direction | query | sorting direction can either be asc or desc                | No | string |
+| size | query | maximum size to fetch                                      | No | long |
+| offset | query | offset to fetch from                                       | No | long |
+| with_total | query | if set include total field in response                     | No | boolean |
+| is_deleted | query | (default: false) if set include deleted assets in response | No | boolean |
+| data | query | filter by fields inside asset.data (JSON object)           | No | string |
 
 ##### Responses
 
@@ -135,13 +137,13 @@ Find an asset
 
 ##### Description
 
-Returns a single asset with given ID
+Returns a single asset with given ID or URN
 
 ##### Parameters
 
 | Name | Located in | Description | Required | Schema |
 | ---- | ---------- | ----------- | -------- | ------ |
-| id | path |  | Yes | string |
+| id | path | asset ID (UUID) or URN | Yes | string |
 
 ##### Responses
 
@@ -157,11 +159,11 @@ Returns a single asset with given ID
 #### DELETE
 ##### Summary
 
-Delete an asset
+Soft-delete an asset
 
 ##### Description
 
-Delete a single asset with given ID
+Soft-delete a single asset (by ID or URN). The server enqueues a background job to perform downstream cleanup (index and lineage) — the operation is asynchronous.
 
 ##### Parameters
 
@@ -183,39 +185,25 @@ Delete a single asset with given ID
 ### /v1beta1/assets/delete-by-query
 ##### Summary
 
-Delete assets by [query expression](https://expr-lang.org/).
+Soft-delete assets by [query expression](https://expr-lang.org/).
 
 ##### Description
 
-Delete all assets that match the given [query expression](https://expr-lang.org/). 
-The query expr at least must consist `refreshed_at`, `type`, and `service` identifiers. 
-`type` and `service` identifiers valid only if it's using equals (`==`) or `IN` operator, to prevent human error on deleting assets.
-For example of the correct query:
+Soft-delete all assets that match the given [query expression](https://expr-lang.org/). The request is processed asynchronously by the server — if dry_run is false the server enqueues a background job to perform soft deletions and downstream cleanup. The query expression must include `refreshed_at`, `type`, and `service` identifiers. `type` and `service` identifiers must use equals (`==`) or `IN` operator to prevent accidental broad deletions.
+
+Example of a correct query:
 ```
 refreshed_at <= "2023-12-12 23:59:59" && service in ["service-1", "service-2"] && type == "table"
 ```
-```
-refreshed_at <= (now() - duration('24h') && service == "service-1" && (type == "table" || data.foo != "bar")
-```
 
-The idea of query expr converter is convert `query_expr` to AST (Abstract Syntax Tree), then make it as SQL Query and Elasticsearch Query so can used as filter query on deletion process.
-Currently, the expr query **already support most of the frequently used cases, except** ChainNode, SliceNode, CallNode, ClosureNode, PointerNode, VariableDeclaratorNode, MapNode, and PairNode.
-For more contexts, please refer to [AST Node](https://github.com/expr-lang/expr/blob/master/ast/node.go) in expr-lang library and [Query Expr Converter](https://github.com/goto/compass/tree/main/pkg/query_expr) in Compass.
-Example of **unsupported query for now** due to not directly produce a value is
-```
-service in filter(assets, .Service startsWith "T")
-```
-
-Complex query covered only if it directly produces a value, like `bool_identifier == !(findLast([1, 2, 3, 4], # > 2) == 4)` will produce `bool_identifier == false`. 
-However, **please do the best practice that try to simplify the query first** to makes readable and prevent unwanted things like errors or false positive result. Like example before, please write `false` instead of `!(findLast([1, 2, 3, 4], # > 2) == 4)`. You can use [expr-lang playground](https://expr-lang.org/playground) to simplify the query expr.
-
+The query is converted to SQL/Elasticsearch queries. The expr converter supports most common nodes; see the code's query expr converter for exact capabilities. Prefer simpler expressions to avoid unexpected results.
 
 ##### Parameters
 
 | Name       | Located in | Description                                                                                                                                                                                                                                                   | Required | Schema |
 |------------|------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------| ------ |
-| query_expr | body       | query expression based on [expr-lang](https://expr-lang.org/) to filtering the assets that wants to be deleted. `refreshed_at`, `type`, and `service` identifiers must exist in the query. The `type` and `service` must using equals (`==`) or `IN` operator | Yes      | string |
-| dry_run    | body       | (default: false) if set to true, deletion will not be executed but the number of rows matching the query is returned. Else, will perform deletion in the background (default)                                                                                 | No       | string |
+| query_expr | body       | query expression based on [expr-lang](https://expr-lang.org/) to filter assets to be deleted. `refreshed_at`, `type`, and `service` identifiers must exist in the query. The `type` and `service` must use equals (`==`) or `IN` operator | Yes      | string |
+| dry_run    | body       | (default: false) if true, deletion is not executed and the API returns the number of matching rows. If false, the server will enqueue a background soft-delete job (default: false)                                                                                 | No       | boolean |
 
 ##### Responses
 
@@ -225,6 +213,7 @@ However, **please do the best practice that try to simplify the query first** to
 | 400 | Returned when the data that user input is wrong. | [Status](#status)                           |
 | 500 | Returned when theres is something wrong on the server side. | [Status](#status)                             |
 | default | An unexpected error response. | [Status](#status)                             |
+
 ### /v1beta1/assets/{id}/stargazers
 
 #### GET
@@ -323,7 +312,7 @@ Get Lineage Graph
 
 ##### Description
 
-Returns the lineage graph. Each entry in the graph describes a (edge) directed relation of assets with source and destination using it's urn, type, and service.
+Returns the lineage graph. Each entry in the graph describes a (edge) directed relation of assets with source and destination using it's urn, type, and service. Optionally the response can include node attributes (latest probe info) when requested.
 
 ##### Parameters
 
@@ -332,6 +321,7 @@ Returns the lineage graph. Each entry in the graph describes a (edge) directed r
 | urn | path |  | Yes | string |
 | level | query |  | No | long |
 | direction | query |  | No | string |
+| with_attributes | query | include node attributes (latest probes) | No | boolean |
 
 ##### Responses
 
@@ -353,17 +343,35 @@ Search for an asset
 
 ##### Description
 
-API for querying documents. 'text' is fuzzy matched against all the available datasets, and matched results are returned. You can specify additional match criteria using 'filter[.*]' query parameters. You can specify each filter multiple times to specify a set of values for those filters. For instance, to specify two landscape 'vn' and 'th', the query could be `/search/?text=<text>&filter[environment]=integration&filter[landscape]=vn&filter[landscape]=th`. As an alternative, this API also supports fuzzy filter match with 'query' query params. For instance, searching assets that has 'bigqu' term in its description `/search/?text=<text>&query[description]=bigqu`
+API for querying documents. 'text' is fuzzy matched against all the available datasets, and matched results are returned. You can specify additional match criteria using 'filter[.*]' query parameters. You can specify each filter multiple times to specify a set of values for those filters. As an alternative, this API also supports fuzzy filter match with 'query' query params. For instance, searching assets that has 'bigqu' term in its description `/search/?text=<text>&query[description]=bigqu`
 
 ##### Parameters
 
 | Name | Located in | Description | Required | Schema |
 | ---- | ---------- | ----------- | -------- | ------ |
 | text | query | text to search for (fuzzy) | No | string |
-| rankby | query | descendingly sort based on a numeric field in the asset. the nested field is written with period separated field name. eg, "rankby[data.profile.usage_count]" | No | string |
+| rankby | query | descendingly sort based on a numeric field in the asset, or a comma-separated list of field,value pairs to boost exact matches (see note below) | No | string |
 | size | query | number of results to return | No | long |
 | include_fields | query |  | No | [ string ] |
 | offset | query | offset parameter defines the offset from the first result you want to fetch | No | long |
+| flags.enable_highlight | query | enable highlight in results | No | boolean |
+| flags.disable_fuzzy | query | disable fuzzy matching | No | boolean |
+| flags.is_column_search | query | enable column-level search | No | boolean |
+
+##### RankBy behavior
+
+- Single-field numeric mode: when `rankby` is a single field name (for example `rankby=data.profile.usage_count`), the search uses a numeric `field_value_factor` on that field to boost results with larger values. This behaves like a numeric ranking signal (weight applied).
+- Pair-value mode (field,value pairs): when `rankby` contains commas, it is interpreted as a sequence of field,value pairs (e.g. `rankby=data.attributes.category,ssot` or multiple pairs `rankby=field1,val1,field2,val2`). For each pair the search adds a boolean term condition (on the `.keyword` form of the field) as a scoring function. Documents where `field == value` receive a score boost — effectively prioritizing exact matches for those pairs.
+
+Examples:
+- `rankby=data.profile.usage_count` — rank higher results with larger `data.profile.usage_count`.
+- `rankby=data.attributes.category,ssot` — boost documents where `data.attributes.category == "ssot"`.
+- `rankby=type,table,service,analytics` — boost documents that match `type == "table"` and/or `service == "analytics"`.
+
+Implementation notes (how scores are combined):
+- If search `text` and the query field (e.g. name) are present, an exact term match is added with a large weight (strong priority for exact matches).
+- Pair-value matches are added as weighted functions (smaller weight than exact-match) to prefer documents that satisfy the provided pairs.
+- When `rankby` is a numeric field, a `field_value_factor` is used with a weighting multiplier so higher numeric values push documents up the ranking.
 
 ##### Responses
 
@@ -385,13 +393,13 @@ Suggest an asset
 
 ##### Description
 
-API for retreiving N number of asset names that similar with the `text`. By default, N = 5 for now and hardcoded in the code.
+Return a list of suggested asset names that match the provided `text`. The request requires `text` to be non-empty; the server returns a 400 error when `text` is empty.
 
 ##### Parameters
 
 | Name | Located in | Description | Required | Schema |
 | ---- | ---------- | ----------- | -------- | ------ |
-| text | query | text to search for suggestions | No | string |
+| text | query | text to search for suggestions | Yes | string |
 
 ##### Responses
 
@@ -399,12 +407,10 @@ API for retreiving N number of asset names that similar with the `text`. By defa
 | ---- | ----------- | ------ |
 | 200 | A successful response. | [SuggestAssetsResponse](#suggestassetsresponse) |
 | 400 | Returned when the data that user input is wrong. | [Status](#status) |
-| 404 | Returned when the resource does not exist. | [Status](#status) |
-| 409 | Returned when the resource already exist. | [Status](#status) |
 | 500 | Returned when theres is something wrong on the server side. | [Status](#status) |
 | default | An unexpected error response. | [Status](#status) |
 
-## default
+## Discussions & Comments
 
 ### /v1beta1/discussions
 
@@ -461,129 +467,6 @@ Create a discussion
 | 500 | Returned when theres is something wrong on the server side. | [Status](#status) |
 | default | An unexpected error response. | [Status](#status) |
 
-### /v1beta1/discussions/{discussion_id}/comments
-
-#### GET
-##### Summary
-
-Get all comments of a discussion
-
-##### Parameters
-
-| Name | Located in | Description | Required | Schema |
-| ---- | ---------- | ----------- | -------- | ------ |
-| discussion_id | path |  | Yes | string |
-| sort | query |  | No | string |
-| direction | query |  | No | string |
-| size | query |  | No | long |
-| offset | query |  | No | long |
-
-##### Responses
-
-| Code | Description | Schema |
-| ---- | ----------- | ------ |
-| 200 | A successful response. | [GetAllCommentsResponse](#getallcommentsresponse) |
-| 400 | Returned when the data that user input is wrong. | [Status](#status) |
-| 404 | Returned when the resource does not exist. | [Status](#status) |
-| 409 | Returned when the resource already exist. | [Status](#status) |
-| 500 | Returned when theres is something wrong on the server side. | [Status](#status) |
-| default | An unexpected error response. | [Status](#status) |
-
-#### POST
-##### Summary
-
-Create a comment of a discussion
-
-##### Parameters
-
-| Name | Located in | Description | Required | Schema |
-| ---- | ---------- | ----------- | -------- | ------ |
-| discussion_id | path |  | Yes | string |
-| body | body |  | Yes | { **"body"**: string } |
-
-##### Responses
-
-| Code | Description | Schema |
-| ---- | ----------- | ------ |
-| 200 | A successful response. | [CreateCommentResponse](#createcommentresponse) |
-| 400 | Returned when the data that user input is wrong. | [Status](#status) |
-| 404 | Returned when the resource does not exist. | [Status](#status) |
-| 409 | Returned when the resource already exist. | [Status](#status) |
-| 500 | Returned when theres is something wrong on the server side. | [Status](#status) |
-| default | An unexpected error response. | [Status](#status) |
-
-### /v1beta1/discussions/{discussion_id}/comments/{id}
-
-#### GET
-##### Summary
-
-Get a comment of a discussion
-
-##### Parameters
-
-| Name | Located in | Description | Required | Schema |
-| ---- | ---------- | ----------- | -------- | ------ |
-| discussion_id | path |  | Yes | string |
-| id | path |  | Yes | string |
-
-##### Responses
-
-| Code | Description | Schema |
-| ---- | ----------- | ------ |
-| 200 | A successful response. | [GetCommentResponse](#getcommentresponse) |
-| 400 | Returned when the data that user input is wrong. | [Status](#status) |
-| 404 | Returned when the resource does not exist. | [Status](#status) |
-| 409 | Returned when the resource already exist. | [Status](#status) |
-| 500 | Returned when theres is something wrong on the server side. | [Status](#status) |
-| default | An unexpected error response. | [Status](#status) |
-
-#### DELETE
-##### Summary
-
-Delete a comment of a discussion
-
-##### Parameters
-
-| Name | Located in | Description | Required | Schema |
-| ---- | ---------- | ----------- | -------- | ------ |
-| discussion_id | path |  | Yes | string |
-| id | path |  | Yes | string |
-
-##### Responses
-
-| Code | Description | Schema |
-| ---- | ----------- | ------ |
-| 200 | A successful response. | [DeleteCommentResponse](#deletecommentresponse) |
-| 400 | Returned when the data that user input is wrong. | [Status](#status) |
-| 404 | Returned when the resource does not exist. | [Status](#status) |
-| 409 | Returned when the resource already exist. | [Status](#status) |
-| 500 | Returned when theres is something wrong on the server side. | [Status](#status) |
-| default | An unexpected error response. | [Status](#status) |
-
-#### PUT
-##### Summary
-
-Update a comment of a discussion
-
-##### Parameters
-
-| Name | Located in | Description | Required | Schema |
-| ---- | ---------- | ----------- | -------- | ------ |
-| discussion_id | path |  | Yes | string |
-| id | path |  | Yes | string |
-| body | body |  | Yes | { **"body"**: string } |
-
-##### Responses
-
-| Code | Description | Schema |
-| ---- | ----------- | ------ |
-| 200 | A successful response. | [UpdateCommentResponse](#updatecommentresponse) |
-| 400 | Returned when the data that user input is wrong. | [Status](#status) |
-| 404 | Returned when the resource does not exist. | [Status](#status) |
-| 409 | Returned when the resource already exist. | [Status](#status) |
-| 500 | Returned when theres is something wrong on the server side. | [Status](#status) |
-| default | An unexpected error response. | [Status](#status) |
-
 ### /v1beta1/discussions/{id}
 
 #### GET
@@ -631,44 +514,6 @@ Patch a discussion
 | 500 | Returned when theres is something wrong on the server side. | [Status](#status) |
 | default | An unexpected error response. | [Status](#status) |
 
-### /v1beta1/me/discussions
-
-#### GET
-##### Summary
-
-Get all discussions of a user
-
-##### Description
-
-Returns all discussions given possible filters of a user
-
-##### Parameters
-
-| Name | Located in | Description | Required | Schema |
-| ---- | ---------- | ----------- | -------- | ------ |
-| filter | query |  | No | string |
-| type | query |  | No | string |
-| state | query |  | No | string |
-| asset | query |  | No | string |
-| labels | query |  | No | string |
-| sort | query |  | No | string |
-| direction | query |  | No | string |
-| size | query |  | No | long |
-| offset | query |  | No | long |
-
-##### Responses
-
-| Code | Description | Schema |
-| ---- | ----------- | ------ |
-| 200 | A successful response. | [GetMyDiscussionsResponse](#getmydiscussionsresponse) |
-| 400 | Returned when the data that user input is wrong. | [Status](#status) |
-| 404 | Returned when the resource does not exist. | [Status](#status) |
-| 409 | Returned when the resource already exist. | [Status](#status) |
-| 500 | Returned when theres is something wrong on the server side. | [Status](#status) |
-| default | An unexpected error response. | [Status](#status) |
-
-## default
-
 ### /v1beta1/discussions/{discussion_id}/comments
 
 #### GET
@@ -792,39 +637,7 @@ Update a comment of a discussion
 | 500 | Returned when theres is something wrong on the server side. | [Status](#status) |
 | default | An unexpected error response. | [Status](#status) |
 
-## default
-
-### /v1beta1/lineage/{urn}
-
-#### GET
-##### Summary
-
-Get Lineage Graph
-
-##### Description
-
-Returns the lineage graph. Each entry in the graph describes a (edge) directed relation of assets with source and destination using it's urn, type, and service.
-
-##### Parameters
-
-| Name | Located in | Description | Required | Schema |
-| ---- | ---------- | ----------- | -------- | ------ |
-| urn | path |  | Yes | string |
-| level | query |  | No | long |
-| direction | query |  | No | string |
-
-##### Responses
-
-| Code | Description | Schema |
-| ---- | ----------- | ------ |
-| 200 | A successful response. | [GetGraphResponse](#getgraphresponse) |
-| 400 | Returned when the data that user input is wrong. | [Status](#status) |
-| 404 | Returned when the resource does not exist. | [Status](#status) |
-| 409 | Returned when the resource already exist. | [Status](#status) |
-| 500 | Returned when theres is something wrong on the server side. | [Status](#status) |
-| default | An unexpected error response. | [Status](#status) |
-
-## default
+## Me & Stars
 
 ### /v1beta1/me/discussions
 
@@ -871,7 +684,7 @@ Get my starred assets
 
 ##### Description
 
-Get all assets starred by me
+Get all assets starred by the authenticated user
 
 ##### Parameters
 
@@ -900,7 +713,7 @@ Get my starred asset
 
 ##### Description
 
-Get an asset starred by me
+Get an asset starred by the authenticated user
 
 ##### Parameters
 
@@ -926,7 +739,7 @@ Unstar an asset
 
 ##### Description
 
-Unmark my starred asset
+Unmark a starred asset for the authenticated user
 
 ##### Parameters
 
@@ -952,7 +765,7 @@ Star an asset
 
 ##### Description
 
-Mark an asset with a star
+Mark an asset with a star for the authenticated user
 
 ##### Parameters
 
@@ -980,7 +793,7 @@ Get assets starred by a user
 
 ##### Description
 
-Get all assets starred by a user
+Get all assets starred by a (specified) user
 
 ##### Parameters
 
@@ -1001,210 +814,7 @@ Get all assets starred by a user
 | 500 | Returned when theres is something wrong on the server side. | [Status](#status) |
 | default | An unexpected error response. | [Status](#status) |
 
-## default
-
-### /v1beta1/me/starred
-
-#### GET
-##### Summary
-
-Get my starred assets
-
-##### Description
-
-Get all assets starred by me
-
-##### Parameters
-
-| Name | Located in | Description | Required | Schema |
-| ---- | ---------- | ----------- | -------- | ------ |
-| size | query |  | No | long |
-| offset | query |  | No | long |
-
-##### Responses
-
-| Code | Description | Schema |
-| ---- | ----------- | ------ |
-| 200 | A successful response. | [GetMyStarredAssetsResponse](#getmystarredassetsresponse) |
-| 400 | Returned when the data that user input is wrong. | [Status](#status) |
-| 404 | Returned when the resource does not exist. | [Status](#status) |
-| 409 | Returned when the resource already exist. | [Status](#status) |
-| 500 | Returned when theres is something wrong on the server side. | [Status](#status) |
-| default | An unexpected error response. | [Status](#status) |
-
-### /v1beta1/me/starred/{asset_id}
-
-#### GET
-##### Summary
-
-Get my starred asset
-
-##### Description
-
-Get an asset starred by me
-
-##### Parameters
-
-| Name | Located in | Description | Required | Schema |
-| ---- | ---------- | ----------- | -------- | ------ |
-| asset_id | path |  | Yes | string |
-
-##### Responses
-
-| Code | Description | Schema |
-| ---- | ----------- | ------ |
-| 200 | A successful response. | [GetMyStarredAssetResponse](#getmystarredassetresponse) |
-| 400 | Returned when the data that user input is wrong. | [Status](#status) |
-| 404 | Returned when the resource does not exist. | [Status](#status) |
-| 409 | Returned when the resource already exist. | [Status](#status) |
-| 500 | Returned when theres is something wrong on the server side. | [Status](#status) |
-| default | An unexpected error response. | [Status](#status) |
-
-#### DELETE
-##### Summary
-
-Unstar an asset
-
-##### Description
-
-Unmark my starred asset
-
-##### Parameters
-
-| Name | Located in | Description | Required | Schema |
-| ---- | ---------- | ----------- | -------- | ------ |
-| asset_id | path |  | Yes | string |
-
-##### Responses
-
-| Code | Description | Schema |
-| ---- | ----------- | ------ |
-| 200 | A successful response. | [UnstarAssetResponse](#unstarassetresponse) |
-| 400 | Returned when the data that user input is wrong. | [Status](#status) |
-| 404 | Returned when the resource does not exist. | [Status](#status) |
-| 409 | Returned when the resource already exist. | [Status](#status) |
-| 500 | Returned when theres is something wrong on the server side. | [Status](#status) |
-| default | An unexpected error response. | [Status](#status) |
-
-#### PUT
-##### Summary
-
-Star an asset
-
-##### Description
-
-Mark an asset with a star
-
-##### Parameters
-
-| Name | Located in | Description | Required | Schema |
-| ---- | ---------- | ----------- | -------- | ------ |
-| asset_id | path |  | Yes | string |
-
-##### Responses
-
-| Code | Description | Schema |
-| ---- | ----------- | ------ |
-| 200 | A successful response. | [StarAssetResponse](#starassetresponse) |
-| 400 | Returned when the data that user input is wrong. | [Status](#status) |
-| 404 | Returned when the resource does not exist. | [Status](#status) |
-| 409 | Returned when the resource already exist. | [Status](#status) |
-| 500 | Returned when theres is something wrong on the server side. | [Status](#status) |
-| default | An unexpected error response. | [Status](#status) |
-
-### /v1beta1/users/{user_id}/starred
-
-#### GET
-##### Summary
-
-Get assets starred by a user
-
-##### Description
-
-Get all assets starred by a user
-
-##### Parameters
-
-| Name | Located in | Description | Required | Schema |
-| ---- | ---------- | ----------- | -------- | ------ |
-| user_id | path |  | Yes | string |
-| size | query |  | No | long |
-| offset | query |  | No | long |
-
-##### Responses
-
-| Code | Description | Schema |
-| ---- | ----------- | ------ |
-| 200 | A successful response. | [GetUserStarredAssetsResponse](#getuserstarredassetsresponse) |
-| 400 | Returned when the data that user input is wrong. | [Status](#status) |
-| 404 | Returned when the resource does not exist. | [Status](#status) |
-| 409 | Returned when the resource already exist. | [Status](#status) |
-| 500 | Returned when theres is something wrong on the server side. | [Status](#status) |
-| default | An unexpected error response. | [Status](#status) |
-
-## default
-
-### /v1beta1/search
-
-#### GET
-##### Summary
-
-Search for an asset
-
-##### Description
-
-API for querying documents. 'text' is fuzzy matched against all the available datasets, and matched results are returned. You can specify additional match criteria using 'filter[.*]' query parameters. You can specify each filter multiple times to specify a set of values for those filters. For instance, to specify two landscape 'vn' and 'th', the query could be `/search/?text=<text>&filter[environment]=integration&filter[landscape]=vn&filter[landscape]=th`. As an alternative, this API also supports fuzzy filter match with 'query' query params. For instance, searching assets that has 'bigqu' term in its description `/search/?text=<text>&query[description]=bigqu`
-
-##### Parameters
-
-| Name | Located in | Description | Required | Schema |
-| ---- | ---------- | ----------- | -------- | ------ |
-| text | query | text to search for (fuzzy) | No | string |
-| rankby | query | descendingly sort based on a numeric field in the asset. the nested field is written with period separated field name. eg, "rankby[data.profile.usage_count]" | No | string |
-| size | query | number of results to return | No | long |
-| include_fields | query |  | No | [ string ] |
-| offset | query | offset parameter defines the offset from the first result you want to fetch | No | long |
-
-##### Responses
-
-| Code | Description | Schema |
-| ---- | ----------- | ------ |
-| 200 | A successful response. | [SearchAssetsResponse](#searchassetsresponse) |
-| 400 | Returned when the data that user input is wrong. | [Status](#status) |
-| 404 | Returned when the resource does not exist. | [Status](#status) |
-| 409 | Returned when the resource already exist. | [Status](#status) |
-| 500 | Returned when theres is something wrong on the server side. | [Status](#status) |
-| default | An unexpected error response. | [Status](#status) |
-
-### /v1beta1/search/suggest
-
-#### GET
-##### Summary
-
-Suggest an asset
-
-##### Description
-
-API for retreiving N number of asset names that similar with the `text`. By default, N = 5 for now and hardcoded in the code.
-
-##### Parameters
-
-| Name | Located in | Description | Required | Schema |
-| ---- | ---------- | ----------- | -------- | ------ |
-| text | query | text to search for suggestions | No | string |
-
-##### Responses
-
-| Code | Description | Schema |
-| ---- | ----------- | ------ |
-| 200 | A successful response. | [SuggestAssetsResponse](#suggestassetsresponse) |
-| 400 | Returned when the data that user input is wrong. | [Status](#status) |
-| 404 | Returned when the resource does not exist. | [Status](#status) |
-| 409 | Returned when the resource already exist. | [Status](#status) |
-| 500 | Returned when theres is something wrong on the server side. | [Status](#status) |
-| default | An unexpected error response. | [Status](#status) |
-
-## default
+## Tags
 
 ### /v1beta1/tags/assets
 
@@ -1243,7 +853,7 @@ Get an asset's tags
 
 ##### Description
 
-Get all tags for an assets
+Get all tags for an asset
 
 ##### Parameters
 
@@ -1481,7 +1091,7 @@ Update an existing tag template
 | 500 | Returned when theres is something wrong on the server side. | [Status](#status) |
 | default | An unexpected error response. | [Status](#status) |
 
-## default
+## Types
 
 ### /v1beta1/types
 
