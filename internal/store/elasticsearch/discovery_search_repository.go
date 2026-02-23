@@ -15,8 +15,8 @@ import (
 )
 
 const (
-	defaultMaxResults                  = 10000
-	defaultGroupsSize                  = 10000
+	defaultMaxResults                  = 1000
+	defaultGroupsSize                  = 1000
 	defaultMinScore                    = 0.01
 	defaultFunctionScoreQueryScoreMode = "sum"
 	suggesterName                      = "name-phrase-suggest"
