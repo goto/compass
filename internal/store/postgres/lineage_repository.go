@@ -431,7 +431,13 @@ func (*LineageRepository) compareGraph(current, new asset.LineageGraph) (toInser
 	return toInserts, toRemoves
 }
 
-func (repo *LineageRepository) getUpstreamsGraph(ctx context.Context, urn string, level int, includeDeleted bool, tableColumns ...string) (asset.LineageGraph, error) {
+func (repo *LineageRepository) getUpstreamsGraph(
+	ctx context.Context,
+	urn string,
+	level int,
+	includeDeleted bool,
+	tableColumns ...string,
+) (asset.LineageGraph, error) {
 	var graph asset.LineageGraph
 
 	query, args, err := repo.resolveCoverageQuery(urn, true, level, includeDeleted, tableColumns...)
@@ -450,7 +456,13 @@ func (repo *LineageRepository) getUpstreamsGraph(ctx context.Context, urn string
 	return graph, nil
 }
 
-func (repo *LineageRepository) getDownstreamsGraph(ctx context.Context, urn string, level int, includeDeleted bool, tableColumns ...string) (asset.LineageGraph, error) {
+func (repo *LineageRepository) getDownstreamsGraph(
+	ctx context.Context,
+	urn string,
+	level int,
+	includeDeleted bool,
+	tableColumns ...string,
+) (asset.LineageGraph, error) {
 	var graph asset.LineageGraph
 
 	query, args, err := repo.resolveCoverageQuery(urn, false, level, includeDeleted, tableColumns...)
@@ -469,7 +481,13 @@ func (repo *LineageRepository) getDownstreamsGraph(ctx context.Context, urn stri
 	return graph, nil
 }
 
-func (repo *LineageRepository) resolveCoverageQuery(urn string, isUpstream bool, level int, includeDeleted bool, tableColumns ...string) (string, []interface{}, error) {
+func (repo *LineageRepository) resolveCoverageQuery(
+	urn string,
+	isUpstream bool,
+	level int,
+	includeDeleted bool,
+	tableColumns ...string,
+) (string, []interface{}, error) {
 	if len(tableColumns) > 0 {
 		return repo.buildColumnQuery(urn, isUpstream, level, includeDeleted, tableColumns...)
 	}
@@ -542,19 +560,27 @@ func (*LineageRepository) buildRecursiveQuery(alias string, nonRecursiveBuilder,
 	return query, args, nil
 }
 
-func (repo *LineageRepository) buildColumnQuery(urn string, isUpstream bool, level int, includeDeleted bool, tableColumns ...string) (query string, args []interface{}, err error) {
+func (repo *LineageRepository) buildColumnQuery(
+	urn string,
+	isUpstream bool,
+	level int,
+	includeDeleted bool,
+	tableColumns ...string,
+) (query string, args []interface{}, err error) {
 	alias := "search_graph"
 	base := "source"
 	if isUpstream {
 		base = "target"
 	}
 	nonRecursiveBuilder := sq.
-		Select("source_asset", "source_column", "target_asset", "target_column", "prop", "1 as depth", fmt.Sprintf("ARRAY[%s_asset || '.' || %s_column] as path", base, base)).
+		Select("source_asset", "source_column", "target_asset", "target_column", "prop", "1 as depth",
+			fmt.Sprintf("ARRAY[%s_asset || '.' || %s_column] as path", base, base)).
 		From("column_lineage_graph").
 		Where(sq.Eq{fmt.Sprintf("%s_asset", base): urn}).
 		Where(sq.Eq{fmt.Sprintf("%s_column", base): tableColumns})
 	recursiveBuilder := sq.
-		Select("lg.source_asset", "lg.source_column", "lg.target_asset", "lg.target_column", "lg.prop", "sg.depth + 1", fmt.Sprintf("sg.path || (lg.%s_asset || '.' || lg.%s_column)", base, base)).
+		Select("lg.source_asset", "lg.source_column", "lg.target_asset", "lg.target_column", "lg.prop", "sg.depth + 1",
+			fmt.Sprintf("sg.path || (lg.%s_asset || '.' || lg.%s_column)", base, base)).
 		From(fmt.Sprintf("column_lineage_graph lg, %s sg", alias)).
 		Where(fmt.Sprintf("(lg.%s_asset || '.' || lg.%s_column) <> ALL(sg.path)", base, base))
 

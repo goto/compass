@@ -1586,7 +1586,7 @@ func TestService_GetColumnLineage(t *testing.T) {
 				WithAttributes: true,
 				TargetColumn:   "column-1",
 			},
-			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository, lr *mocks.LineageRepository) {
+			Setup: func(ctx context.Context, _ *mocks.AssetRepository, _ *mocks.DiscoveryRepository, lr *mocks.LineageRepository) {
 				lr.EXPECT().GetColumnGraph(ctx, "urn-source-1", asset.LineageQuery{WithAttributes: true, TargetColumn: "column-1"}).
 					Return(asset.LineageGraph{}, errors.New("error fetching graph"))
 			},
@@ -1600,7 +1600,7 @@ func TestService_GetColumnLineage(t *testing.T) {
 				WithAttributes: true,
 				TargetColumn:   "column-1",
 			},
-			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository, lr *mocks.LineageRepository) {
+			Setup: func(ctx context.Context, ar *mocks.AssetRepository, _ *mocks.DiscoveryRepository, lr *mocks.LineageRepository) {
 				lr.EXPECT().GetColumnGraph(ctx, "urn-source-1", asset.LineageQuery{WithAttributes: true, TargetColumn: "column-1"}).
 					Return(asset.LineageGraph{}, nil)
 				ar.EXPECT().GetProbesWithFilter(ctx, asset.ProbesFilter{
@@ -1618,7 +1618,7 @@ func TestService_GetColumnLineage(t *testing.T) {
 				WithAttributes: true,
 				TargetColumn:   "column-1",
 			},
-			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository, lr *mocks.LineageRepository) {
+			Setup: func(ctx context.Context, ar *mocks.AssetRepository, _ *mocks.DiscoveryRepository, lr *mocks.LineageRepository) {
 				lr.EXPECT().GetColumnGraph(ctx, "urn-source-1", asset.LineageQuery{WithAttributes: true, TargetColumn: "column-1"}).Return(asset.LineageGraph{
 					{Source: "urn-source-1", SourceColumn: "column-1", Target: "urn-target-1", TargetColumn: "column-1", Prop: nil},
 					{Source: "urn-source-1", SourceColumn: "column-1", Target: "urn-target-2", TargetColumn: "column-2", Prop: nil},
@@ -1639,7 +1639,7 @@ func TestService_GetColumnLineage(t *testing.T) {
 				WithAttributes: true,
 				TargetColumn:   "column-1",
 			},
-			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository, lr *mocks.LineageRepository) {
+			Setup: func(ctx context.Context, ar *mocks.AssetRepository, _ *mocks.DiscoveryRepository, lr *mocks.LineageRepository) {
 				lr.EXPECT().GetColumnGraph(ctx, "urn-source-1", asset.LineageQuery{WithAttributes: true, TargetColumn: "column-1"}).Return(asset.LineageGraph{
 					{Source: "urn-source-1", SourceColumn: "column-1", Target: "urn-target-1", TargetColumn: "column-1", Prop: nil},
 					{Source: "urn-source-1", SourceColumn: "column-1", Target: "urn-target-2", TargetColumn: "column-2", Prop: nil},
@@ -1667,7 +1667,7 @@ func TestService_GetColumnLineage(t *testing.T) {
 				WithAttributes: false,
 				TargetColumn:   "column-1",
 			},
-			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository, lr *mocks.LineageRepository) {
+			Setup: func(ctx context.Context, _ *mocks.AssetRepository, _ *mocks.DiscoveryRepository, lr *mocks.LineageRepository) {
 				lr.EXPECT().GetColumnGraph(ctx, "urn-source-1", asset.LineageQuery{WithAttributes: false, TargetColumn: "column-1"}).Return(asset.LineageGraph{
 					{Source: "urn-source-1", SourceColumn: "column-1", Target: "urn-target-1", TargetColumn: "column-1", Prop: nil},
 					{Source: "urn-source-1", SourceColumn: "column-1", Target: "urn-target-2", TargetColumn: "column-2", Prop: nil},
@@ -1690,7 +1690,7 @@ func TestService_GetColumnLineage(t *testing.T) {
 				WithAttributes: true,
 				TargetColumn:   "column-1",
 			},
-			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository, lr *mocks.LineageRepository) {
+			Setup: func(ctx context.Context, ar *mocks.AssetRepository, _ *mocks.DiscoveryRepository, lr *mocks.LineageRepository) {
 				lr.EXPECT().GetColumnGraph(ctx, "urn-source-1", asset.LineageQuery{WithAttributes: true, TargetColumn: "column-1"}).Return(asset.LineageGraph{
 					{Source: "urn-source-1", SourceColumn: "column-1", Target: "urn-target-1", TargetColumn: "column-1", Prop: nil},
 					{Source: "urn-source-1", SourceColumn: "column-1", Target: "urn-target-2", TargetColumn: "column-2", Prop: nil},

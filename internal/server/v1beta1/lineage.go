@@ -95,11 +95,6 @@ func probesInfoToProto(probes asset.ProbesInfo) (*compassv1beta1.GetGraphRespons
 }
 
 func (server *APIServer) GetGraphV2(ctx context.Context, req *compassv1beta1.GetGraphV2Request) (*compassv1beta1.GetGraphV2Response, error) {
-	var (
-		lineage   asset.Lineage
-		graphType asset.LineageType
-	)
-
 	_, err := server.ValidateUserInCtx(ctx)
 	if err != nil {
 		return nil, err
@@ -115,75 +110,21 @@ func (server *APIServer) GetGraphV2(ctx context.Context, req *compassv1beta1.Get
 		return nil, status.Error(codes.InvalidArgument, "invalid coverage value")
 	}
 
-	withAttributes := true
-	if req != nil && req.WithAttributes != nil {
-		withAttributes = *req.WithAttributes
+	withAttributes := req == nil || req.WithAttributes == nil || *req.WithAttributes
+
+	lineage, graphType, err := server.resolveLineageV2(ctx, req, direction, coverage, withAttributes)
+	if err != nil {
+		return nil, err
 	}
 
-	if req != nil && req.ColumnName != nil {
-		graphType = asset.LineageColumnType
-		lineage, err = server.assetService.GetColumnLineage(ctx, req.GetUrn(), asset.LineageQuery{
-			Level:          int(req.GetLevel()),
-			Direction:      direction,
-			WithAttributes: withAttributes,
-			IncludeDeleted: req.GetIncludeDeleted(),
-			TargetColumn:   req.GetColumnName(),
-		})
-		if err != nil {
-			return nil, internalServerError(server.logger, err.Error())
-		}
-	} else {
-		switch coverage {
-		case asset.LineageCoverageColumn:
-			graphType = asset.LineageColumnType
-			existingAsset, err := server.assetService.GetAssetByID(ctx, req.GetUrn())
-			if err != nil {
-				return nil, internalServerError(server.logger, err.Error())
-			}
-
-			lineage, err = server.assetService.GetColumnLineage(ctx, req.GetUrn(), asset.LineageQuery{
-				Level:          int(req.GetLevel()),
-				Direction:      direction,
-				WithAttributes: withAttributes,
-				IncludeDeleted: req.GetIncludeDeleted(),
-				AssetDetail:    existingAsset,
-			})
-			if err != nil {
-				return nil, internalServerError(server.logger, err.Error())
-			}
-		default:
-			graphType = asset.LineageAssetType
-			lineage, err = server.assetService.GetLineage(ctx, req.GetUrn(), asset.LineageQuery{
-				Level:          int(req.GetLevel()),
-				Direction:      direction,
-				WithAttributes: withAttributes,
-				IncludeDeleted: req.GetIncludeDeleted(),
-			})
-			if err != nil {
-				return nil, internalServerError(server.logger, err.Error())
-			}
-		}
+	edges, err := buildLineageEdgesV2(lineage.Edges)
+	if err != nil {
+		return nil, internalServerError(server.logger, err.Error())
 	}
 
-	edges := make([]*compassv1beta1.LineageEdgeV2, 0, len(lineage.Edges))
-	for _, edge := range lineage.Edges {
-		edgePB, err := lineageEdgeToProtoV2(edge)
-		if err != nil {
-			return nil, internalServerError(server.logger, err.Error())
-		}
-		edges = append(edges, edgePB)
-	}
-
-	nodeAttrs := make(map[string]*compassv1beta1.GetGraphV2Response_NodeAttributes, len(lineage.NodeAttrs))
-	for urn, attrs := range lineage.NodeAttrs {
-		probesInfo, err := probesInfoToProtoV2(attrs.Probes)
-		if err != nil {
-			return nil, internalServerError(server.logger, err.Error())
-		}
-
-		nodeAttrs[urn] = &compassv1beta1.GetGraphV2Response_NodeAttributes{
-			Probes: probesInfo,
-		}
+	nodeAttrs, err := buildNodeAttrsV2(lineage.NodeAttrs)
+	if err != nil {
+		return nil, internalServerError(server.logger, err.Error())
 	}
 
 	return &compassv1beta1.GetGraphV2Response{
@@ -191,6 +132,86 @@ func (server *APIServer) GetGraphV2(ctx context.Context, req *compassv1beta1.Get
 		Data:      edges,
 		NodeAttrs: nodeAttrs,
 	}, nil
+}
+
+func buildLineageEdgesV2(edges []asset.LineageEdge) ([]*compassv1beta1.LineageEdgeV2, error) {
+	result := make([]*compassv1beta1.LineageEdgeV2, 0, len(edges))
+	for _, edge := range edges {
+		edgePB, err := lineageEdgeToProtoV2(edge)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, edgePB)
+	}
+	return result, nil
+}
+
+func buildNodeAttrsV2(nodeAttrs map[string]asset.NodeAttributes) (map[string]*compassv1beta1.GetGraphV2Response_NodeAttributes, error) {
+	result := make(map[string]*compassv1beta1.GetGraphV2Response_NodeAttributes, len(nodeAttrs))
+	for urn, attrs := range nodeAttrs {
+		probesInfo, err := probesInfoToProtoV2(attrs.Probes)
+		if err != nil {
+			return nil, err
+		}
+		result[urn] = &compassv1beta1.GetGraphV2Response_NodeAttributes{
+			Probes: probesInfo,
+		}
+	}
+	return result, nil
+}
+
+func (server *APIServer) resolveLineageV2(
+	ctx context.Context,
+	req *compassv1beta1.GetGraphV2Request,
+	direction asset.LineageDirection,
+	coverage asset.LineageCoverage,
+	withAttributes bool,
+) (asset.Lineage, asset.LineageType, error) {
+	baseQuery := asset.LineageQuery{
+		Level:          int(req.GetLevel()),
+		Direction:      direction,
+		WithAttributes: withAttributes,
+		IncludeDeleted: req.GetIncludeDeleted(),
+	}
+
+	if req != nil && req.ColumnName != nil {
+		baseQuery.TargetColumn = req.GetColumnName()
+		lineage, err := server.assetService.GetColumnLineage(ctx, req.GetUrn(), baseQuery)
+		if err != nil {
+			return asset.Lineage{}, "", internalServerError(server.logger, err.Error())
+		}
+		return lineage, asset.LineageColumnType, nil
+	}
+
+	if coverage == asset.LineageCoverageColumn {
+		return server.resolveColumnLineageV2(ctx, req.GetUrn(), baseQuery)
+	}
+
+	lineage, err := server.assetService.GetLineage(ctx, req.GetUrn(), baseQuery)
+	if err != nil {
+		return asset.Lineage{}, "", internalServerError(server.logger, err.Error())
+	}
+
+	return lineage, asset.LineageAssetType, nil
+}
+
+func (server *APIServer) resolveColumnLineageV2(
+	ctx context.Context,
+	urn string,
+	baseQuery asset.LineageQuery,
+) (asset.Lineage, asset.LineageType, error) {
+	existingAsset, err := server.assetService.GetAssetByID(ctx, urn)
+	if err != nil {
+		return asset.Lineage{}, "", internalServerError(server.logger, err.Error())
+	}
+
+	baseQuery.AssetDetail = existingAsset
+	lineage, err := server.assetService.GetColumnLineage(ctx, urn, baseQuery)
+	if err != nil {
+		return asset.Lineage{}, "", internalServerError(server.logger, err.Error())
+	}
+
+	return lineage, asset.LineageColumnType, nil
 }
 
 func lineageEdgeToProtoV2(e asset.LineageEdge) (*compassv1beta1.LineageEdgeV2, error) {
