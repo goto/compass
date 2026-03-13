@@ -1567,6 +1567,202 @@ func TestService_GetLineage(t *testing.T) {
 	}
 }
 
+func TestService_GetColumnLineage(t *testing.T) {
+	assetID := "some-id"
+	type testCase struct {
+		Description string
+		ID          string
+		Query       asset.LineageQuery
+		Setup       func(context.Context, *mocks.AssetRepository, *mocks.DiscoveryRepository, *mocks.LineageRepository)
+		Expected    asset.Lineage
+		Err         error
+	}
+
+	testCases := []testCase{
+		{
+			Description: `should return error if the GetColumnGraph function return error`,
+			ID:          assetID,
+			Query: asset.LineageQuery{
+				WithAttributes: true,
+				TargetColumn:   "column-1",
+			},
+			Setup: func(ctx context.Context, _ *mocks.AssetRepository, _ *mocks.DiscoveryRepository, lr *mocks.LineageRepository) {
+				lr.EXPECT().GetColumnGraph(ctx, "urn-source-1", asset.LineageQuery{WithAttributes: true, TargetColumn: "column-1"}).
+					Return(asset.LineageGraph{}, errors.New("error fetching graph"))
+			},
+			Expected: asset.Lineage{},
+			Err:      errors.New("error fetching graph"),
+		},
+		{
+			Description: `should return no error if column graph with 0 edges are returned`,
+			ID:          assetID,
+			Query: asset.LineageQuery{
+				WithAttributes: true,
+				TargetColumn:   "column-1",
+			},
+			Setup: func(ctx context.Context, ar *mocks.AssetRepository, _ *mocks.DiscoveryRepository, lr *mocks.LineageRepository) {
+				lr.EXPECT().GetColumnGraph(ctx, "urn-source-1", asset.LineageQuery{WithAttributes: true, TargetColumn: "column-1"}).
+					Return(asset.LineageGraph{}, nil)
+				ar.EXPECT().GetProbesWithFilter(ctx, asset.ProbesFilter{
+					AssetURNs: []string{"urn-source-1"},
+					MaxRows:   1,
+				}).Return(nil, nil)
+			},
+			Expected: asset.Lineage{Edges: []asset.LineageEdge{}, NodeAttrs: map[string]asset.NodeAttributes{}},
+			Err:      nil,
+		},
+		{
+			Description: `should return an error if GetProbesWithFilter function returns error`,
+			ID:          assetID,
+			Query: asset.LineageQuery{
+				WithAttributes: true,
+				TargetColumn:   "column-1",
+			},
+			Setup: func(ctx context.Context, ar *mocks.AssetRepository, _ *mocks.DiscoveryRepository, lr *mocks.LineageRepository) {
+				lr.EXPECT().GetColumnGraph(ctx, "urn-source-1", asset.LineageQuery{WithAttributes: true, TargetColumn: "column-1"}).Return(asset.LineageGraph{
+					{Source: "urn-source-1", SourceColumn: "column-1", Target: "urn-target-1", TargetColumn: "column-1", Prop: nil},
+					{Source: "urn-source-1", SourceColumn: "column-1", Target: "urn-target-2", TargetColumn: "column-2", Prop: nil},
+					{Source: "urn-target-2", SourceColumn: "column-2", Target: "urn-target-3", TargetColumn: "column-3", Prop: nil},
+				}, nil)
+				ar.EXPECT().GetProbesWithFilter(ctx, asset.ProbesFilter{
+					AssetURNs: []string{"urn-source-1", "urn-target-1", "urn-target-2", "urn-target-3"},
+					MaxRows:   1,
+				}).Return(nil, errors.New("error fetching probes"))
+			},
+			Expected: asset.Lineage{},
+			Err:      errors.New("error fetching probes"),
+		},
+		{
+			Description: `should return no error if GetProbesWithFilter function returns 0 probes`,
+			ID:          assetID,
+			Query: asset.LineageQuery{
+				WithAttributes: true,
+				TargetColumn:   "column-1",
+			},
+			Setup: func(ctx context.Context, ar *mocks.AssetRepository, _ *mocks.DiscoveryRepository, lr *mocks.LineageRepository) {
+				lr.EXPECT().GetColumnGraph(ctx, "urn-source-1", asset.LineageQuery{WithAttributes: true, TargetColumn: "column-1"}).Return(asset.LineageGraph{
+					{Source: "urn-source-1", SourceColumn: "column-1", Target: "urn-target-1", TargetColumn: "column-1", Prop: nil},
+					{Source: "urn-source-1", SourceColumn: "column-1", Target: "urn-target-2", TargetColumn: "column-2", Prop: nil},
+					{Source: "urn-target-2", SourceColumn: "column-2", Target: "urn-target-3", TargetColumn: "column-3", Prop: nil},
+				}, nil)
+				ar.EXPECT().GetProbesWithFilter(ctx, asset.ProbesFilter{
+					AssetURNs: []string{"urn-source-1", "urn-target-1", "urn-target-2", "urn-target-3"},
+					MaxRows:   1,
+				}).Return(nil, nil)
+			},
+			Expected: asset.Lineage{
+				Edges: []asset.LineageEdge{
+					{Source: "urn-source-1", SourceColumn: "column-1", Target: "urn-target-1", TargetColumn: "column-1", Prop: nil},
+					{Source: "urn-source-1", SourceColumn: "column-1", Target: "urn-target-2", TargetColumn: "column-2", Prop: nil},
+					{Source: "urn-target-2", SourceColumn: "column-2", Target: "urn-target-3", TargetColumn: "column-3", Prop: nil},
+				},
+				NodeAttrs: map[string]asset.NodeAttributes{},
+			},
+			Err: nil,
+		},
+		{
+			Description: `should return lineage with edges and without node attributes`,
+			ID:          assetID,
+			Query: asset.LineageQuery{
+				WithAttributes: false,
+				TargetColumn:   "column-1",
+			},
+			Setup: func(ctx context.Context, _ *mocks.AssetRepository, _ *mocks.DiscoveryRepository, lr *mocks.LineageRepository) {
+				lr.EXPECT().GetColumnGraph(ctx, "urn-source-1", asset.LineageQuery{WithAttributes: false, TargetColumn: "column-1"}).Return(asset.LineageGraph{
+					{Source: "urn-source-1", SourceColumn: "column-1", Target: "urn-target-1", TargetColumn: "column-1", Prop: nil},
+					{Source: "urn-source-1", SourceColumn: "column-1", Target: "urn-target-2", TargetColumn: "column-2", Prop: nil},
+					{Source: "urn-target-2", SourceColumn: "column-2", Target: "urn-target-3", TargetColumn: "column-3", Prop: nil},
+				}, nil)
+			},
+			Expected: asset.Lineage{
+				Edges: []asset.LineageEdge{
+					{Source: "urn-source-1", SourceColumn: "column-1", Target: "urn-target-1", TargetColumn: "column-1", Prop: nil},
+					{Source: "urn-source-1", SourceColumn: "column-1", Target: "urn-target-2", TargetColumn: "column-2", Prop: nil},
+					{Source: "urn-target-2", SourceColumn: "column-2", Target: "urn-target-3", TargetColumn: "column-3", Prop: nil},
+				},
+			},
+			Err: nil,
+		},
+		{
+			Description: `should return lineage with edges and node attributes`,
+			ID:          assetID,
+			Query: asset.LineageQuery{
+				WithAttributes: true,
+				TargetColumn:   "column-1",
+			},
+			Setup: func(ctx context.Context, ar *mocks.AssetRepository, _ *mocks.DiscoveryRepository, lr *mocks.LineageRepository) {
+				lr.EXPECT().GetColumnGraph(ctx, "urn-source-1", asset.LineageQuery{WithAttributes: true, TargetColumn: "column-1"}).Return(asset.LineageGraph{
+					{Source: "urn-source-1", SourceColumn: "column-1", Target: "urn-target-1", TargetColumn: "column-1", Prop: nil},
+					{Source: "urn-source-1", SourceColumn: "column-1", Target: "urn-target-2", TargetColumn: "column-2", Prop: nil},
+					{Source: "urn-target-2", SourceColumn: "column-2", Target: "urn-target-3", TargetColumn: "column-3", Prop: nil},
+				}, nil)
+				ar.EXPECT().GetProbesWithFilter(ctx, asset.ProbesFilter{
+					AssetURNs: []string{"urn-source-1", "urn-target-1", "urn-target-2", "urn-target-3"},
+					MaxRows:   1,
+				}).Return(
+					map[string][]asset.Probe{
+						"urn-source-1": {
+							asset.Probe{Status: "SUCCESS"},
+						},
+						"urn-target-2": {},
+						"urn-target-3": {
+							asset.Probe{Status: "FAILED"},
+						},
+					},
+					nil,
+				)
+			},
+			Expected: asset.Lineage{
+				Edges: []asset.LineageEdge{
+					{Source: "urn-source-1", SourceColumn: "column-1", Target: "urn-target-1", TargetColumn: "column-1", Prop: nil},
+					{Source: "urn-source-1", SourceColumn: "column-1", Target: "urn-target-2", TargetColumn: "column-2", Prop: nil},
+					{Source: "urn-target-2", SourceColumn: "column-2", Target: "urn-target-3", TargetColumn: "column-3", Prop: nil},
+				},
+				NodeAttrs: map[string]asset.NodeAttributes{
+					"urn-source-1": {
+						Probes: asset.ProbesInfo{
+							Latest: asset.Probe{Status: "SUCCESS"},
+						},
+					},
+					"urn-target-3": {
+						Probes: asset.ProbesInfo{
+							Latest: asset.Probe{Status: "FAILED"},
+						},
+					},
+				},
+			},
+			Err: nil,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.Description, func(t *testing.T) {
+			ctx := context.Background()
+
+			mockAssetRepo := mocks.NewAssetRepository(t)
+			mockDiscoveryRepo := mocks.NewDiscoveryRepository(t)
+			mockLineageRepo := mocks.NewLineageRepository(t)
+			if tc.Setup != nil {
+				tc.Setup(ctx, mockAssetRepo, mockDiscoveryRepo, mockLineageRepo)
+			}
+
+			svc, cancel := asset.NewService(asset.ServiceDeps{
+				AssetRepo:     mockAssetRepo,
+				DiscoveryRepo: mockDiscoveryRepo,
+				LineageRepo:   mockLineageRepo,
+			})
+			defer cancel()
+
+			actual, err := svc.GetColumnLineage(ctx, "urn-source-1", tc.Query)
+			if tc.Err == nil {
+				assert.NoError(t, err)
+			} else {
+				assert.ErrorContains(t, err, tc.Err.Error())
+			}
+			assert.Equal(t, tc.Expected, actual)
+		})
+	}
+}
+
 func TestService_SearchSuggestGroupAssets(t *testing.T) {
 	assetID := "some-id"
 	type testCase struct {

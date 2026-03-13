@@ -38,6 +38,7 @@ type AssetService interface {
 	SoftDeleteAssets(ctx context.Context, request asset.DeleteAssetsRequest, updatedBy string) (uint32, error)
 
 	GetLineage(ctx context.Context, urn string, query asset.LineageQuery) (asset.Lineage, error)
+	GetColumnLineage(ctx context.Context, urn string, query asset.LineageQuery) (asset.Lineage, error)
 	GetTypes(ctx context.Context, flt asset.Filter) (map[asset.Type]int, error)
 
 	SearchAssets(ctx context.Context, cfg asset.SearchConfig) (results []asset.SearchResult, err error)

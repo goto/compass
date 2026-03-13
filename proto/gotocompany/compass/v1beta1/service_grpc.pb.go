@@ -32,6 +32,7 @@ const (
 	CompassService_GroupAssets_FullMethodName              = "/gotocompany.compass.v1beta1.CompassService/GroupAssets"
 	CompassService_SuggestAssets_FullMethodName            = "/gotocompany.compass.v1beta1.CompassService/SuggestAssets"
 	CompassService_GetGraph_FullMethodName                 = "/gotocompany.compass.v1beta1.CompassService/GetGraph"
+	CompassService_GetGraphV2_FullMethodName               = "/gotocompany.compass.v1beta1.CompassService/GetGraphV2"
 	CompassService_GetAllTypes_FullMethodName              = "/gotocompany.compass.v1beta1.CompassService/GetAllTypes"
 	CompassService_GetAllAssets_FullMethodName             = "/gotocompany.compass.v1beta1.CompassService/GetAllAssets"
 	CompassService_GetAssetByID_FullMethodName             = "/gotocompany.compass.v1beta1.CompassService/GetAssetByID"
@@ -82,6 +83,7 @@ type CompassServiceClient interface {
 	GroupAssets(ctx context.Context, in *GroupAssetsRequest, opts ...grpc.CallOption) (*GroupAssetsResponse, error)
 	SuggestAssets(ctx context.Context, in *SuggestAssetsRequest, opts ...grpc.CallOption) (*SuggestAssetsResponse, error)
 	GetGraph(ctx context.Context, in *GetGraphRequest, opts ...grpc.CallOption) (*GetGraphResponse, error)
+	GetGraphV2(ctx context.Context, in *GetGraphV2Request, opts ...grpc.CallOption) (*GetGraphV2Response, error)
 	GetAllTypes(ctx context.Context, in *GetAllTypesRequest, opts ...grpc.CallOption) (*GetAllTypesResponse, error)
 	GetAllAssets(ctx context.Context, in *GetAllAssetsRequest, opts ...grpc.CallOption) (*GetAllAssetsResponse, error)
 	GetAssetByID(ctx context.Context, in *GetAssetByIDRequest, opts ...grpc.CallOption) (*GetAssetByIDResponse, error)
@@ -233,6 +235,15 @@ func (c *compassServiceClient) SuggestAssets(ctx context.Context, in *SuggestAss
 func (c *compassServiceClient) GetGraph(ctx context.Context, in *GetGraphRequest, opts ...grpc.CallOption) (*GetGraphResponse, error) {
 	out := new(GetGraphResponse)
 	err := c.cc.Invoke(ctx, CompassService_GetGraph_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *compassServiceClient) GetGraphV2(ctx context.Context, in *GetGraphV2Request, opts ...grpc.CallOption) (*GetGraphV2Response, error) {
+	out := new(GetGraphV2Response)
+	err := c.cc.Invoke(ctx, CompassService_GetGraphV2_FullMethodName, in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -511,6 +522,7 @@ type CompassServiceServer interface {
 	GroupAssets(context.Context, *GroupAssetsRequest) (*GroupAssetsResponse, error)
 	SuggestAssets(context.Context, *SuggestAssetsRequest) (*SuggestAssetsResponse, error)
 	GetGraph(context.Context, *GetGraphRequest) (*GetGraphResponse, error)
+	GetGraphV2(context.Context, *GetGraphV2Request) (*GetGraphV2Response, error)
 	GetAllTypes(context.Context, *GetAllTypesRequest) (*GetAllTypesResponse, error)
 	GetAllAssets(context.Context, *GetAllAssetsRequest) (*GetAllAssetsResponse, error)
 	GetAssetByID(context.Context, *GetAssetByIDRequest) (*GetAssetByIDResponse, error)
@@ -586,6 +598,9 @@ func (UnimplementedCompassServiceServer) SuggestAssets(context.Context, *Suggest
 }
 func (UnimplementedCompassServiceServer) GetGraph(context.Context, *GetGraphRequest) (*GetGraphResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetGraph not implemented")
+}
+func (UnimplementedCompassServiceServer) GetGraphV2(context.Context, *GetGraphV2Request) (*GetGraphV2Response, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetGraphV2 not implemented")
 }
 func (UnimplementedCompassServiceServer) GetAllTypes(context.Context, *GetAllTypesRequest) (*GetAllTypesResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetAllTypes not implemented")
@@ -914,6 +929,24 @@ func _CompassService_GetGraph_Handler(srv interface{}, ctx context.Context, dec 
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(CompassServiceServer).GetGraph(ctx, req.(*GetGraphRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _CompassService_GetGraphV2_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetGraphV2Request)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CompassServiceServer).GetGraphV2(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CompassService_GetGraphV2_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CompassServiceServer).GetGraphV2(ctx, req.(*GetGraphV2Request))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1480,6 +1513,10 @@ var CompassService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetGraph",
 			Handler:    _CompassService_GetGraph_Handler,
+		},
+		{
+			MethodName: "GetGraphV2",
+			Handler:    _CompassService_GetGraphV2_Handler,
 		},
 		{
 			MethodName: "GetAllTypes",
