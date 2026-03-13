@@ -99,7 +99,7 @@ func NewElasticsearchTestServer() *ElasticsearchTestServer {
 	}
 
 	// wait for the elasticsearch server to come up
-	timeout := 7 * time.Minute
+	timeout := 5 * time.Minute
 	if err := server.wait4Ready(timeout); err != nil {
 		panic(fmt.Sprintf("error checking elasticsearch status: %v", err))
 	}
