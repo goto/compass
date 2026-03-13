@@ -96,12 +96,12 @@ func NewElasticsearchTestServer() *ElasticsearchTestServer {
 			Scheme: "http",
 			Host:   strings.TrimSpace(string(hostBytes)),
 		}
+	}
 
-		// wait for the self-managed container to come up
-		timeout := 5 * time.Minute
-		if err := server.wait4Ready(timeout); err != nil {
-			panic(fmt.Sprintf("error checking elasticsearch status: %v", err))
-		}
+	// wait for the elasticsearch server to come up
+	timeout := 5 * time.Minute
+	if err := server.wait4Ready(timeout); err != nil {
+		panic(fmt.Sprintf("error checking elasticsearch status: %v", err))
 	}
 
 	// create the client
