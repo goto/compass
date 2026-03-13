@@ -9,7 +9,7 @@ var (
 	esTestServer  *testutil.ElasticsearchTestServer
 )
 
-//func TestMain(m *testing.M) {
+// func TestMain(m *testing.M) {
 //	// TODO(Aman): this block makes it impossible to skip starting
 //	// an elasticsearch server. That means you can't run unit tests
 //	// standalone :/
