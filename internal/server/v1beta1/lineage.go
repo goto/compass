@@ -2,6 +2,7 @@ package handlersv1beta1
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/goto/compass/core/asset"
@@ -202,6 +203,12 @@ func (server *APIServer) resolveColumnLineageV2(
 ) (asset.Lineage, asset.LineageType, error) {
 	existingAsset, err := server.assetService.GetAssetByID(ctx, urn)
 	if err != nil {
+		if errors.As(err, new(asset.InvalidError)) {
+			return asset.Lineage{}, "", status.Error(codes.InvalidArgument, err.Error())
+		}
+		if errors.As(err, new(asset.NotFoundError)) {
+			return asset.Lineage{}, "", status.Error(codes.NotFound, err.Error())
+		}
 		return asset.Lineage{}, "", internalServerError(server.logger, err.Error())
 	}
 

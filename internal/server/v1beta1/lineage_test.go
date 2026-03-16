@@ -543,6 +543,54 @@ func TestGetLineageGraphV2(t *testing.T) {
 			}
 		})
 
+		t.Run("should return error when invalid asset detail for column lineage", func(t *testing.T) {
+			mockSvc := new(mocks.AssetService)
+			mockUserSvc := new(mocks.UserService)
+			defer mockUserSvc.AssertExpectations(t)
+			defer mockSvc.AssertExpectations(t)
+
+			mockSvc.EXPECT().GetAssetByID(ctx, nodeURN).Return(assetDetail, asset.InvalidError{AssetID: nodeURN})
+			mockUserSvc.EXPECT().ValidateUser(ctx, userEmail).Return(userID, nil)
+
+			handler := NewAPIServer(APIServerDeps{AssetSvc: mockSvc, UserSvc: mockUserSvc, Logger: logger})
+
+			_, err := handler.GetGraphV2(ctx, &compassv1beta1.GetGraphV2Request{
+				Urn:       nodeURN,
+				Level:     uint32(level),
+				Direction: string(direction),
+				Coverage:  proto.String(string(asset.LineageCoverageColumn)),
+			})
+
+			code := status.Code(err)
+			if code != codes.InvalidArgument {
+				t.Errorf("expected handler to return Code %s, returned Code %s instead", codes.InvalidArgument, code.String())
+			}
+		})
+
+		t.Run("should return error when get asset detail not found for column lineage", func(t *testing.T) {
+			mockSvc := new(mocks.AssetService)
+			mockUserSvc := new(mocks.UserService)
+			defer mockUserSvc.AssertExpectations(t)
+			defer mockSvc.AssertExpectations(t)
+
+			mockSvc.EXPECT().GetAssetByID(ctx, nodeURN).Return(assetDetail, asset.NotFoundError{URN: nodeURN})
+			mockUserSvc.EXPECT().ValidateUser(ctx, userEmail).Return(userID, nil)
+
+			handler := NewAPIServer(APIServerDeps{AssetSvc: mockSvc, UserSvc: mockUserSvc, Logger: logger})
+
+			_, err := handler.GetGraphV2(ctx, &compassv1beta1.GetGraphV2Request{
+				Urn:       nodeURN,
+				Level:     uint32(level),
+				Direction: string(direction),
+				Coverage:  proto.String(string(asset.LineageCoverageColumn)),
+			})
+
+			code := status.Code(err)
+			if code != codes.NotFound {
+				t.Errorf("expected handler to return Code %s, returned Code %s instead", codes.NotFound, code.String())
+			}
+		})
+
 		t.Run("should return error when failed to get asset detail for column lineage", func(t *testing.T) {
 			mockSvc := new(mocks.AssetService)
 			mockUserSvc := new(mocks.UserService)
