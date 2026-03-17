@@ -1924,7 +1924,7 @@ paths:
   /v1beta1/v2/lineage/{urn}:
     get:
       summary: Get Lineage Graph V2 (Table/Column Level)
-      description: Returns the full table dan column level lineage graph. Each entry in the graph describes a (edge) directed relation of assets with source and destination using it's urn, type, and service.
+      description: Returns the full table and column level lineage graph. Each entry in the graph describes a (edge) directed relation of assets with source and destination using it's urn, type, and service.
       operationId: CompassService_GetGraphV2
       responses:
         "200":
