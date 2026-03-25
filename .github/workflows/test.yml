@@ -10,7 +10,12 @@ jobs:
         ports:
           - 9200:9200
         env:
-          ES_TEST_SERVER_URL: 'http://elasticsearch:9200'
+          discovery.type: single-node
+        options: >-
+          --health-cmd "curl -f http://localhost:9200/_cat/health || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-go@v2
@@ -21,6 +26,8 @@ jobs:
       - name: Install packages
         run: go mod tidy
       - name: Run Test
+        env:
+          ES_TEST_SERVER_URL: 'http://localhost:9200'
         run: make test
       - name: Install goveralls and send coverage
         env:

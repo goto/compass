@@ -442,6 +442,38 @@ func (s *Service) GetLineage(ctx context.Context, urn string, query LineageQuery
 	}, nil
 }
 
+func (s *Service) GetColumnLineage(ctx context.Context, urn string, query LineageQuery) (Lineage, error) {
+	edges, err := s.lineageRepository.GetColumnGraph(ctx, urn, query)
+	if err != nil {
+		return Lineage{}, fmt.Errorf("get lineage: get column graph edges: %w", err)
+	}
+
+	if !query.WithAttributes {
+		return Lineage{
+			Edges: edges,
+		}, nil
+	}
+
+	urns := newUniqueStrings(len(edges))
+	urns.add(urn)
+	for _, edge := range edges {
+		urns.add(edge.Source, edge.Target)
+	}
+
+	assetProbes, err := s.assetRepository.GetProbesWithFilter(ctx, ProbesFilter{
+		AssetURNs: urns.list(),
+		MaxRows:   1,
+	})
+	if err != nil {
+		return Lineage{}, fmt.Errorf("get lineage: get latest probes: %w", err)
+	}
+
+	return Lineage{
+		Edges:     edges,
+		NodeAttrs: buildNodeAttrs(assetProbes),
+	}, nil
+}
+
 func (s *Service) GetTypes(ctx context.Context, flt Filter) (map[Type]int, error) {
 	result, err := s.assetRepository.GetTypes(ctx, flt)
 	if err != nil {

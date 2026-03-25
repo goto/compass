@@ -12,6 +12,8 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
+const defaultColumnLevel = 1
+
 type LineageRepository struct {
 	client *Client
 }
@@ -41,12 +43,76 @@ func (repo *LineageRepository) GetGraph(ctx context.Context, urn string, query a
 	if query.Direction == "" || query.Direction == asset.LineageDirectionDownstream {
 		downstreams, err := repo.getDownstreamsGraph(ctx, urn, query.Level, query.IncludeDeleted)
 		if err != nil {
-			return graph, fmt.Errorf("error fetching upstreams graph: %w", err)
+			return graph, fmt.Errorf("error fetching downstreams graph: %w", err)
 		}
 		graph = append(graph, downstreams...)
 	}
 
 	return graph, nil
+}
+
+// GetColumnGraph returns a graph that contains list of relations of a given node at column level
+func (repo *LineageRepository) GetColumnGraph(ctx context.Context, urn string, query asset.LineageQuery) (asset.LineageGraph, error) {
+	var graph asset.LineageGraph
+
+	tableColumns, err := extractTableColumns(query)
+	if err != nil {
+		return graph, fmt.Errorf("get column lineage: extract table columns: %w", err)
+	}
+
+	if query.Direction == "" || query.Direction == asset.LineageDirectionUpstream {
+		upstreams, err := repo.getUpstreamsGraph(ctx, urn, query.Level, query.IncludeDeleted, tableColumns...)
+		if err != nil {
+			return graph, fmt.Errorf("error fetching upstreams column graph: %w", err)
+		}
+		graph = append(graph, upstreams...)
+	}
+
+	if query.Direction == "" || query.Direction == asset.LineageDirectionDownstream {
+		downstreams, err := repo.getDownstreamsGraph(ctx, urn, query.Level, query.IncludeDeleted, tableColumns...)
+		if err != nil {
+			return graph, fmt.Errorf("error fetching downstreams column graph: %w", err)
+		}
+		graph = append(graph, downstreams...)
+	}
+
+	return graph, nil
+}
+
+func extractTableColumns(query asset.LineageQuery) ([]string, error) {
+	if query.TargetColumn != "" {
+		return []string{query.TargetColumn}, nil
+	}
+
+	assetDetail := query.AssetDetail
+	if assetDetail.Data == nil {
+		return nil, fmt.Errorf("asset URN %s has no data", assetDetail.URN)
+	}
+
+	columns, exists := assetDetail.Data["columns"]
+	if !exists {
+		return nil, fmt.Errorf("asset URN %s has no columns", assetDetail.URN)
+	}
+
+	columnCollection, valid := columns.([]interface{})
+	if !valid {
+		return nil, fmt.Errorf("invalid column detail format for asset URN %s: expected []interface{}", assetDetail.URN)
+	}
+
+	columnNames := make([]string, 0, len(columnCollection))
+	for _, col := range columnCollection {
+		columnDetail, valid := col.(map[string]interface{})
+		if !valid {
+			return nil, fmt.Errorf("invalid column entry format for asset URN %s", assetDetail.URN)
+		}
+		columnName, valid := columnDetail["name"].(string)
+		if !valid {
+			return nil, fmt.Errorf("invalid column name in asset URN %s: expected string", assetDetail.URN)
+		}
+		columnNames = append(columnNames, columnName)
+	}
+
+	return columnNames, nil
 }
 
 func (repo *LineageRepository) DeleteByURN(ctx context.Context, urn string) error {
@@ -260,6 +326,44 @@ func insertGraphChunk(ctx context.Context, execer sqlx.ExecerContext, graph asse
 	return nil
 }
 
+// InsertColumnGraph inserts column level lineage graph into the database for testing purpose as of now
+func (repo *LineageRepository) InsertColumnGraph(ctx context.Context, graph asset.LineageGraph) error {
+	return repo.client.RunWithinTx(ctx, func(tx *sqlx.Tx) error {
+		if len(graph) == 0 {
+			return nil
+		}
+
+		// PostgreSQL has a limit of 65535 parameters per query
+		// With 3 columns per edge (source, target, prop), we can safely insert 20000 edges per batch
+		// (20000 * 3 = 60000 parameters, well below the limit)
+		const chunkSize = 20000
+
+		return generichelper.ProcessInChunksConcurrently(ctx, graph, chunkSize, 3, func(chunk []asset.LineageEdge) error {
+			return insertColumnGraphChunk(ctx, tx, chunk)
+		})
+	})
+}
+
+func insertColumnGraphChunk(ctx context.Context, execer sqlx.ExecerContext, graph asset.LineageGraph) error {
+	builder := sq.Insert("column_lineage_graph").Columns("source_asset", "source_column", "target_asset", "target_column", "prop").PlaceholderFormat(sq.Dollar)
+	for _, edge := range graph {
+		builder = builder.Values(edge.Source, edge.SourceColumn, edge.Target, edge.TargetColumn, edge.Prop)
+	}
+	builder = builder.Suffix("ON CONFLICT DO NOTHING")
+
+	sql, args, err := builder.ToSql()
+	if err != nil {
+		return fmt.Errorf("error building query: %w", err)
+	}
+
+	_, err = execer.ExecContext(ctx, sql, args...)
+	if err != nil {
+		return fmt.Errorf("error executing insert query: %w", err)
+	}
+
+	return nil
+}
+
 func (*LineageRepository) removeGraph(ctx context.Context, execer sqlx.ExecerContext, graph asset.LineageGraph) error {
 	if len(graph) == 0 {
 		return nil
@@ -329,10 +433,16 @@ func (*LineageRepository) compareGraph(current, new asset.LineageGraph) (toInser
 	return toInserts, toRemoves
 }
 
-func (repo *LineageRepository) getUpstreamsGraph(ctx context.Context, urn string, level int, includeDeleted bool) (asset.LineageGraph, error) {
+func (repo *LineageRepository) getUpstreamsGraph(
+	ctx context.Context,
+	urn string,
+	level int,
+	includeDeleted bool,
+	tableColumns ...string,
+) (asset.LineageGraph, error) {
 	var graph asset.LineageGraph
 
-	query, args, err := repo.buildQuery(urn, true, level, includeDeleted)
+	query, args, err := repo.resolveCoverageQuery(urn, true, level, includeDeleted, tableColumns...)
 	if err != nil {
 		return graph, fmt.Errorf("error building upstream query: %w", err)
 	}
@@ -348,10 +458,16 @@ func (repo *LineageRepository) getUpstreamsGraph(ctx context.Context, urn string
 	return graph, nil
 }
 
-func (repo *LineageRepository) getDownstreamsGraph(ctx context.Context, urn string, level int, includeDeleted bool) (asset.LineageGraph, error) {
+func (repo *LineageRepository) getDownstreamsGraph(
+	ctx context.Context,
+	urn string,
+	level int,
+	includeDeleted bool,
+	tableColumns ...string,
+) (asset.LineageGraph, error) {
 	var graph asset.LineageGraph
 
-	query, args, err := repo.buildQuery(urn, false, level, includeDeleted)
+	query, args, err := repo.resolveCoverageQuery(urn, false, level, includeDeleted, tableColumns...)
 	if err != nil {
 		return graph, fmt.Errorf("error building downstream query: %w", err)
 	}
@@ -365,6 +481,19 @@ func (repo *LineageRepository) getDownstreamsGraph(ctx context.Context, urn stri
 	graph = gm.toGraph()
 
 	return graph, nil
+}
+
+func (repo *LineageRepository) resolveCoverageQuery(
+	urn string,
+	isUpstream bool,
+	level int,
+	includeDeleted bool,
+	tableColumns ...string,
+) (string, []interface{}, error) {
+	if len(tableColumns) > 0 {
+		return repo.buildColumnQuery(urn, isUpstream, level, includeDeleted, tableColumns...)
+	}
+	return repo.buildQuery(urn, isUpstream, level, includeDeleted)
 }
 
 func (repo *LineageRepository) buildQuery(urn string, isUpstream bool, level int, includeDeleted bool) (query string, args []interface{}, err error) {
@@ -421,6 +550,84 @@ func (*LineageRepository) buildRecursiveQuery(alias string, nonRecursiveBuilder,
 
 	query, args, err = sq.
 		Select("source", "target", "prop").
+		From(alias).
+		Prefix(cteQuery).
+		PlaceholderFormat(sq.Dollar).
+		ToSql()
+	if err != nil {
+		return "", nil, fmt.Errorf("build final recursive query: %w", err)
+	}
+
+	args = append(cteArgs, args...)
+	return query, args, nil
+}
+
+func (repo *LineageRepository) buildColumnQuery(
+	urn string,
+	isUpstream bool,
+	level int,
+	includeDeleted bool,
+	tableColumns ...string,
+) (query string, args []interface{}, err error) {
+	alias := "search_graph"
+	base := "source"
+	if isUpstream {
+		base = "target"
+	}
+	nonRecursiveBuilder := sq.
+		Select("source_asset", "source_column", "target_asset", "target_column", "prop", "1 as depth",
+			fmt.Sprintf("ARRAY[%s_asset || '.' || %s_column] as path", base, base)).
+		From("column_lineage_graph").
+		Where(sq.Eq{fmt.Sprintf("%s_asset", base): urn}).
+		Where(sq.Eq{fmt.Sprintf("%s_column", base): tableColumns})
+	recursiveBuilder := sq.
+		Select("lg.source_asset", "lg.source_column", "lg.target_asset", "lg.target_column", "lg.prop", "sg.depth + 1",
+			fmt.Sprintf("sg.path || (lg.%s_asset || '.' || lg.%s_column)", base, base)).
+		From(fmt.Sprintf("column_lineage_graph lg, %s sg", alias)).
+		Where(fmt.Sprintf("(lg.%s_asset || '.' || lg.%s_column) <> ALL(sg.path)", base, base))
+
+	if isUpstream {
+		recursiveBuilder = recursiveBuilder.Where("lg.target_asset = sg.source_asset AND lg.target_column = sg.source_column")
+	} else {
+		recursiveBuilder = recursiveBuilder.Where("lg.source_asset = sg.target_asset AND lg.source_column = sg.target_column")
+	}
+
+	if level > 0 {
+		recursiveBuilder = recursiveBuilder.Where("sg.depth < ?", level)
+	} else if level == 0 {
+		recursiveBuilder = recursiveBuilder.Where("sg.depth < ?", defaultColumnLevel)
+	}
+
+	if !includeDeleted {
+		nonRecursiveBuilder = nonRecursiveBuilder.Where(sq.And{
+			sq.Eq{"prop->>'source_is_deleted'": "false"},
+			sq.Eq{"prop->>'target_is_deleted'": "false"},
+		})
+		recursiveBuilder = recursiveBuilder.Where(sq.And{
+			sq.Eq{"lg.prop->>'source_is_deleted'": "false"},
+			sq.Eq{"lg.prop->>'target_is_deleted'": "false"},
+		})
+	}
+
+	return repo.buildRecursiveColumnQuery(alias, nonRecursiveBuilder, recursiveBuilder)
+}
+
+func (*LineageRepository) buildRecursiveColumnQuery(alias string, nonRecursiveBuilder, recursiveBuilder sq.SelectBuilder) (
+	query string, args []interface{}, err error,
+) {
+	cteBuilder := recursiveCTEBuilder{
+		alias:               alias,
+		columns:             []string{"source_asset", "source_column", "target_asset", "target_column", "prop", "depth", "path"},
+		nonRecursiveBuilder: nonRecursiveBuilder,
+		recursiveBuilder:    recursiveBuilder,
+	}
+	cteQuery, cteArgs, err := cteBuilder.toSQL()
+	if err != nil {
+		return "", nil, fmt.Errorf("build recursive cte: %w", err)
+	}
+
+	query, args, err = sq.
+		Select("source_asset as source", "source_column", "target_asset as target", "target_column", "prop").
 		From(alias).
 		Prefix(cteQuery).
 		PlaceholderFormat(sq.Dollar).

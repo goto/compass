@@ -1921,6 +1921,71 @@ paths:
       tags:
         - User
         - Star
+  /v1beta1/v2/lineage/{urn}:
+    get:
+      summary: Get Lineage Graph V2 (Table/Column Level)
+      description: Returns the full table and column level lineage graph. Each entry in the graph describes a (edge) directed relation of assets with source and destination using it's urn, type, and service.
+      operationId: CompassService_GetGraphV2
+      responses:
+        "200":
+          description: A successful response.
+          schema:
+            $ref: '#/definitions/GetGraphV2Response'
+        "400":
+          description: Returned when the data that user input is wrong.
+          schema:
+            $ref: '#/definitions/Status'
+        "404":
+          description: Returned when the resource does not exist.
+          schema:
+            $ref: '#/definitions/Status'
+        "409":
+          description: Returned when the resource already exist.
+          schema:
+            $ref: '#/definitions/Status'
+        "500":
+          description: Returned when theres is something wrong on the server side.
+          schema:
+            $ref: '#/definitions/Status'
+        default:
+          description: An unexpected error response.
+          schema:
+            $ref: '#/definitions/Status'
+      parameters:
+        - name: urn
+          in: path
+          required: true
+          type: string
+          pattern: .+
+        - name: level
+          in: query
+          required: false
+          type: integer
+          format: int64
+        - name: direction
+          in: query
+          required: false
+          type: string
+        - name: with_attributes
+          in: query
+          required: false
+          type: boolean
+        - name: include_deleted
+          description: If true, include soft deleted assets in the lineage graph result
+          in: query
+          required: false
+          type: boolean
+        - name: coverage
+          in: query
+          required: false
+          type: string
+        - name: column_name
+          in: query
+          required: false
+          type: string
+      tags:
+        - Lineage
+        - Asset
 definitions:
   Any:
     type: object
@@ -2248,10 +2313,49 @@ definitions:
       node_attrs:
         type: object
         additionalProperties:
-          $ref: '#/definitions/NodeAttributes'
+          $ref: '#/definitions/GetGraphResponse.NodeAttributes'
         description: |-
           Key is the asset URN. Node attributes, if present, will be returned for
           source and target nodes in the LineageEdge.
+  GetGraphResponse.NodeAttributes:
+    type: object
+    properties:
+      probes:
+        $ref: '#/definitions/GetGraphResponse.ProbesInfo'
+  GetGraphResponse.ProbesInfo:
+    type: object
+    properties:
+      latest:
+        $ref: '#/definitions/v1beta1.Probe'
+  GetGraphV2Response:
+    type: object
+    properties:
+      type:
+        type: string
+        description: Lineage graph type if it's asset or column level lineage.
+      data:
+        type: array
+        items:
+          type: object
+          $ref: '#/definitions/LineageEdgeV2'
+        description: Edges in the graph.
+      node_attrs:
+        type: object
+        additionalProperties:
+          $ref: '#/definitions/GetGraphV2Response.NodeAttributes'
+        description: |-
+          Key is the asset URN. Node attributes, if present, will be returned for
+          source and target nodes in the LineageEdge.
+  GetGraphV2Response.NodeAttributes:
+    type: object
+    properties:
+      probes:
+        $ref: '#/definitions/GetGraphV2Response.ProbesInfo'
+  GetGraphV2Response.ProbesInfo:
+    type: object
+    properties:
+      latest:
+        $ref: '#/definitions/v1beta1.Probe'
   GetMyDiscussionsResponse:
     type: object
     properties:
@@ -2316,6 +2420,20 @@ definitions:
       prop:
         type: object
     title: LineageEdge
+  LineageEdgeV2:
+    type: object
+    properties:
+      source_asset:
+        type: string
+      source_column:
+        type: string
+      target_asset:
+        type: string
+      target_column:
+        type: string
+      prop:
+        type: object
+    title: LineageEdgeV2
   LineageNode:
     type: object
     properties:
@@ -2326,11 +2444,6 @@ definitions:
       service:
         type: string
     title: LineageNode
-  NodeAttributes:
-    type: object
-    properties:
-      probes:
-        $ref: '#/definitions/ProbesInfo'
   NullValue:
     type: string
     enum:
@@ -2345,11 +2458,6 @@ definitions:
        - NULL_VALUE: Null value.
   PatchDiscussionResponse:
     type: object
-  ProbesInfo:
-    type: object
-    properties:
-      latest:
-        $ref: '#/definitions/v1beta1.Probe'
   SearchAssetsResponse:
     type: object
     properties:
