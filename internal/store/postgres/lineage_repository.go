@@ -12,6 +12,8 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
+const defaultColumnLevel = 1
+
 type LineageRepository struct {
 	client *Client
 }
@@ -592,6 +594,8 @@ func (repo *LineageRepository) buildColumnQuery(
 
 	if level > 0 {
 		recursiveBuilder = recursiveBuilder.Where("sg.depth < ?", level)
+	} else if level == 0 {
+		recursiveBuilder = recursiveBuilder.Where("sg.depth < ?", defaultColumnLevel)
 	}
 
 	if !includeDeleted {

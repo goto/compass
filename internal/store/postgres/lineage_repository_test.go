@@ -152,14 +152,10 @@ func (r *LineageRepositoryTestSuite) TestGetColumnGraph() {
 	})
 	r.Require().NoError(err)
 
-	r.Run("should recursively fetch all graph", func() {
+	r.Run("should recursively fetch graph by default level value", func() {
 		expected := asset.LineageGraph{
 			{Source: "table-30", SourceColumn: "column-2", Target: rootNode, TargetColumn: "column-final", Prop: prop},
-			{Source: "table-51", SourceColumn: "column-1", Target: "table-30", TargetColumn: "column-2", Prop: prop},
-			{Source: "table-50", SourceColumn: "column-3", Target: "table-30", TargetColumn: "column-2", Prop: prop},
 			{Source: rootNode, SourceColumn: "column-final", Target: "table-10", TargetColumn: "column-5", Prop: prop},
-			{Source: "table-10", SourceColumn: "column-5", Target: "table-22", TargetColumn: "column-4", Prop: prop},
-			{Source: "table-10", SourceColumn: "column-5", Target: "table-20", TargetColumn: "column-5", Prop: prop},
 		}
 
 		graph, err := r.repository.GetColumnGraph(r.ctx, rootNode, asset.LineageQuery{TargetColumn: "column-final"})
@@ -184,13 +180,39 @@ func (r *LineageRepositoryTestSuite) TestGetColumnGraph() {
 	r.Run("should fetch based on the direction given in config if any", func() {
 		expected := asset.LineageGraph{
 			{Source: rootNode, SourceColumn: "column-final", Target: "table-10", TargetColumn: "column-5", Prop: prop},
-			{Source: "table-10", SourceColumn: "column-5", Target: "table-22", TargetColumn: "column-4", Prop: prop},
-			{Source: "table-10", SourceColumn: "column-5", Target: "table-20", TargetColumn: "column-5", Prop: prop},
+			{Source: "table-10", SourceColumn: "column-5", Target: "table-20", TargetColumn: "column-4", Prop: prop},
+			{Source: "table-10", SourceColumn: "column-5", Target: "table-22", TargetColumn: "column-5", Prop: prop},
 		}
 
 		graph, err := r.repository.GetColumnGraph(r.ctx, rootNode, asset.LineageQuery{
+			Level:        2,
 			Direction:    asset.LineageDirectionDownstream,
 			TargetColumn: "column-final",
+		})
+		r.Require().NoError(err)
+		r.compareGraphs(expected, graph)
+	})
+
+	r.Run("should fetch based for all column names in the asset", func() {
+		expected := asset.LineageGraph{
+			{Source: rootNode, SourceColumn: "column-final", Target: "table-10", TargetColumn: "column-5", Prop: prop},
+			{Source: "table-10", SourceColumn: "column-5", Target: "table-20", TargetColumn: "column-4", Prop: prop},
+			{Source: "table-10", SourceColumn: "column-5", Target: "table-22", TargetColumn: "column-5", Prop: prop},
+		}
+
+		graph, err := r.repository.GetColumnGraph(r.ctx, rootNode, asset.LineageQuery{
+			Level:     2,
+			Direction: asset.LineageDirectionDownstream,
+			AssetDetail: asset.Asset{
+				URN: rootNode,
+				Data: map[string]interface{}{
+					"columns": []interface{}{
+						map[string]interface{}{
+							"name": "column-final",
+						},
+					},
+				},
+			},
 		})
 		r.Require().NoError(err)
 		r.compareGraphs(expected, graph)
@@ -256,30 +278,6 @@ func (r *LineageRepositoryTestSuite) TestGetColumnGraph() {
 			},
 		})
 		r.Require().Contains(err.Error(), fmt.Sprintf("invalid column name in asset URN %s", rootNode))
-	})
-
-	r.Run("should return error when column name is in invalid format", func() {
-		expected := asset.LineageGraph{
-			{Source: rootNode, SourceColumn: "column-final", Target: "table-10", TargetColumn: "column-5", Prop: prop},
-			{Source: "table-10", SourceColumn: "column-5", Target: "table-22", TargetColumn: "column-4", Prop: prop},
-			{Source: "table-10", SourceColumn: "column-5", Target: "table-20", TargetColumn: "column-5", Prop: prop},
-		}
-
-		graph, err := r.repository.GetColumnGraph(r.ctx, rootNode, asset.LineageQuery{
-			Direction: asset.LineageDirectionDownstream,
-			AssetDetail: asset.Asset{
-				URN: rootNode,
-				Data: map[string]interface{}{
-					"columns": []interface{}{
-						map[string]interface{}{
-							"name": "column-final",
-						},
-					},
-				},
-			},
-		})
-		r.Require().NoError(err)
-		r.compareGraphs(expected, graph)
 	})
 }
 
@@ -461,8 +459,8 @@ func (r *LineageRepositoryTestSuite) TestUpsert() {
 		graph, err := r.repository.GetGraph(r.ctx, nodeURN, asset.LineageQuery{})
 		r.Require().NoError(err)
 		r.compareGraphs(asset.LineageGraph{
-			{Source: "job-99", Target: nodeURN},
 			{Source: "job-100", Target: nodeURN},
+			{Source: "job-99", Target: nodeURN},
 			{Source: nodeURN, Target: "dashboard-93"},
 		}, graph)
 	})
