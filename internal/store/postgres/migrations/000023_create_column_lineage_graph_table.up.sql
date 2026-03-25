@@ -3,7 +3,6 @@ CREATE TABLE column_lineage_graph (
     source_column text NOT NULL,
     target_asset text NOT NULL,
     target_column text NOT NULL,
-    is_deleted BOOLEAN DEFAULT false,
     prop jsonb,
     primary key (source_asset, source_column, target_asset, target_column)
 );
