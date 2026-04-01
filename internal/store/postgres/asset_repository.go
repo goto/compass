@@ -22,12 +22,14 @@ import (
 var (
 	errOffsetCannotBeNegative = errors.New("offset cannot be negative")
 	errSizeCannotBeNegative   = errors.New("size cannot be negative")
-
-	excludedChangelogPaths = []string{
-		`["data","update_time"]`,
-		`["data","optimus", "resolved_sql"]`,
-	}
 )
+
+func excludedChangelogPaths() []string {
+	return []string{
+		`["data","update_time"]`,
+		`["data","optimus","resolved_sql"]`,
+	}
+}
 
 // AssetRepository is a type that manages user operation to the primary database
 type AssetRepository struct {
@@ -299,9 +301,10 @@ func (r *AssetRepository) GetVersionHistory(ctx context.Context, flt asset.Filte
 		size = r.defaultGetMaxSize
 	}
 
-	var formattedExcludedChangelogPaths []string
-	for _, path := range excludedChangelogPaths {
-		formattedExcludedChangelogPaths = append(formattedExcludedChangelogPaths, fmt.Sprintf("'%s'::jsonb", path))
+	paths := excludedChangelogPaths()
+	formattedExcludedChangelogPaths := make([]string, len(paths))
+	for i, path := range paths {
+		formattedExcludedChangelogPaths[i] = fmt.Sprintf("'%s'::jsonb", path)
 	}
 	excludeExpr := fmt.Sprintf(`EXISTS (
 				SELECT 1
