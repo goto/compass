@@ -1338,7 +1338,7 @@ func TestService_GetAssetVersionHistory(t *testing.T) {
 			Description: `should return error if the GetVersionHistory function return error`,
 			ID:          assetID,
 			Setup: func(ctx context.Context, ar *mocks.AssetRepository) {
-				ar.EXPECT().GetVersionHistory(ctx, asset.Filter{}, assetID).Return(ast, errors.New("error fetching asset"))
+				ar.EXPECT().GetVersionHistory(ctx, asset.Filter{}, assetID, []string{}).Return(ast, errors.New("error fetching asset"))
 			},
 			Err: errors.New("error fetching asset"),
 		},
@@ -1346,7 +1346,7 @@ func TestService_GetAssetVersionHistory(t *testing.T) {
 			Description: `should return no error if asset is found by the version`,
 			ID:          assetID,
 			Setup: func(ctx context.Context, ar *mocks.AssetRepository) {
-				ar.EXPECT().GetVersionHistory(ctx, asset.Filter{}, assetID).Return(ast, nil)
+				ar.EXPECT().GetVersionHistory(ctx, asset.Filter{}, assetID, []string{}).Return(ast, nil)
 			},
 			Err: nil,
 		},

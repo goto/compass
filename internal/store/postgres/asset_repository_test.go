@@ -790,6 +790,7 @@ func (r *AssetRepositoryTestSuite) TestGetByURN() {
 func (r *AssetRepositoryTestSuite) TestVersions() {
 	currentTime := time.Date(2024, time.August, 20, 8, 19, 49, 0, time.UTC)
 	assetURN := uuid.NewString() + "urn-u-2-version"
+	excludedChangelogPaths := []string{"data.update_time"}
 	// v0.1
 	astVersioning := asset.Asset{
 		URN:         assetURN,
@@ -1018,7 +1019,7 @@ func (r *AssetRepositoryTestSuite) TestVersions() {
 			},
 		}
 
-		assetVersions, err := r.repository.GetVersionHistory(r.ctx, asset.Filter{Size: 3, Offset: 86}, ast.ID)
+		assetVersions, err := r.repository.GetVersionHistory(r.ctx, asset.Filter{Size: 3, Offset: 86}, ast.ID, excludedChangelogPaths)
 		r.NoError(err)
 		// making updatedby user time empty to make ast comparable
 		for i := 0; i < len(assetVersions); i++ {
@@ -1048,14 +1049,14 @@ func (r *AssetRepositoryTestSuite) TestVersions() {
 			r.Require().Equal(upsertedAsset.ID, ast.ID)
 		}
 
-		assetVersions, err := r.repository.GetVersionHistory(r.ctx, asset.Filter{Size: 0, Offset: 86}, ast.ID)
+		assetVersions, err := r.repository.GetVersionHistory(r.ctx, asset.Filter{Size: 0, Offset: 86}, ast.ID, excludedChangelogPaths)
 		r.NoError(err)
 		r.Equal(defaultGetMaxSize, len(assetVersions))
 	})
 
 	r.Run("should return error if invalid uuid is passed", func() {
 		assetURN := "invalid uuid"
-		_, err := r.repository.GetVersionHistory(r.ctx, asset.Filter{Size: 3, Offset: 86}, assetURN)
+		_, err := r.repository.GetVersionHistory(r.ctx, asset.Filter{Size: 3, Offset: 86}, assetURN, excludedChangelogPaths)
 		r.NotNil(err)
 		r.Equal(asset.InvalidError{AssetID: assetURN}, err)
 	})

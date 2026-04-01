@@ -24,13 +24,6 @@ var (
 	errSizeCannotBeNegative   = errors.New("size cannot be negative")
 )
 
-func excludedChangelogPaths() []string {
-	return []string{
-		`["data","update_time"]`,
-		`["data","optimus","resolved_sql"]`,
-	}
-}
-
 // AssetRepository is a type that manages user operation to the primary database
 type AssetRepository struct {
 	client              *Client
@@ -291,7 +284,7 @@ func (r *AssetRepository) getWithPredicateWithTx(ctx context.Context, tx *sqlx.T
 }
 
 // GetVersionHistory retrieves the versions of an asset
-func (r *AssetRepository) GetVersionHistory(ctx context.Context, flt asset.Filter, id string) ([]asset.Asset, error) {
+func (r *AssetRepository) GetVersionHistory(ctx context.Context, flt asset.Filter, id string, excludedChangelogPaths []string) ([]asset.Asset, error) {
 	if !isValidUUID(id) {
 		return nil, asset.InvalidError{AssetID: id}
 	}
@@ -301,22 +294,25 @@ func (r *AssetRepository) GetVersionHistory(ctx context.Context, flt asset.Filte
 		size = r.defaultGetMaxSize
 	}
 
-	paths := excludedChangelogPaths()
-	formattedExcludedChangelogPaths := make([]string, len(paths))
-	for i, path := range paths {
-		formattedExcludedChangelogPaths[i] = fmt.Sprintf("'%s'::jsonb", path)
-	}
-	excludeExpr := fmt.Sprintf(`EXISTS (
+	var filter sq.Sqlizer = sq.Eq{"a.asset_id": id}
+
+	if len(excludedChangelogPaths) > 0 {
+		formattedPaths := make([]string, len(excludedChangelogPaths))
+		for idx, path := range excludedChangelogPaths {
+			formattedPaths[idx] = `'["` + strings.Join(strings.Split(path, "."), `","`) + `"]'::jsonb`
+		}
+		filter = sq.And{
+			sq.Eq{"a.asset_id": id},
+			sq.Expr(fmt.Sprintf(`EXISTS (
 				SELECT 1
 				FROM jsonb_array_elements(a.changelog) AS elem
 				WHERE elem->'path' NOT IN (%s)
-			)`, strings.Join(formattedExcludedChangelogPaths, ", "))
+			)`, strings.Join(formattedPaths, ", "))),
+		}
+	}
 
 	query, args, err := r.getAssetVersionSQL().
-		Where(sq.And{
-			sq.Eq{"a.asset_id": id},
-			sq.Expr(excludeExpr),
-		}).
+		Where(filter).
 		OrderBy("string_to_array(version, '.')::int[] DESC").
 		Limit(uint64(size)).
 		Offset(uint64(flt.Offset)).

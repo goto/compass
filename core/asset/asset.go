@@ -17,7 +17,7 @@ type Repository interface {
 	GetCountByIsDeletedAndServicesAndUpdatedAt(ctx context.Context, isDeleted bool, services []string, thresholdTime time.Time) (uint32, error)
 	GetByID(ctx context.Context, id string) (Asset, error)
 	GetByURN(ctx context.Context, urn string) (Asset, error)
-	GetVersionHistory(ctx context.Context, flt Filter, id string) ([]Asset, error)
+	GetVersionHistory(ctx context.Context, flt Filter, id string, excludedChangelogPaths []string) ([]Asset, error)
 	GetByVersionWithID(ctx context.Context, id, version string) (Asset, error)
 	GetByVersionWithURN(ctx context.Context, urn, version string) (Asset, error)
 	GetTypes(ctx context.Context, flt Filter) (map[Type]int, error)
