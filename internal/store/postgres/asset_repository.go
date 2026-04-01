@@ -22,6 +22,11 @@ import (
 var (
 	errOffsetCannotBeNegative = errors.New("offset cannot be negative")
 	errSizeCannotBeNegative   = errors.New("size cannot be negative")
+
+	excludedChangelogPaths = []string{
+		`["data","update_time"]`,
+		`["data","optimus", "resolved_sql"]`,
+	}
 )
 
 // AssetRepository is a type that manages user operation to the primary database
@@ -294,8 +299,21 @@ func (r *AssetRepository) GetVersionHistory(ctx context.Context, flt asset.Filte
 		size = r.defaultGetMaxSize
 	}
 
+	var formattedExcludedChangelogPaths []string
+	for _, path := range excludedChangelogPaths {
+		formattedExcludedChangelogPaths = append(formattedExcludedChangelogPaths, fmt.Sprintf("'%s'::jsonb", path))
+	}
+	excludeExpr := fmt.Sprintf(`EXISTS (
+				SELECT 1
+				FROM jsonb_array_elements(a.changelog) AS elem
+				WHERE elem->'path' NOT IN (%s)
+			)`, strings.Join(formattedExcludedChangelogPaths, ", "))
+
 	query, args, err := r.getAssetVersionSQL().
-		Where(sq.Eq{"a.asset_id": id}).
+		Where(sq.And{
+			sq.Eq{"a.asset_id": id},
+			sq.Expr(excludeExpr),
+		}).
 		OrderBy("string_to_array(version, '.')::int[] DESC").
 		Limit(uint64(size)).
 		Offset(uint64(flt.Offset)).
