@@ -66,6 +66,9 @@ func NewService(deps ServiceDeps) (service *Service, cancel func()) {
 		cancelFnMap:         new(sync.Map),
 		assetOpCounter:      assetOpCounter,
 	}
+	if newService.config.ExcludedChangelogPaths == nil {
+		newService.config.ExcludedChangelogPaths = []string{}
+	}
 
 	return newService, func() {
 		newService.cancelFnMap.Range(func(_, value interface{}) bool {
