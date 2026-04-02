@@ -202,5 +202,39 @@
       "entity": "gotocompany",
       "country": "vn"
     }
+  },
+  {
+    "urn": "array-index-mock-1",
+    "name": "array-index-one",
+    "type": "topic",
+    "service": "bigquery",
+    "description": "asset with array schema first",
+    "data": {
+      "attributes": {
+        "schema": [
+          {"name": "column_alpha", "type": "string"},
+          {"name": "column_beta", "type": "integer"}
+        ]
+      },
+      "entity": "gotocompany",
+      "country": "sg"
+    }
+  },
+  {
+    "urn": "array-index-mock-2",
+    "name": "array-index-two",
+    "type": "topic",
+    "service": "bigquery",
+    "description": "asset with array schema second",
+    "data": {
+      "attributes": {
+        "schema": [
+          {"name": "column_alpha", "type": "float"},
+          {"name": "column_gamma", "type": "boolean"}
+        ]
+      },
+      "entity": "gotocompany",
+      "country": "sg"
+    }
   }
 ]

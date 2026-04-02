@@ -193,6 +193,40 @@ func (r *AssetRepositoryTestSuite) TestBuildFilterQuery() {
 			},
 			expectedQuery: `(data->'properties'->'attributes'->>'entity' = $1 OR data->'properties'->'attributes'->>'entity' = $2)`,
 		},
+		{
+			description: "should return sql query with array index in query fields filter",
+			config: asset.Filter{
+				QueryFields: []string{"data.attributes.schema[0].name"},
+				Query:       "column_alpha",
+			},
+			expectedQuery: `(data->'attributes'->'schema'->0->>'name' ILIKE $1)`,
+		},
+		{
+			description: "should return sql query with array index in data filter",
+			config: asset.Filter{
+				Data: map[string][]string{
+					"attributes.schema[0].name": {"column_alpha"},
+				},
+			},
+			expectedQuery: `(data->'attributes'->'schema'->0->>'name' = $1)`,
+		},
+		{
+			description: "should return sql query with array index accessing last element directly",
+			config: asset.Filter{
+				Data: map[string][]string{
+					"attributes.schema[1].type": {"integer"},
+				},
+			},
+			expectedQuery: `(data->'attributes'->'schema'->1->>'type' = $1)`,
+		},
+		{
+			description: "should return sql query with array index as the terminal segment",
+			config: asset.Filter{
+				QueryFields: []string{"data.properties.dependencies[0]"},
+				Query:       "test",
+			},
+			expectedQuery: `(data->'properties'->'dependencies'->>0 ILIKE $1)`,
+		},
 	}
 
 	for _, testCase := range testCases {
@@ -221,7 +255,7 @@ func (r *AssetRepositoryTestSuite) TestGetAll() {
 	})
 
 	r.Run("should return all assets without filtering based on size", func() {
-		expectedSize := 12
+		expectedSize := 14
 
 		results, err := r.repository.GetAll(r.ctx, asset.Filter{})
 		r.Require().NoError(err)
@@ -394,6 +428,86 @@ func (r *AssetRepositoryTestSuite) TestGetAll() {
 			r.Equal(expectedURNs[i], results[i].URN)
 		}
 	})
+
+	r.Run("should filter using array index in data fields matching both records", func() {
+		results, err := r.repository.GetAll(r.ctx, asset.Filter{
+			Data: map[string][]string{
+				"attributes.schema[0].name": {"column_alpha"},
+			},
+			SortBy: "urn",
+		})
+		r.Require().NoError(err)
+
+		expectedURNs := []string{"array-index-mock-1", "array-index-mock-2"}
+		r.Equal(len(expectedURNs), len(results))
+		for i := range results {
+			r.Equal(expectedURNs[i], results[i].URN)
+		}
+	})
+
+	r.Run("should filter using array index in data fields matching only first record", func() {
+		results, err := r.repository.GetAll(r.ctx, asset.Filter{
+			Data: map[string][]string{
+				"attributes.schema[1].name": {"column_beta"},
+			},
+			SortBy: "urn",
+		})
+		r.Require().NoError(err)
+
+		expectedURNs := []string{"array-index-mock-1"}
+		r.Equal(len(expectedURNs), len(results))
+		for i := range results {
+			r.Equal(expectedURNs[i], results[i].URN)
+		}
+	})
+
+	r.Run("should filter using array index in data fields matching only second record", func() {
+		results, err := r.repository.GetAll(r.ctx, asset.Filter{
+			Data: map[string][]string{
+				"attributes.schema[1].name": {"column_gamma"},
+			},
+			SortBy: "urn",
+		})
+		r.Require().NoError(err)
+
+		expectedURNs := []string{"array-index-mock-2"}
+		r.Equal(len(expectedURNs), len(results))
+		for i := range results {
+			r.Equal(expectedURNs[i], results[i].URN)
+		}
+	})
+
+	r.Run("should filter using array index in query fields", func() {
+		results, err := r.repository.GetAll(r.ctx, asset.Filter{
+			QueryFields: []string{"data.attributes.schema[0].name"},
+			Query:       "column_alpha",
+			SortBy:      "urn",
+		})
+		r.Require().NoError(err)
+
+		expectedURNs := []string{"array-index-mock-1", "array-index-mock-2"}
+		r.Equal(len(expectedURNs), len(results))
+		for i := range results {
+			r.Equal(expectedURNs[i], results[i].URN)
+		}
+	})
+
+	r.Run("should filter using array index in data fields combined with other data filters", func() {
+		results, err := r.repository.GetAll(r.ctx, asset.Filter{
+			Data: map[string][]string{
+				"attributes.schema[0].name": {"column_alpha"},
+				"attributes.schema[1].type": {"integer"},
+			},
+			SortBy: "urn",
+		})
+		r.Require().NoError(err)
+
+		expectedURNs := []string{"array-index-mock-1"}
+		r.Equal(len(expectedURNs), len(results))
+		for i := range results {
+			r.Equal(expectedURNs[i], results[i].URN)
+		}
+	})
 }
 
 func (r *AssetRepositoryTestSuite) TestGetTypes() {
@@ -420,7 +534,7 @@ func (r *AssetRepositoryTestSuite) TestGetTypes() {
 				typeDashboard: 5,
 				typeJob:       1,
 				typeTable:     3,
-				typeTopic:     3,
+				typeTopic:     5,
 			},
 		},
 		{
