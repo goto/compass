@@ -193,6 +193,91 @@ func (r *AssetRepositoryTestSuite) TestBuildFilterQuery() {
 			},
 			expectedQuery: `(data->'properties'->'attributes'->>'entity' = $1 OR data->'properties'->'attributes'->>'entity' = $2)`,
 		},
+		{
+			description: "should return sql query with array index in query fields filter",
+			config: asset.Filter{
+				QueryFields: []string{"data.attributes.schema[0].name"},
+				Query:       "column_alpha",
+			},
+			expectedQuery: `(data->'attributes'->'schema'->0->>'name' ILIKE $1)`,
+		},
+		{
+			description: "should return sql query with array index in data filter",
+			config: asset.Filter{
+				Data: map[string][]string{
+					"attributes.schema[0].name": {"column_alpha"},
+				},
+			},
+			expectedQuery: `(data->'attributes'->'schema'->0->>'name' = $1)`,
+		},
+		{
+			description: "should return sql query with array index accessing last element directly",
+			config: asset.Filter{
+				Data: map[string][]string{
+					"attributes.schema[1].type": {"integer"},
+				},
+			},
+			expectedQuery: `(data->'attributes'->'schema'->1->>'type' = $1)`,
+		},
+		{
+			description: "should return sql query with array index as the terminal segment",
+			config: asset.Filter{
+				QueryFields: []string{"data.properties.dependencies[0]"},
+				Query:       "test",
+			},
+			expectedQuery: `(data->'properties'->'dependencies'->>0 ILIKE $1)`,
+		},
+		{
+			description: "should return sql query with dot-notation array index in query fields filter (API-safe format)",
+			config: asset.Filter{
+				QueryFields: []string{"data.attributes.schema.0.name"},
+				Query:       "column_alpha",
+			},
+			expectedQuery: `(data->'attributes'->'schema'->0->>'name' ILIKE $1)`,
+		},
+		{
+			description: "should return sql query with dot-notation array index in data filter (API-safe format)",
+			config: asset.Filter{
+				Data: map[string][]string{
+					"attributes.schema.0.name": {"column_alpha"},
+				},
+			},
+			expectedQuery: `(data->'attributes'->'schema'->0->>'name' = $1)`,
+		},
+		{
+			description: "should return sql query with dot-notation array index as terminal segment",
+			config: asset.Filter{
+				QueryFields: []string{"data.properties.dependencies.0"},
+				Query:       "test",
+			},
+			expectedQuery: `(data->'properties'->'dependencies'->>0 ILIKE $1)`,
+		},
+		{
+			description: `should treat quoted integer segment as string key in query fields ("0" not an array index)`,
+			config: asset.Filter{
+				QueryFields: []string{`data.attributes."0".name`},
+				Query:       "value",
+			},
+			expectedQuery: `(data->'attributes'->'0'->>'name' ILIKE $1)`,
+		},
+		{
+			description: `should treat quoted integer segment as string key in data filter ("0" not an array index)`,
+			config: asset.Filter{
+				Data: map[string][]string{
+					`attributes."0".name`: {"value"},
+				},
+			},
+			expectedQuery: `(data->'attributes'->'0'->>'name' = $1)`,
+		},
+		{
+			description: `should treat quoted integer as terminal string key`,
+			config: asset.Filter{
+				Data: map[string][]string{
+					`attributes."0"`: {"value"},
+				},
+			},
+			expectedQuery: `(data->'attributes'->>'0' = $1)`,
+		},
 	}
 
 	for _, testCase := range testCases {
@@ -221,7 +306,7 @@ func (r *AssetRepositoryTestSuite) TestGetAll() {
 	})
 
 	r.Run("should return all assets without filtering based on size", func() {
-		expectedSize := 12
+		expectedSize := 15
 
 		results, err := r.repository.GetAll(r.ctx, asset.Filter{})
 		r.Require().NoError(err)
@@ -394,6 +479,167 @@ func (r *AssetRepositoryTestSuite) TestGetAll() {
 			r.Equal(expectedURNs[i], results[i].URN)
 		}
 	})
+
+	r.Run("should filter using array index in data fields matching both records", func() {
+		results, err := r.repository.GetAll(r.ctx, asset.Filter{
+			Data: map[string][]string{
+				"attributes.schema[0].name": {"column_alpha"},
+			},
+			SortBy: "urn",
+		})
+		r.Require().NoError(err)
+
+		expectedURNs := []string{"array-index-mock-1", "array-index-mock-2"}
+		r.Equal(len(expectedURNs), len(results))
+		for i := range results {
+			r.Equal(expectedURNs[i], results[i].URN)
+		}
+	})
+
+	r.Run("should filter using array index in data fields matching only first record", func() {
+		results, err := r.repository.GetAll(r.ctx, asset.Filter{
+			Data: map[string][]string{
+				"attributes.schema[1].name": {"column_beta"},
+			},
+			SortBy: "urn",
+		})
+		r.Require().NoError(err)
+
+		expectedURNs := []string{"array-index-mock-1"}
+		r.Equal(len(expectedURNs), len(results))
+		for i := range results {
+			r.Equal(expectedURNs[i], results[i].URN)
+		}
+	})
+
+	r.Run("should filter using array index in data fields matching only second record", func() {
+		results, err := r.repository.GetAll(r.ctx, asset.Filter{
+			Data: map[string][]string{
+				"attributes.schema[1].name": {"column_gamma"},
+			},
+			SortBy: "urn",
+		})
+		r.Require().NoError(err)
+
+		expectedURNs := []string{"array-index-mock-2"}
+		r.Equal(len(expectedURNs), len(results))
+		for i := range results {
+			r.Equal(expectedURNs[i], results[i].URN)
+		}
+	})
+
+	r.Run("should filter using array index in query fields", func() {
+		results, err := r.repository.GetAll(r.ctx, asset.Filter{
+			QueryFields: []string{"data.attributes.schema[0].name"},
+			Query:       "column_alpha",
+			SortBy:      "urn",
+		})
+		r.Require().NoError(err)
+
+		expectedURNs := []string{"array-index-mock-1", "array-index-mock-2"}
+		r.Equal(len(expectedURNs), len(results))
+		for i := range results {
+			r.Equal(expectedURNs[i], results[i].URN)
+		}
+	})
+
+	r.Run("should filter using array index in data fields combined with other data filters", func() {
+		results, err := r.repository.GetAll(r.ctx, asset.Filter{
+			Data: map[string][]string{
+				"attributes.schema[0].name": {"column_alpha"},
+				"attributes.schema[1].type": {"integer"},
+			},
+			SortBy: "urn",
+		})
+		r.Require().NoError(err)
+
+		expectedURNs := []string{"array-index-mock-1"}
+		r.Equal(len(expectedURNs), len(results))
+		for i := range results {
+			r.Equal(expectedURNs[i], results[i].URN)
+		}
+	})
+
+	// dot-notation (attributes.schema.0.name) is the API-safe equivalent of bracket-notation
+	// (attributes.schema[0].name). When passing through HTTP query params, grpc-gateway's
+	// bracket parser misinterprets nested brackets (e.g. data[schema[0].name]), so dot-notation
+	// must be used instead: data[schema.0.name]=value.
+	r.Run("should filter using dot-notation array index in data fields matching both records", func() {
+		results, err := r.repository.GetAll(r.ctx, asset.Filter{
+			Data: map[string][]string{
+				"attributes.schema.0.name": {"column_alpha"},
+			},
+			SortBy: "urn",
+		})
+		r.Require().NoError(err)
+
+		expectedURNs := []string{"array-index-mock-1", "array-index-mock-2"}
+		r.Equal(len(expectedURNs), len(results))
+		for i := range results {
+			r.Equal(expectedURNs[i], results[i].URN)
+		}
+	})
+
+	r.Run("should filter using dot-notation array index in data fields matching only first record", func() {
+		results, err := r.repository.GetAll(r.ctx, asset.Filter{
+			Data: map[string][]string{
+				"attributes.schema.1.name": {"column_beta"},
+			},
+			SortBy: "urn",
+		})
+		r.Require().NoError(err)
+
+		expectedURNs := []string{"array-index-mock-1"}
+		r.Equal(len(expectedURNs), len(results))
+		for i := range results {
+			r.Equal(expectedURNs[i], results[i].URN)
+		}
+	})
+
+	r.Run("should filter using dot-notation array index in query fields", func() {
+		results, err := r.repository.GetAll(r.ctx, asset.Filter{
+			QueryFields: []string{"data.attributes.schema.0.name"},
+			Query:       "column_alpha",
+			SortBy:      "urn",
+		})
+		r.Require().NoError(err)
+
+		expectedURNs := []string{"array-index-mock-1", "array-index-mock-2"}
+		r.Equal(len(expectedURNs), len(results))
+		for i := range results {
+			r.Equal(expectedURNs[i], results[i].URN)
+		}
+	})
+
+	// Quoted segment: wrap an integer-looking key in double-quotes to force string-key lookup.
+	// e.g. attributes."0" targets the JSON object key "0", not array index 0.
+	r.Run(`should filter using quoted integer segment as string key in data fields`, func() {
+		results, err := r.repository.GetAll(r.ctx, asset.Filter{
+			Data: map[string][]string{
+				`attributes."0"`: {"numeric-string-value"},
+			},
+			SortBy: "urn",
+		})
+		r.Require().NoError(err)
+
+		expectedURNs := []string{"quoted-key-mock"}
+		r.Equal(len(expectedURNs), len(results))
+		for i := range results {
+			r.Equal(expectedURNs[i], results[i].URN)
+		}
+	})
+
+	r.Run(`should not match array index when using quoted string key`, func() {
+		// array-index-mock-1 has attributes.schema[0] (array), not attributes."0"
+		results, err := r.repository.GetAll(r.ctx, asset.Filter{
+			Data: map[string][]string{
+				`attributes."0"`: {"column_alpha"},
+			},
+			SortBy: "urn",
+		})
+		r.Require().NoError(err)
+		r.Equal(0, len(results))
+	})
 }
 
 func (r *AssetRepositoryTestSuite) TestGetTypes() {
@@ -420,7 +666,7 @@ func (r *AssetRepositoryTestSuite) TestGetTypes() {
 				typeDashboard: 5,
 				typeJob:       1,
 				typeTable:     3,
-				typeTopic:     3,
+				typeTopic:     6,
 			},
 		},
 		{

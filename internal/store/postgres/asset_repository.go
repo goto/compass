@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -22,6 +23,17 @@ import (
 var (
 	errOffsetCannotBeNegative = errors.New("offset cannot be negative")
 	errSizeCannotBeNegative   = errors.New("size cannot be negative")
+
+	// arrayIndexRegexp matches array index notation like [0], [1], etc.
+	arrayIndexRegexp = regexp.MustCompile(`\[(\d+)]`)
+
+	// pureIntegerRegexp matches a path segment that is a bare non-negative integer,
+	// used for dot-notation array indices, e.g. "schema.0.name".
+	pureIntegerRegexp = regexp.MustCompile(`^\d+$`)
+
+	// quotedStringRegexp matches a path segment wrapped in double quotes, e.g. `"0"`.
+	// Quoted segments are always treated as literal string keys, even if they look like integers.
+	quotedStringRegexp = regexp.MustCompile(`^"(.*)"$`)
 )
 
 // AssetRepository is a type that manages user operation to the primary database
@@ -1603,26 +1615,81 @@ func (r *AssetRepository) buildOrderQuery(builder sq.SelectBuilder, flt asset.Fi
 	return builder.OrderBy(flt.SortBy + " " + orderDirection)
 }
 
-// buildDataField is a helper function to build nested data fields
+// buildDataField is a helper function to build nested data fields.
+// It supports dot-separated paths and array index notation, e.g.:
+//
+//	"attributes.name"           → data->'attributes'->>'name'
+//	"attributes.schemas[0].name" → data->'attributes'->'schemas'->0->>'name'
+//	"attributes.tags[0]"        → data->'attributes'->'tags'->>0
+//	"attributes.schemas.0.name"  → data->'attributes'->'schemas'->0->>'name'  (dot-notation)
+//	"attributes.\"0\".name"     → data->'attributes'->'0'->>'name'          (quoted string key)
+//
+// Priority for each dot-separated segment:
+//  1. Wrapped in double quotes → always a string key, e.g. `"0"` → ->'0'
+//  2. Bare non-negative integer → array index, e.g. 0 → ->0
+//  3. Contains [N] bracket notation → array index, e.g. schemas[0] → ->'schemas'->0
+//  4. Otherwise → string key
+//
+// Dot-notation integers (rule 2) should be preferred over bracket-notation (rule 3) when
+// passing keys through HTTP query parameters because grpc-gateway's bracket parser cannot
+// handle nested brackets like data[schema[0].name]; use data[schema.0.name] instead.
 func (r *AssetRepository) buildDataField(key string, asJsonB bool) (finalQuery string) {
 	var queries []string
 
 	queries = append(queries, "data")
 	nestedParams := strings.Split(key, ".")
 	totalParams := len(nestedParams)
-	for i := 0; i < totalParams-1; i++ {
-		nestedQuery := fmt.Sprintf("->'%s'", nestedParams[i])
-		queries = append(queries, nestedQuery)
+
+	for i, param := range nestedParams {
+		isLast := i == totalParams-1
+
+		// 1. Quoted segment → force string key, strip the surrounding quotes
+		if match := quotedStringRegexp.FindStringSubmatch(param); match != nil {
+			strKey := match[1]
+			if isLast && !asJsonB {
+				queries = append(queries, fmt.Sprintf("->>'%s'", strKey))
+			} else {
+				queries = append(queries, fmt.Sprintf("->'%s'", strKey))
+			}
+			continue
+		}
+
+		// 2. Bare non-negative integer → array index (dot-notation)
+		if pureIntegerRegexp.MatchString(param) {
+			if isLast && !asJsonB {
+				queries = append(queries, fmt.Sprintf("->>%s", param))
+			} else {
+				queries = append(queries, fmt.Sprintf("->%s", param))
+			}
+			continue
+		}
+
+		// 3. Bracket-notation array index, e.g. "schema[0]" or "schema[0][1]"
+		loc := arrayIndexRegexp.FindStringIndex(param)
+		if loc == nil {
+			// 4. Plain string key
+			if isLast && !asJsonB {
+				queries = append(queries, fmt.Sprintf("->>'%s'", param))
+			} else {
+				queries = append(queries, fmt.Sprintf("->'%s'", param))
+			}
+		} else {
+			keyPart := param[:loc[0]]
+			indices := arrayIndexRegexp.FindAllStringSubmatch(param, -1)
+
+			queries = append(queries, fmt.Sprintf("->'%s'", keyPart))
+
+			for j, idx := range indices {
+				isLastIndex := isLast && j == len(indices)-1
+				if isLastIndex && !asJsonB {
+					queries = append(queries, fmt.Sprintf("->>%s", idx[1]))
+				} else {
+					queries = append(queries, fmt.Sprintf("->%s", idx[1]))
+				}
+			}
+		}
 	}
 
-	var lastParam string
-	if asJsonB {
-		lastParam = fmt.Sprintf("->'%s'", nestedParams[totalParams-1])
-	} else {
-		lastParam = fmt.Sprintf("->>'%s'", nestedParams[totalParams-1])
-	}
-
-	queries = append(queries, lastParam)
 	finalQuery = strings.Join(queries, "")
 
 	return finalQuery
