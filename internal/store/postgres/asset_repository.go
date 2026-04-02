@@ -26,6 +26,14 @@ var (
 
 	// arrayIndexRegexp matches array index notation like [0], [1], etc.
 	arrayIndexRegexp = regexp.MustCompile(`\[(\d+)]`)
+
+	// pureIntegerRegexp matches a path segment that is a bare non-negative integer,
+	// used for dot-notation array indices, e.g. "schema.0.name".
+	pureIntegerRegexp = regexp.MustCompile(`^\d+$`)
+
+	// quotedStringRegexp matches a path segment wrapped in double quotes, e.g. `"0"`.
+	// Quoted segments are always treated as literal string keys, even if they look like integers.
+	quotedStringRegexp = regexp.MustCompile(`^"(.*)"$`)
 )
 
 // AssetRepository is a type that manages user operation to the primary database
@@ -1611,8 +1619,20 @@ func (r *AssetRepository) buildOrderQuery(builder sq.SelectBuilder, flt asset.Fi
 // It supports dot-separated paths and array index notation, e.g.:
 //
 //	"attributes.name"           → data->'attributes'->>'name'
-//	"attributes.schema[0].name" → data->'attributes'->'schema'->0->>'name'
+//	"attributes.schemas[0].name" → data->'attributes'->'schemas'->0->>'name'
 //	"attributes.tags[0]"        → data->'attributes'->'tags'->>0
+//	"attributes.schemas.0.name"  → data->'attributes'->'schemas'->0->>'name'  (dot-notation)
+//	"attributes.\"0\".name"     → data->'attributes'->'0'->>'name'          (quoted string key)
+//
+// Priority for each dot-separated segment:
+//  1. Wrapped in double quotes → always a string key, e.g. `"0"` → ->'0'
+//  2. Bare non-negative integer → array index, e.g. 0 → ->0
+//  3. Contains [N] bracket notation → array index, e.g. schemas[0] → ->'schemas'->0
+//  4. Otherwise → string key
+//
+// Dot-notation integers (rule 2) should be preferred over bracket-notation (rule 3) when
+// passing keys through HTTP query parameters because grpc-gateway's bracket parser cannot
+// handle nested brackets like data[schema[0].name]; use data[schema.0.name] instead.
 func (r *AssetRepository) buildDataField(key string, asJsonB bool) (finalQuery string) {
 	var queries []string
 
@@ -1623,23 +1643,42 @@ func (r *AssetRepository) buildDataField(key string, asJsonB bool) (finalQuery s
 	for i, param := range nestedParams {
 		isLast := i == totalParams-1
 
+		// 1. Quoted segment → force string key, strip the surrounding quotes
+		if match := quotedStringRegexp.FindStringSubmatch(param); match != nil {
+			strKey := match[1]
+			if isLast && !asJsonB {
+				queries = append(queries, fmt.Sprintf("->>'%s'", strKey))
+			} else {
+				queries = append(queries, fmt.Sprintf("->'%s'", strKey))
+			}
+			continue
+		}
+
+		// 2. Bare non-negative integer → array index (dot-notation)
+		if pureIntegerRegexp.MatchString(param) {
+			if isLast && !asJsonB {
+				queries = append(queries, fmt.Sprintf("->>%s", param))
+			} else {
+				queries = append(queries, fmt.Sprintf("->%s", param))
+			}
+			continue
+		}
+
+		// 3. Bracket-notation array index, e.g. "schema[0]" or "schema[0][1]"
 		loc := arrayIndexRegexp.FindStringIndex(param)
 		if loc == nil {
-			// No array index in this segment
+			// 4. Plain string key
 			if isLast && !asJsonB {
 				queries = append(queries, fmt.Sprintf("->>'%s'", param))
 			} else {
 				queries = append(queries, fmt.Sprintf("->'%s'", param))
 			}
 		} else {
-			// Segment has one or more array indices, e.g. "schema[0]" or "schema[0][1]"
 			keyPart := param[:loc[0]]
 			indices := arrayIndexRegexp.FindAllStringSubmatch(param, -1)
 
-			// The key part always uses -> since array access follows
 			queries = append(queries, fmt.Sprintf("->'%s'", keyPart))
 
-			// Append each array index
 			for j, idx := range indices {
 				isLastIndex := isLast && j == len(indices)-1
 				if isLastIndex && !asJsonB {

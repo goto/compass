@@ -236,5 +236,19 @@
       "entity": "gotocompany",
       "country": "sg"
     }
+  },
+  {
+    "urn": "quoted-key-mock",
+    "name": "quoted-key",
+    "type": "topic",
+    "service": "bigquery",
+    "description": "asset with numeric string object key",
+    "data": {
+      "attributes": {
+        "0": "numeric-string-value"
+      },
+      "entity": "gotocompany",
+      "country": "sg"
+    }
   }
 ]
