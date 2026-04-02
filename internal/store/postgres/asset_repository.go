@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -22,6 +23,9 @@ import (
 var (
 	errOffsetCannotBeNegative = errors.New("offset cannot be negative")
 	errSizeCannotBeNegative   = errors.New("size cannot be negative")
+
+	// arrayIndexRegexp matches array index notation like [0], [1], etc.
+	arrayIndexRegexp = regexp.MustCompile(`\[(\d+)]`)
 )
 
 // AssetRepository is a type that manages user operation to the primary database
@@ -1603,26 +1607,50 @@ func (r *AssetRepository) buildOrderQuery(builder sq.SelectBuilder, flt asset.Fi
 	return builder.OrderBy(flt.SortBy + " " + orderDirection)
 }
 
-// buildDataField is a helper function to build nested data fields
+// buildDataField is a helper function to build nested data fields.
+// It supports dot-separated paths and array index notation, e.g.:
+//
+//	"attributes.name"           → data->'attributes'->>'name'
+//	"attributes.schema[0].name" → data->'attributes'->'schema'->0->>'name'
+//	"attributes.tags[0]"        → data->'attributes'->'tags'->>0
 func (r *AssetRepository) buildDataField(key string, asJsonB bool) (finalQuery string) {
 	var queries []string
 
 	queries = append(queries, "data")
 	nestedParams := strings.Split(key, ".")
 	totalParams := len(nestedParams)
-	for i := 0; i < totalParams-1; i++ {
-		nestedQuery := fmt.Sprintf("->'%s'", nestedParams[i])
-		queries = append(queries, nestedQuery)
+
+	for i, param := range nestedParams {
+		isLast := i == totalParams-1
+
+		loc := arrayIndexRegexp.FindStringIndex(param)
+		if loc == nil {
+			// No array index in this segment
+			if isLast && !asJsonB {
+				queries = append(queries, fmt.Sprintf("->>'%s'", param))
+			} else {
+				queries = append(queries, fmt.Sprintf("->'%s'", param))
+			}
+		} else {
+			// Segment has one or more array indices, e.g. "schema[0]" or "schema[0][1]"
+			keyPart := param[:loc[0]]
+			indices := arrayIndexRegexp.FindAllStringSubmatch(param, -1)
+
+			// The key part always uses -> since array access follows
+			queries = append(queries, fmt.Sprintf("->'%s'", keyPart))
+
+			// Append each array index
+			for j, idx := range indices {
+				isLastIndex := isLast && j == len(indices)-1
+				if isLastIndex && !asJsonB {
+					queries = append(queries, fmt.Sprintf("->>%s", idx[1]))
+				} else {
+					queries = append(queries, fmt.Sprintf("->%s", idx[1]))
+				}
+			}
+		}
 	}
 
-	var lastParam string
-	if asJsonB {
-		lastParam = fmt.Sprintf("->'%s'", nestedParams[totalParams-1])
-	} else {
-		lastParam = fmt.Sprintf("->>'%s'", nestedParams[totalParams-1])
-	}
-
-	queries = append(queries, lastParam)
 	finalQuery = strings.Join(queries, "")
 
 	return finalQuery
