@@ -114,10 +114,10 @@ func (s *Service) UpsertAssetWithoutLineage(ctx context.Context, ast *Asset, isU
 	currentTime := time.Now()
 	ast.RefreshedAt = &currentTime
 
-	asset, err := s.assetRepository.Upsert(ctx, ast, isUpdateOnly)
+	asset, err := s.assetRepository.Upsert(ctx, ast, isUpdateOnly, s.config.ExcludedChangelogPaths)
 	// retry due to race condition possibility on insert
 	if errors.Is(err, ErrURNExist) {
-		asset, err = s.assetRepository.Upsert(ctx, ast, isUpdateOnly)
+		asset, err = s.assetRepository.Upsert(ctx, ast, isUpdateOnly, s.config.ExcludedChangelogPaths)
 	}
 	if err != nil {
 		return "", err
@@ -153,10 +153,10 @@ func (s *Service) UpsertPatchAssetWithoutLineage(ctx context.Context, ast *Asset
 	currentTime := time.Now()
 	ast.RefreshedAt = &currentTime
 
-	asset, err := s.assetRepository.UpsertPatch(ctx, ast, patchData, isUpdateOnly)
+	asset, err := s.assetRepository.UpsertPatch(ctx, ast, patchData, isUpdateOnly, s.config.ExcludedChangelogPaths)
 	// retry due to race condition possibility on insert
 	if errors.Is(err, ErrURNExist) {
-		asset, err = s.assetRepository.UpsertPatch(ctx, ast, patchData, isUpdateOnly)
+		asset, err = s.assetRepository.UpsertPatch(ctx, ast, patchData, isUpdateOnly, s.config.ExcludedChangelogPaths)
 	}
 	if err != nil {
 		return "", err

@@ -413,7 +413,12 @@ func (r *AssetRepository) getByVersion(
 // Upsert creates a new asset if it does not exist yet.
 // It updates if asset does exist.
 // Checking existence is done using "urn", "type", "name", "data", and "service" fields.
-func (r *AssetRepository) Upsert(ctx context.Context, ast *asset.Asset, isUpdateOnly bool) (upsertedAsset *asset.Asset, err error) {
+func (r *AssetRepository) Upsert(
+	ctx context.Context,
+	ast *asset.Asset,
+	isUpdateOnly bool,
+	excludedChangelogPaths []string,
+) (upsertedAsset *asset.Asset, err error) {
 	err = r.client.RunWithinTx(ctx, func(tx *sqlx.Tx) (err error) {
 		fetchedAsset, err := r.GetByURNWithTx(ctx, tx, ast.URN)
 		if errors.As(err, new(asset.NotFoundError)) {
@@ -436,7 +441,7 @@ func (r *AssetRepository) Upsert(ctx context.Context, ast *asset.Asset, isUpdate
 		// reset IsDeleted flag if asset is resync'd
 		ast.IsDeleted = false
 
-		changelog, err := fetchedAsset.Diff(ast)
+		changelog, err := fetchedAsset.Diff(ast, excludedChangelogPaths)
 		if err != nil {
 			return fmt.Errorf("error diffing two assets: %w", err)
 		}
@@ -465,6 +470,7 @@ func (r *AssetRepository) UpsertPatch( //nolint:gocognit
 	ast *asset.Asset,
 	patchData map[string]interface{},
 	isUpdateOnly bool,
+	excludedChangelogPaths []string,
 ) (upsertedAsset *asset.Asset, err error) {
 	err = r.client.RunWithinTx(ctx, func(tx *sqlx.Tx) (err error) {
 		fetchedAsset, err := r.GetByURNWithTx(ctx, tx, ast.URN)
@@ -501,7 +507,7 @@ func (r *AssetRepository) UpsertPatch( //nolint:gocognit
 		if err := r.validateAsset(newAsset); err != nil {
 			return err
 		}
-		changelog, err := fetchedAsset.Diff(&newAsset)
+		changelog, err := fetchedAsset.Diff(&newAsset, excludedChangelogPaths)
 		if err != nil {
 			return fmt.Errorf("error diffing two assets: %w", err)
 		}

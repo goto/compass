@@ -3,6 +3,7 @@ package asset
 //go:generate mockery --name=Repository -r --case underscore --with-expecter --structname AssetRepository --filename asset_repository.go --output=./mocks
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/goto/compass/core/user"
@@ -21,8 +22,8 @@ type Repository interface {
 	GetByVersionWithID(ctx context.Context, id, version string) (Asset, error)
 	GetByVersionWithURN(ctx context.Context, urn, version string) (Asset, error)
 	GetTypes(ctx context.Context, flt Filter) (map[Type]int, error)
-	Upsert(ctx context.Context, ast *Asset, isUpdateOnly bool) (*Asset, error)
-	UpsertPatch(ctx context.Context, ast *Asset, patchData map[string]interface{}, isUpdateOnly bool) (*Asset, error)
+	Upsert(ctx context.Context, ast *Asset, isUpdateOnly bool, excludedChangelogPaths []string) (*Asset, error)
+	UpsertPatch(ctx context.Context, ast *Asset, patchData map[string]interface{}, isUpdateOnly bool, excludedChangelogPaths []string) (*Asset, error)
 	DeleteByID(ctx context.Context, id string) (string, error)
 	DeleteByURN(ctx context.Context, urn string) error
 	SoftDeleteByID(ctx context.Context, executedAt time.Time, id, updatedByID string) (string, string, error)
@@ -67,8 +68,17 @@ type SoftDeleteAssetParams struct {
 
 // Diff returns nil changelog with nil error if equal
 // returns wrapped r3labs/diff Changelog struct with nil error if not equal
-func (a *Asset) Diff(otherAsset *Asset) (diff.Changelog, error) {
-	return diff.Diff(a, otherAsset, diff.DiscardComplexOrigin(), diff.AllowTypeMismatch(true))
+func (a *Asset) Diff(otherAsset *Asset, excludedChangelogPaths []string) (diff.Changelog, error) {
+	changelog, err := diff.Diff(a, otherAsset, diff.DiscardComplexOrigin(), diff.AllowTypeMismatch(true))
+	if err != nil {
+		return nil, err
+	}
+
+	for _, path := range excludedChangelogPaths {
+		changelog = changelog.FilterOut(strings.Split(path, "."))
+	}
+
+	return changelog, nil
 }
 
 // Patch appends asset with data from map. It mutates the asset itself.
