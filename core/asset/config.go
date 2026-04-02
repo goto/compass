@@ -8,8 +8,9 @@ import (
 var errDeleteAssetsTimeoutIsZero = errors.New("delete assets timeout must greater than 0 second")
 
 type Config struct {
-	AdditionalTypes     []string      `mapstructure:"additional_types"`
-	DeleteAssetsTimeout time.Duration `mapstructure:"delete_assets_timeout" default:"5m"`
+	AdditionalTypes        []string      `mapstructure:"additional_types"`
+	DeleteAssetsTimeout    time.Duration `mapstructure:"delete_assets_timeout" default:"5m"`
+	ExcludedChangelogPaths []string      `mapstructure:"excluded_changelog_paths"`
 }
 
 func (c *Config) Validate() error {

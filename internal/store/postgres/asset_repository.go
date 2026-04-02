@@ -284,7 +284,7 @@ func (r *AssetRepository) getWithPredicateWithTx(ctx context.Context, tx *sqlx.T
 }
 
 // GetVersionHistory retrieves the versions of an asset
-func (r *AssetRepository) GetVersionHistory(ctx context.Context, flt asset.Filter, id string) ([]asset.Asset, error) {
+func (r *AssetRepository) GetVersionHistory(ctx context.Context, flt asset.Filter, id string, excludedChangelogPaths []string) ([]asset.Asset, error) {
 	if !isValidUUID(id) {
 		return nil, asset.InvalidError{AssetID: id}
 	}
@@ -294,8 +294,25 @@ func (r *AssetRepository) GetVersionHistory(ctx context.Context, flt asset.Filte
 		size = r.defaultGetMaxSize
 	}
 
+	var filter sq.Sqlizer = sq.Eq{"a.asset_id": id}
+
+	if len(excludedChangelogPaths) > 0 {
+		formattedPaths := make([]string, len(excludedChangelogPaths))
+		for idx, path := range excludedChangelogPaths {
+			formattedPaths[idx] = `'["` + strings.Join(strings.Split(path, "."), `","`) + `"]'::jsonb`
+		}
+		filter = sq.And{
+			sq.Eq{"a.asset_id": id},
+			sq.Expr(fmt.Sprintf(`EXISTS (
+				SELECT 1
+				FROM jsonb_array_elements(a.changelog) AS elem
+				WHERE elem->'path' NOT IN (%s)
+			)`, strings.Join(formattedPaths, ", "))),
+		}
+	}
+
 	query, args, err := r.getAssetVersionSQL().
-		Where(sq.Eq{"a.asset_id": id}).
+		Where(filter).
 		OrderBy("string_to_array(version, '.')::int[] DESC").
 		Limit(uint64(size)).
 		Offset(uint64(flt.Offset)).
@@ -396,7 +413,12 @@ func (r *AssetRepository) getByVersion(
 // Upsert creates a new asset if it does not exist yet.
 // It updates if asset does exist.
 // Checking existence is done using "urn", "type", "name", "data", and "service" fields.
-func (r *AssetRepository) Upsert(ctx context.Context, ast *asset.Asset, isUpdateOnly bool) (upsertedAsset *asset.Asset, err error) {
+func (r *AssetRepository) Upsert(
+	ctx context.Context,
+	ast *asset.Asset,
+	isUpdateOnly bool,
+	excludedChangelogPaths []string,
+) (upsertedAsset *asset.Asset, err error) {
 	err = r.client.RunWithinTx(ctx, func(tx *sqlx.Tx) (err error) {
 		fetchedAsset, err := r.GetByURNWithTx(ctx, tx, ast.URN)
 		if errors.As(err, new(asset.NotFoundError)) {
@@ -419,7 +441,7 @@ func (r *AssetRepository) Upsert(ctx context.Context, ast *asset.Asset, isUpdate
 		// reset IsDeleted flag if asset is resync'd
 		ast.IsDeleted = false
 
-		changelog, err := fetchedAsset.Diff(ast)
+		changelog, err := fetchedAsset.Diff(ast, excludedChangelogPaths)
 		if err != nil {
 			return fmt.Errorf("error diffing two assets: %w", err)
 		}
@@ -448,6 +470,7 @@ func (r *AssetRepository) UpsertPatch( //nolint:gocognit
 	ast *asset.Asset,
 	patchData map[string]interface{},
 	isUpdateOnly bool,
+	excludedChangelogPaths []string,
 ) (upsertedAsset *asset.Asset, err error) {
 	err = r.client.RunWithinTx(ctx, func(tx *sqlx.Tx) (err error) {
 		fetchedAsset, err := r.GetByURNWithTx(ctx, tx, ast.URN)
@@ -484,7 +507,7 @@ func (r *AssetRepository) UpsertPatch( //nolint:gocognit
 		if err := r.validateAsset(newAsset); err != nil {
 			return err
 		}
-		changelog, err := fetchedAsset.Diff(&newAsset)
+		changelog, err := fetchedAsset.Diff(&newAsset, excludedChangelogPaths)
 		if err != nil {
 			return fmt.Errorf("error diffing two assets: %w", err)
 		}

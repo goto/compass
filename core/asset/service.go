@@ -66,6 +66,9 @@ func NewService(deps ServiceDeps) (service *Service, cancel func()) {
 		cancelFnMap:         new(sync.Map),
 		assetOpCounter:      assetOpCounter,
 	}
+	if newService.config.ExcludedChangelogPaths == nil {
+		newService.config.ExcludedChangelogPaths = []string{}
+	}
 
 	return newService, func() {
 		newService.cancelFnMap.Range(func(_, value interface{}) bool {
@@ -111,10 +114,10 @@ func (s *Service) UpsertAssetWithoutLineage(ctx context.Context, ast *Asset, isU
 	currentTime := time.Now()
 	ast.RefreshedAt = &currentTime
 
-	asset, err := s.assetRepository.Upsert(ctx, ast, isUpdateOnly)
+	asset, err := s.assetRepository.Upsert(ctx, ast, isUpdateOnly, s.config.ExcludedChangelogPaths)
 	// retry due to race condition possibility on insert
 	if errors.Is(err, ErrURNExist) {
-		asset, err = s.assetRepository.Upsert(ctx, ast, isUpdateOnly)
+		asset, err = s.assetRepository.Upsert(ctx, ast, isUpdateOnly, s.config.ExcludedChangelogPaths)
 	}
 	if err != nil {
 		return "", err
@@ -150,10 +153,10 @@ func (s *Service) UpsertPatchAssetWithoutLineage(ctx context.Context, ast *Asset
 	currentTime := time.Now()
 	ast.RefreshedAt = &currentTime
 
-	asset, err := s.assetRepository.UpsertPatch(ctx, ast, patchData, isUpdateOnly)
+	asset, err := s.assetRepository.UpsertPatch(ctx, ast, patchData, isUpdateOnly, s.config.ExcludedChangelogPaths)
 	// retry due to race condition possibility on insert
 	if errors.Is(err, ErrURNExist) {
-		asset, err = s.assetRepository.UpsertPatch(ctx, ast, patchData, isUpdateOnly)
+		asset, err = s.assetRepository.UpsertPatch(ctx, ast, patchData, isUpdateOnly, s.config.ExcludedChangelogPaths)
 	}
 	if err != nil {
 		return "", err
@@ -403,7 +406,7 @@ func (s *Service) GetAssetByVersion(ctx context.Context, id, version string) (as
 }
 
 func (s *Service) GetAssetVersionHistory(ctx context.Context, flt Filter, id string) ([]Asset, error) {
-	return s.assetRepository.GetVersionHistory(ctx, flt, id)
+	return s.assetRepository.GetVersionHistory(ctx, flt, id, s.config.ExcludedChangelogPaths)
 }
 
 func (s *Service) AddProbe(ctx context.Context, assetURN string, probe *Probe) error {
