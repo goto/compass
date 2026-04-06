@@ -815,6 +815,7 @@ func (r *AssetRepository) softDeleteByQuery(
 		Set("updated_at", executedAt).
 		Set("refreshed_at", executedAt).
 		Set("updated_by", updatedByID).
+		Set("version", sq.Expr("bump_minor_version(version)")).
 		Where(whereCondition).
 		Suffix("RETURNING *").
 		Prefix("WITH assets AS (").
@@ -1050,18 +1051,6 @@ func (r *AssetRepository) update(ctx context.Context, tx *sqlx.Tx, newAsset, old
 		currentTime = *newAsset.RefreshedAt
 	}
 
-	if len(clog) == 0 {
-		if newAsset.RefreshedAt == nil || newAsset.RefreshedAt == oldAsset.RefreshedAt {
-			return newAsset, nil
-		}
-
-		updatedAsset, err := r.updateAssetRefreshedAt(ctx, tx, assetID, currentTime)
-		if err != nil {
-			return nil, fmt.Errorf("error updating asset's refreshed_at: %w", err)
-		}
-		return &updatedAsset, err
-	}
-
 	// managing owners
 	newAssetOwners, err := r.createOrFetchUsers(ctx, tx, newAsset.Owners)
 	if err != nil {
@@ -1076,11 +1065,13 @@ func (r *AssetRepository) update(ctx context.Context, tx *sqlx.Tx, newAsset, old
 	}
 
 	// update assets
-	newVersion, err := asset.IncreaseMinorVersion(oldAsset.Version)
-	if err != nil {
-		return nil, err
+	if len(clog) != 0 {
+		newVersion, err := asset.IncreaseMinorVersion(oldAsset.Version)
+		if err != nil {
+			return nil, err
+		}
+		newAsset.Version = newVersion
 	}
-	newAsset.Version = newVersion
 	newAsset.ID = assetID
 	newAsset.UpdatedAt = currentTime
 	newAsset.RefreshedAt = &currentTime
@@ -1090,9 +1081,11 @@ func (r *AssetRepository) update(ctx context.Context, tx *sqlx.Tx, newAsset, old
 		return nil, err
 	}
 
-	// insert versions
-	if err := r.insertAssetVersion(ctx, tx, newAsset, clog); err != nil {
-		return nil, err
+	if len(clog) != 0 {
+		// insert versions
+		if err := r.insertAssetVersion(ctx, tx, newAsset, clog); err != nil {
+			return nil, err
+		}
 	}
 
 	return &updatedAsset, nil
