@@ -81,6 +81,12 @@ func TestSQLExpr_ToQuery(t *testing.T) {
 			wantErr: false,
 		},
 		{
+			name:    "matches regexp condition",
+			expr:    queryexpr.SQLExpr(`name matches "^[A-Z][a-z]+$"`),
+			want:    `(name ~ '^[A-Z][a-z]+$')`,
+			wantErr: false,
+		},
+		{
 			name:    "complex query expression that can NOT directly produce a value",
 			expr:    queryexpr.SQLExpr(`service in filter(assets, .Service startsWith "T")`),
 			want:    "",

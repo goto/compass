@@ -199,6 +199,8 @@ func (SQLExpr) operatorToSQL(bn *ast.BinaryNode) string {
 		return bn.Operator
 	case "IN", "NOT IN":
 		return bn.Operator
+	case "MATCHES":
+		return "~"
 	}
 
 	return "" // identify operation, like: +, -, *, etc
