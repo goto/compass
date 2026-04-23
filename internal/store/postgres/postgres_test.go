@@ -64,7 +64,7 @@ func createUser(userRepo user.Repository, email string) (string, error) {
 func createAsset(assetRepo asset.Repository, updaterID, ownerEmail, assetURN, assetType string) (*asset.Asset, error) {
 	ast := getAsset(ownerEmail, assetURN, assetType)
 	ast.UpdatedBy.ID = updaterID
-	insertedAsset, err := assetRepo.Upsert(context.Background(), ast, false, []string{})
+	insertedAsset, _, err := assetRepo.Upsert(context.Background(), ast, false, asset.Config{})
 	if err != nil {
 		return nil, err
 	}
@@ -74,6 +74,7 @@ func createAsset(assetRepo asset.Repository, updaterID, ownerEmail, assetURN, as
 func getAsset(ownerEmail, assetURN, assetType string) *asset.Asset {
 	return &asset.Asset{
 		URN:     assetURN,
+		Name:    "test-asset",
 		Type:    asset.Type(assetType),
 		Service: "bigquery",
 		Owners: []user.User{
@@ -84,6 +85,7 @@ func getAsset(ownerEmail, assetURN, assetType string) *asset.Asset {
 		UpdatedBy: user.User{
 			Email: ownerEmail,
 		},
+		Data: map[string]interface{}{},
 	}
 }
 

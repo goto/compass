@@ -11,6 +11,7 @@ import (
 	"github.com/goto/compass/core/asset"
 	"github.com/goto/compass/core/asset/mocks"
 	"github.com/goto/compass/internal/workermanager"
+	"github.com/goto/salt/log"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -197,7 +198,7 @@ func TestService_UpsertAsset(t *testing.T) {
 			Asset:        sampleAsset,
 			IsUpdateOnly: true,
 			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository, lr *mocks.LineageRepository) {
-				ar.EXPECT().Upsert(ctx, sampleAsset, true, []string{}).Return(nil, errors.New("unknown error"))
+				ar.EXPECT().Upsert(ctx, sampleAsset, true, asset.Config{ExcludedChangelogPaths: []string{}}).Return(nil, nil, errors.New("unknown error"))
 			},
 			Err:        errors.New("unknown error"),
 			ReturnedID: "",
@@ -206,7 +207,7 @@ func TestService_UpsertAsset(t *testing.T) {
 			Description: `should return error if discovery repository upsert return error`,
 			Asset:       sampleAsset,
 			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository, lr *mocks.LineageRepository) {
-				ar.EXPECT().Upsert(ctx, sampleAsset, false, []string{}).Return(sampleAsset, nil)
+				ar.EXPECT().Upsert(ctx, sampleAsset, false, asset.Config{ExcludedChangelogPaths: []string{}}).Return(sampleAsset, nil, nil)
 				dr.EXPECT().Upsert(ctx, mock.AnythingOfType("asset.Asset")).Return(errors.New("unknown error"))
 			},
 			Err:        errors.New("unknown error"),
@@ -218,7 +219,7 @@ func TestService_UpsertAsset(t *testing.T) {
 			Upstreams:   sampleNodes1,
 			Downstreams: sampleNodes2,
 			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository, lr *mocks.LineageRepository) {
-				ar.EXPECT().Upsert(ctx, sampleAsset, false, []string{}).Return(sampleAsset, nil)
+				ar.EXPECT().Upsert(ctx, sampleAsset, false, asset.Config{ExcludedChangelogPaths: []string{}}).Return(sampleAsset, nil, nil)
 				dr.EXPECT().Upsert(ctx, mock.AnythingOfType("asset.Asset")).Return(nil)
 				lr.EXPECT().Upsert(ctx, sampleAsset.URN, sampleNodes1, sampleNodes2).Return(errors.New("unknown error"))
 			},
@@ -231,7 +232,7 @@ func TestService_UpsertAsset(t *testing.T) {
 			Upstreams:   sampleNodes1,
 			Downstreams: sampleNodes2,
 			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository, lr *mocks.LineageRepository) {
-				ar.EXPECT().Upsert(ctx, sampleAsset, false, []string{}).Return(sampleAsset, nil)
+				ar.EXPECT().Upsert(ctx, sampleAsset, false, asset.Config{ExcludedChangelogPaths: []string{}}).Return(sampleAsset, nil, nil)
 				dr.EXPECT().Upsert(ctx, mock.AnythingOfType("asset.Asset")).Return(nil)
 				lr.EXPECT().Upsert(ctx, sampleAsset.URN, sampleNodes1, sampleNodes2).Return(nil)
 			},
@@ -271,38 +272,102 @@ func TestService_UpsertAsset(t *testing.T) {
 
 func TestService_UpsertAssetWithoutLineage(t *testing.T) {
 	sampleAsset := &asset.Asset{ID: "some-id", URN: "some-urn", Type: asset.Type("dashboard"), Service: "some-service"}
+	sampleEdges := asset.LineageGraph{
+		{Source: "upstream-urn", SourceColumn: "upstream-col", Target: sampleAsset.URN, TargetColumn: "target-col"},
+	}
+
 	testCases := []struct {
 		Description  string
 		Asset        *asset.Asset
 		IsUpdateOnly bool
 		Err          error
 		ReturnedID   string
-		Setup        func(context.Context, *mocks.AssetRepository, *mocks.DiscoveryRepository)
+		Setup        func(context.Context, *mocks.AssetRepository, *mocks.DiscoveryRepository, *mocks.LineageRepository, chan struct{})
 	}{
 		{
 			Description:  `should return error if asset repository upsert return error`,
 			Asset:        sampleAsset,
 			IsUpdateOnly: true,
-			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository) {
-				ar.EXPECT().Upsert(ctx, sampleAsset, true, []string{}).Return(nil, errors.New("unknown error"))
+			Setup: func(ctx context.Context, ar *mocks.AssetRepository, _ *mocks.DiscoveryRepository, _ *mocks.LineageRepository, _ chan struct{}) {
+				ar.EXPECT().Upsert(ctx, sampleAsset, true, asset.Config{ExcludedChangelogPaths: []string{}}).Return(nil, nil, errors.New("unknown error"))
 			},
 			Err: errors.New("unknown error"),
 		},
 		{
 			Description: `should return error if discovery repository upsert return error`,
 			Asset:       sampleAsset,
-			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository) {
-				ar.EXPECT().Upsert(ctx, sampleAsset, false, []string{}).Return(sampleAsset, nil)
+			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository, _ *mocks.LineageRepository, _ chan struct{}) {
+				ar.EXPECT().Upsert(ctx, sampleAsset, false, asset.Config{ExcludedChangelogPaths: []string{}}).Return(sampleAsset, nil, nil)
 				dr.EXPECT().Upsert(ctx, mock.AnythingOfType("asset.Asset")).Return(errors.New("unknown error"))
 			},
 			Err: errors.New("unknown error"),
 		},
 		{
-			Description: `should return no error if all repositories upsert return no error`,
+			Description: `should return no error if all repositories upsert return no error and column lineage when producer is nil`,
 			Asset:       sampleAsset,
-			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository) {
-				ar.EXPECT().Upsert(ctx, sampleAsset, false, []string{}).Return(sampleAsset, nil)
+			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository, _ *mocks.LineageRepository, _ chan struct{}) {
+				ar.EXPECT().Upsert(ctx, sampleAsset, false, asset.Config{ExcludedChangelogPaths: []string{}}).Return(sampleAsset, nil, nil)
 				dr.EXPECT().Upsert(ctx, mock.AnythingOfType("asset.Asset")).Return(nil)
+			},
+			ReturnedID: sampleAsset.ID,
+		},
+		{
+			Description: `should log warning and skip upsert when column lineage producer returns error`,
+			Asset:       sampleAsset,
+			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository, _ *mocks.LineageRepository, done chan struct{}) {
+				producer := asset.ColumnLineageProducer(func(_ context.Context) (asset.LineageGraph, error) {
+					return nil, errors.New("producer error")
+				})
+				ar.EXPECT().Upsert(ctx, sampleAsset, false, asset.Config{ExcludedChangelogPaths: []string{}}).Return(sampleAsset, producer, nil)
+				dr.EXPECT().Upsert(ctx, mock.AnythingOfType("asset.Asset")).Return(nil)
+				close(done)
+			},
+			ReturnedID: sampleAsset.ID,
+		},
+		{
+			Description: `should skip upsert column lineage when producer returns empty edges`,
+			Asset:       sampleAsset,
+			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository, _ *mocks.LineageRepository, done chan struct{}) {
+				producer := asset.ColumnLineageProducer(func(_ context.Context) (asset.LineageGraph, error) {
+					return asset.LineageGraph{}, nil
+				})
+				ar.EXPECT().Upsert(ctx, sampleAsset, false, asset.Config{ExcludedChangelogPaths: []string{}}).Return(sampleAsset, producer, nil)
+				dr.EXPECT().Upsert(ctx, mock.AnythingOfType("asset.Asset")).Return(nil)
+				close(done)
+			},
+			ReturnedID: sampleAsset.ID,
+		},
+		{
+			Description: `should call upsert column lineage when producer returns edges`,
+			Asset:       sampleAsset,
+			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository, lr *mocks.LineageRepository, done chan struct{}) {
+				producer := asset.ColumnLineageProducer(func(_ context.Context) (asset.LineageGraph, error) {
+					return sampleEdges, nil
+				})
+				ar.EXPECT().Upsert(ctx, sampleAsset, false, asset.Config{ExcludedChangelogPaths: []string{}}).Return(sampleAsset, producer, nil)
+				dr.EXPECT().Upsert(ctx, mock.AnythingOfType("asset.Asset")).Return(nil)
+				lr.EXPECT().UpsertColumnLineage(mock.Anything, sampleAsset.URN, sampleEdges).
+					RunAndReturn(func(_ context.Context, _ string, _ asset.LineageGraph) error {
+						close(done)
+						return nil
+					})
+			},
+			ReturnedID: sampleAsset.ID,
+		},
+		{
+			Description: `should log warning when upsert column lineage returns error`,
+			Asset:       sampleAsset,
+			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository, lr *mocks.LineageRepository, done chan struct{}) {
+				producer := asset.ColumnLineageProducer(func(_ context.Context) (asset.LineageGraph, error) {
+					return sampleEdges, nil
+				})
+				ar.EXPECT().Upsert(ctx, sampleAsset, false, asset.Config{ExcludedChangelogPaths: []string{}}).Return(sampleAsset, producer, nil)
+				dr.EXPECT().Upsert(ctx, mock.AnythingOfType("asset.Asset")).Return(nil)
+				lr.EXPECT().UpsertColumnLineage(mock.Anything, sampleAsset.URN, sampleEdges).
+					RunAndReturn(func(_ context.Context, _ string, _ asset.LineageGraph) error {
+						close(done)
+						return errors.New("upsert column lineage error")
+					})
 			},
 			ReturnedID: sampleAsset.ID,
 		},
@@ -310,18 +375,21 @@ func TestService_UpsertAssetWithoutLineage(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.Description, func(t *testing.T) {
 			ctx := context.Background()
+			done := make(chan struct{})
 
 			assetRepo := mocks.NewAssetRepository(t)
 			discoveryRepo := mocks.NewDiscoveryRepository(t)
+			lineageRepo := mocks.NewLineageRepository(t)
 			if tc.Setup != nil {
-				tc.Setup(ctx, assetRepo, discoveryRepo)
+				tc.Setup(ctx, assetRepo, discoveryRepo, lineageRepo, done)
 			}
 
 			svc, cancel := asset.NewService(asset.ServiceDeps{
 				AssetRepo:     assetRepo,
 				DiscoveryRepo: discoveryRepo,
-				LineageRepo:   mocks.NewLineageRepository(t),
+				LineageRepo:   lineageRepo,
 				Worker:        workermanager.NewInSituWorker(workermanager.Deps{DiscoveryRepo: discoveryRepo}),
+				Logger:        log.NewNoop(),
 			})
 			defer cancel()
 
@@ -332,6 +400,11 @@ func TestService_UpsertAssetWithoutLineage(t *testing.T) {
 			}
 			assert.NoError(t, err)
 			assert.Equal(t, tc.ReturnedID, rid)
+
+			select {
+			case <-done:
+			case <-time.After(2 * time.Second):
+			}
 		})
 	}
 }
@@ -357,7 +430,7 @@ func TestService_UpsertPatchAsset(t *testing.T) {
 			Asset:        sampleAsset,
 			IsUpdateOnly: true,
 			Setup: func(ctx context.Context, ar *mocks.AssetRepository, _ *mocks.DiscoveryRepository, _ *mocks.LineageRepository) {
-				ar.EXPECT().UpsertPatch(ctx, sampleAsset, mock.Anything, true, []string{}).Return(nil, errors.New("unknown error"))
+				ar.EXPECT().UpsertPatch(ctx, sampleAsset, mock.Anything, true, asset.Config{ExcludedChangelogPaths: []string{}}).Return(nil, nil, errors.New("unknown error"))
 			},
 			Err:        errors.New("unknown error"),
 			ReturnedID: "",
@@ -366,7 +439,7 @@ func TestService_UpsertPatchAsset(t *testing.T) {
 			Description: `should return error if discovery repository upsert return error`,
 			Asset:       sampleAsset,
 			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository, _ *mocks.LineageRepository) {
-				ar.EXPECT().UpsertPatch(ctx, sampleAsset, mock.Anything, false, []string{}).Return(sampleAsset, nil)
+				ar.EXPECT().UpsertPatch(ctx, sampleAsset, mock.Anything, false, asset.Config{ExcludedChangelogPaths: []string{}}).Return(sampleAsset, nil, nil)
 				dr.EXPECT().Upsert(ctx, mock.AnythingOfType("asset.Asset")).Return(errors.New("unknown error"))
 			},
 			Err:        errors.New("unknown error"),
@@ -378,7 +451,7 @@ func TestService_UpsertPatchAsset(t *testing.T) {
 			Upstreams:   sampleNodes1,
 			Downstreams: sampleNodes2,
 			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository, lr *mocks.LineageRepository) {
-				ar.EXPECT().UpsertPatch(ctx, sampleAsset, mock.Anything, false, []string{}).Return(sampleAsset, nil)
+				ar.EXPECT().UpsertPatch(ctx, sampleAsset, mock.Anything, false, asset.Config{ExcludedChangelogPaths: []string{}}).Return(sampleAsset, nil, nil)
 				dr.EXPECT().Upsert(ctx, mock.AnythingOfType("asset.Asset")).Return(nil)
 				lr.EXPECT().Upsert(ctx, sampleAsset.URN, sampleNodes1, sampleNodes2).Return(errors.New("unknown error"))
 			},
@@ -391,7 +464,7 @@ func TestService_UpsertPatchAsset(t *testing.T) {
 			Upstreams:   sampleNodes1,
 			Downstreams: sampleNodes2,
 			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository, lr *mocks.LineageRepository) {
-				ar.EXPECT().UpsertPatch(ctx, sampleAsset, mock.Anything, false, []string{}).Return(sampleAsset, nil)
+				ar.EXPECT().UpsertPatch(ctx, sampleAsset, mock.Anything, false, asset.Config{ExcludedChangelogPaths: []string{}}).Return(sampleAsset, nil, nil)
 				dr.EXPECT().Upsert(ctx, mock.AnythingOfType("asset.Asset")).Return(nil)
 				lr.EXPECT().Upsert(ctx, sampleAsset.URN, sampleNodes1, sampleNodes2).Return(nil)
 			},
@@ -432,38 +505,101 @@ func TestService_UpsertPatchAsset(t *testing.T) {
 
 func TestService_UpsertPatchAssetWithoutLineage(t *testing.T) {
 	sampleAsset := &asset.Asset{ID: "some-id", URN: "some-urn", Type: asset.Type("dashboard"), Service: "some-service"}
+	sampleEdges := asset.LineageGraph{
+		{Source: "upstream-urn", SourceColumn: "upstream-col", Target: sampleAsset.URN, TargetColumn: "target-col"},
+	}
 	testCases := []struct {
 		Description  string
 		Asset        *asset.Asset
 		IsUpdateOnly bool
 		Err          error
 		ReturnedID   string
-		Setup        func(context.Context, *mocks.AssetRepository, *mocks.DiscoveryRepository)
+		Setup        func(context.Context, *mocks.AssetRepository, *mocks.DiscoveryRepository, *mocks.LineageRepository, chan struct{})
 	}{
 		{
 			Description:  `should return error if asset repository upsert return error`,
 			Asset:        sampleAsset,
 			IsUpdateOnly: true,
-			Setup: func(ctx context.Context, ar *mocks.AssetRepository, _ *mocks.DiscoveryRepository) {
-				ar.EXPECT().UpsertPatch(ctx, sampleAsset, mock.Anything, true, []string{}).Return(nil, errors.New("unknown error"))
+			Setup: func(ctx context.Context, ar *mocks.AssetRepository, _ *mocks.DiscoveryRepository, _ *mocks.LineageRepository, _ chan struct{}) {
+				ar.EXPECT().UpsertPatch(ctx, sampleAsset, mock.Anything, true, asset.Config{ExcludedChangelogPaths: []string{}}).Return(nil, nil, errors.New("unknown error"))
 			},
 			Err: errors.New("unknown error"),
 		},
 		{
 			Description: `should return error if discovery repository upsert return error`,
 			Asset:       sampleAsset,
-			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository) {
-				ar.EXPECT().UpsertPatch(ctx, sampleAsset, mock.Anything, false, []string{}).Return(sampleAsset, nil)
+			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository, _ *mocks.LineageRepository, _ chan struct{}) {
+				ar.EXPECT().UpsertPatch(ctx, sampleAsset, mock.Anything, false, asset.Config{ExcludedChangelogPaths: []string{}}).Return(sampleAsset, nil, nil)
 				dr.EXPECT().Upsert(ctx, mock.AnythingOfType("asset.Asset")).Return(errors.New("unknown error"))
 			},
 			Err: errors.New("unknown error"),
 		},
 		{
-			Description: `should return no error if all repositories upsert return no error`,
+			Description: `should return no error if all repositories upsert return no error and column lineage when producer is nil`,
 			Asset:       sampleAsset,
-			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository) {
-				ar.EXPECT().UpsertPatch(ctx, sampleAsset, mock.Anything, false, []string{}).Return(sampleAsset, nil)
+			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository, _ *mocks.LineageRepository, _ chan struct{}) {
+				ar.EXPECT().UpsertPatch(ctx, sampleAsset, mock.Anything, false, asset.Config{ExcludedChangelogPaths: []string{}}).Return(sampleAsset, nil, nil)
 				dr.EXPECT().Upsert(ctx, mock.AnythingOfType("asset.Asset")).Return(nil)
+			},
+			ReturnedID: sampleAsset.ID,
+		},
+		{
+			Description: `should log warning and skip upsert when column lineage producer returns error`,
+			Asset:       sampleAsset,
+			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository, _ *mocks.LineageRepository, done chan struct{}) {
+				producer := asset.ColumnLineageProducer(func(_ context.Context) (asset.LineageGraph, error) {
+					return nil, errors.New("producer error")
+				})
+				ar.EXPECT().UpsertPatch(ctx, sampleAsset, mock.Anything, false, asset.Config{ExcludedChangelogPaths: []string{}}).Return(sampleAsset, producer, nil)
+				dr.EXPECT().Upsert(ctx, mock.AnythingOfType("asset.Asset")).Return(nil)
+				close(done)
+			},
+			ReturnedID: sampleAsset.ID,
+		},
+		{
+			Description: `should skip upsert column lineage when producer returns empty edges`,
+			Asset:       sampleAsset,
+			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository, _ *mocks.LineageRepository, done chan struct{}) {
+				producer := asset.ColumnLineageProducer(func(_ context.Context) (asset.LineageGraph, error) {
+					return asset.LineageGraph{}, nil
+				})
+				ar.EXPECT().UpsertPatch(ctx, sampleAsset, mock.Anything, false, asset.Config{ExcludedChangelogPaths: []string{}}).Return(sampleAsset, producer, nil)
+				dr.EXPECT().Upsert(ctx, mock.AnythingOfType("asset.Asset")).Return(nil)
+				close(done)
+			},
+			ReturnedID: sampleAsset.ID,
+		},
+		{
+			Description: `should call upsert column lineage when producer returns edges`,
+			Asset:       sampleAsset,
+			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository, lr *mocks.LineageRepository, done chan struct{}) {
+				producer := asset.ColumnLineageProducer(func(_ context.Context) (asset.LineageGraph, error) {
+					return sampleEdges, nil
+				})
+				ar.EXPECT().UpsertPatch(ctx, sampleAsset, mock.Anything, false, asset.Config{ExcludedChangelogPaths: []string{}}).Return(sampleAsset, producer, nil)
+				dr.EXPECT().Upsert(ctx, mock.AnythingOfType("asset.Asset")).Return(nil)
+				lr.EXPECT().UpsertColumnLineage(mock.Anything, sampleAsset.URN, sampleEdges).
+					RunAndReturn(func(_ context.Context, _ string, _ asset.LineageGraph) error {
+						close(done)
+						return nil
+					})
+			},
+			ReturnedID: sampleAsset.ID,
+		},
+		{
+			Description: `should log warning when upsert column lineage returns error`,
+			Asset:       sampleAsset,
+			Setup: func(ctx context.Context, ar *mocks.AssetRepository, dr *mocks.DiscoveryRepository, lr *mocks.LineageRepository, done chan struct{}) {
+				producer := asset.ColumnLineageProducer(func(_ context.Context) (asset.LineageGraph, error) {
+					return sampleEdges, nil
+				})
+				ar.EXPECT().UpsertPatch(ctx, sampleAsset, mock.Anything, false, asset.Config{ExcludedChangelogPaths: []string{}}).Return(sampleAsset, producer, nil)
+				dr.EXPECT().Upsert(ctx, mock.AnythingOfType("asset.Asset")).Return(nil)
+				lr.EXPECT().UpsertColumnLineage(mock.Anything, sampleAsset.URN, sampleEdges).
+					RunAndReturn(func(_ context.Context, _ string, _ asset.LineageGraph) error {
+						close(done)
+						return errors.New("upsert column lineage error")
+					})
 			},
 			ReturnedID: sampleAsset.ID,
 		},
@@ -471,18 +607,21 @@ func TestService_UpsertPatchAssetWithoutLineage(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.Description, func(t *testing.T) {
 			ctx := context.Background()
+			done := make(chan struct{})
 
 			assetRepo := mocks.NewAssetRepository(t)
 			discoveryRepo := mocks.NewDiscoveryRepository(t)
+			lineageRepo := mocks.NewLineageRepository(t)
 			if tc.Setup != nil {
-				tc.Setup(ctx, assetRepo, discoveryRepo)
+				tc.Setup(ctx, assetRepo, discoveryRepo, lineageRepo, done)
 			}
 
 			svc, cancel := asset.NewService(asset.ServiceDeps{
 				AssetRepo:     assetRepo,
 				DiscoveryRepo: discoveryRepo,
-				LineageRepo:   mocks.NewLineageRepository(t),
+				LineageRepo:   lineageRepo,
 				Worker:        workermanager.NewInSituWorker(workermanager.Deps{DiscoveryRepo: discoveryRepo}),
+				Logger:        log.NewNoop(),
 			})
 			defer cancel()
 
@@ -494,6 +633,11 @@ func TestService_UpsertPatchAssetWithoutLineage(t *testing.T) {
 			}
 			assert.NoError(t, err)
 			assert.Equal(t, tc.ReturnedID, rid)
+
+			select {
+			case <-done:
+			case <-time.After(2 * time.Second):
+			}
 		})
 	}
 }

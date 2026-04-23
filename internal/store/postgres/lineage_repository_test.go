@@ -98,19 +98,16 @@ func (r *LineageRepositoryTestSuite) TestGetGraph() {
 	r.Run("should be able control soft deleted assets inclusiveness in lineage with includeDeleted config", func() {
 		nodeURN := "table-1"
 
-		// create initial
 		err := r.repository.Upsert(r.ctx, nodeURN, []string{"table-2"}, []string{"table-3"})
 		r.NoError(err)
 
 		err = r.repository.SoftDeleteByURN(r.ctx, nodeURN)
 		r.NoError(err)
 
-		// fetch without include soft deleted result
 		graph, err := r.repository.GetGraph(r.ctx, nodeURN, asset.LineageQuery{})
 		r.Require().NoError(err)
 		r.compareGraphs(asset.LineageGraph{}, graph)
 
-		// fetch with include soft deleted result
 		graph, err = r.repository.GetGraph(r.ctx, nodeURN, asset.LineageQuery{IncludeDeleted: true})
 		r.Require().NoError(err)
 		r.compareGraphsWithProp(asset.LineageGraph{
@@ -125,6 +122,14 @@ func (r *LineageRepositoryTestSuite) TestGetGraph() {
 				"target_is_deleted": false,
 			}},
 		}, graph)
+	})
+
+	r.Run("should return error when context is canceled", func() {
+		ctx, cancel := context.WithCancel(r.ctx)
+		cancel()
+
+		_, err := r.repository.GetGraph(ctx, "some-urn", asset.LineageQuery{})
+		r.Error(err)
 	})
 }
 
@@ -279,6 +284,16 @@ func (r *LineageRepositoryTestSuite) TestGetColumnGraph() {
 		})
 		r.Require().Contains(err.Error(), fmt.Sprintf("invalid column name in asset URN %s", rootNode))
 	})
+
+	r.Run("should return error when context is canceled", func() {
+		ctx, cancel := context.WithCancel(r.ctx)
+		cancel()
+
+		_, err := r.repository.GetColumnGraph(ctx, "some-urn", asset.LineageQuery{
+			TargetColumn: "some-col",
+		})
+		r.Error(err)
+	})
 }
 
 func (r *LineageRepositoryTestSuite) TestDeleteByURN() {
@@ -301,6 +316,14 @@ func (r *LineageRepositoryTestSuite) TestDeleteByURN() {
 		nodeURN := "table-1"
 		err := r.repository.DeleteByURN(r.ctx, nodeURN)
 		r.NoError(err)
+	})
+
+	r.Run("should return error when context is canceled", func() {
+		ctx, cancel := context.WithCancel(r.ctx)
+		cancel()
+
+		err := r.repository.DeleteByURN(ctx, "some-urn")
+		r.Error(err)
 	})
 }
 
@@ -336,6 +359,14 @@ func (r *LineageRepositoryTestSuite) TestSoftDeleteByURN() {
 		err := r.repository.SoftDeleteByURN(r.ctx, nodeURN)
 		r.NoError(err)
 	})
+
+	r.Run("should return error when context is canceled", func() {
+		ctx, cancel := context.WithCancel(r.ctx)
+		cancel()
+
+		err := r.repository.SoftDeleteByURN(ctx, "some-urn")
+		r.Error(err)
+	})
 }
 
 func (r *LineageRepositoryTestSuite) TestDeleteByURNs() {
@@ -369,6 +400,14 @@ func (r *LineageRepositoryTestSuite) TestDeleteByURNs() {
 
 		err := r.repository.DeleteByURNs(r.ctx, nodeURNs)
 		r.NoError(err)
+	})
+
+	r.Run("should return error when context is canceled", func() {
+		ctx, cancel := context.WithCancel(r.ctx)
+		cancel()
+
+		err := r.repository.DeleteByURNs(ctx, []string{"some-urn-1", "some-urn-2"})
+		r.Error(err)
 	})
 }
 
@@ -426,6 +465,14 @@ func (r *LineageRepositoryTestSuite) TestSoftDeleteByURNs() {
 		err := r.repository.SoftDeleteByURNs(r.ctx, nodeURNs)
 		r.NoError(err)
 	})
+
+	r.Run("should return error when context is canceled", func() {
+		ctx, cancel := context.WithCancel(r.ctx)
+		cancel()
+
+		err := r.repository.SoftDeleteByURNs(ctx, []string{"some-urn-1", "some-urn-2"})
+		r.Error(err)
+	})
 }
 
 func (r *LineageRepositoryTestSuite) TestUpsert() {
@@ -466,9 +513,9 @@ func (r *LineageRepositoryTestSuite) TestUpsert() {
 	})
 
 	r.Run("should restore soft deleted edge when re-sync graph", func() {
+		// ...existing restore test...
 		nodeURN := "restore-table"
 
-		// create initial
 		err := r.repository.Upsert(r.ctx, nodeURN, []string{"job-restore"}, []string{"dashboard-restore"})
 		r.NoError(err)
 		graph, err := r.repository.GetGraph(r.ctx, nodeURN, asset.LineageQuery{IncludeDeleted: true})
@@ -486,7 +533,6 @@ func (r *LineageRepositoryTestSuite) TestUpsert() {
 			}},
 		}, graph)
 
-		// soft delete
 		err = r.repository.SoftDeleteByURN(r.ctx, nodeURN)
 		r.NoError(err)
 		graph, err = r.repository.GetGraph(r.ctx, nodeURN, asset.LineageQuery{IncludeDeleted: true})
@@ -504,7 +550,6 @@ func (r *LineageRepositoryTestSuite) TestUpsert() {
 			}},
 		}, graph)
 
-		// re-sync
 		err = r.repository.Upsert(r.ctx, nodeURN, []string{"job-restore"}, []string{"dashboard-restore"})
 		r.NoError(err)
 		graph, err = r.repository.GetGraph(r.ctx, nodeURN, asset.LineageQuery{IncludeDeleted: true})
@@ -521,6 +566,14 @@ func (r *LineageRepositoryTestSuite) TestUpsert() {
 				"target_is_deleted": false,
 			}},
 		}, graph)
+	})
+
+	r.Run("should return error when context is canceled", func() {
+		ctx, cancel := context.WithCancel(r.ctx)
+		cancel()
+
+		err := r.repository.Upsert(ctx, "some-urn", []string{"upstream-1"}, []string{"downstream-1"})
+		r.Error(err)
 	})
 }
 
@@ -543,6 +596,161 @@ func (r *LineageRepositoryTestSuite) compareGraphsWithProp(expected, actual asse
 		r.Equal(expected[i].Target, actual[i].Target, fmt.Sprintf("different target on index %d", i))
 		r.Equal(expected[i].Prop, actual[i].Prop, fmt.Sprintf("different prop on index %d", i))
 	}
+}
+
+func (r *LineageRepositoryTestSuite) TestUpsertColumnLineage() {
+	prop := map[string]interface{}{
+		"target_is_deleted": false,
+		"source_is_deleted": false,
+	}
+
+	r.Run("should insert new column lineage edges", func() {
+		assetURN := "upsert-col-lineage-target-1"
+		newEdges := asset.LineageGraph{
+			{Source: "upstream-1", SourceColumn: "col-a", Target: assetURN, TargetColumn: "col-x"},
+			{Source: "upstream-2", SourceColumn: "col-b", Target: assetURN, TargetColumn: "col-y"},
+		}
+
+		err := r.repository.UpsertColumnLineage(r.ctx, assetURN, newEdges)
+		r.Require().NoError(err)
+
+		graph, err := r.repository.GetColumnGraph(r.ctx, assetURN, asset.LineageQuery{
+			Direction:    asset.LineageDirectionUpstream,
+			TargetColumn: "col-x",
+		})
+		r.Require().NoError(err)
+		r.Require().Len(graph, 1)
+		r.Equal("upstream-1", graph[0].Source)
+		r.Equal("col-a", graph[0].SourceColumn)
+		r.Equal(assetURN, graph[0].Target)
+		r.Equal("col-x", graph[0].TargetColumn)
+	})
+
+	r.Run("should remove stale edges and add new ones when upserting", func() {
+		assetURN := "upsert-col-lineage-target-2"
+
+		initial := asset.LineageGraph{
+			{Source: "upstream-a", SourceColumn: "col-1", Target: assetURN, TargetColumn: "col-out"},
+			{Source: "upstream-b", SourceColumn: "col-2", Target: assetURN, TargetColumn: "col-out"},
+		}
+		err := r.repository.UpsertColumnLineage(r.ctx, assetURN, initial)
+		r.Require().NoError(err)
+
+		updated := asset.LineageGraph{
+			{Source: "upstream-b", SourceColumn: "col-2", Target: assetURN, TargetColumn: "col-out"},
+			{Source: "upstream-c", SourceColumn: "col-3", Target: assetURN, TargetColumn: "col-out"},
+		}
+		err = r.repository.UpsertColumnLineage(r.ctx, assetURN, updated)
+		r.Require().NoError(err)
+
+		graph, err := r.repository.GetColumnGraph(r.ctx, assetURN, asset.LineageQuery{
+			Direction:    asset.LineageDirectionUpstream,
+			TargetColumn: "col-out",
+		})
+		r.Require().NoError(err)
+		r.Require().Len(graph, 2)
+
+		sources := map[string]bool{}
+		for _, e := range graph {
+			sources[e.Source+"."+e.SourceColumn] = true
+		}
+		r.True(sources["upstream-b.col-2"])
+		r.True(sources["upstream-c.col-3"])
+		r.False(sources["upstream-a.col-1"])
+	})
+
+	r.Run("should keep existing edges that are unchanged", func() {
+		assetURN := "upsert-col-lineage-target-3"
+
+		edges := asset.LineageGraph{
+			{Source: "upstream-x", SourceColumn: "col-p", Target: assetURN, TargetColumn: "col-q"},
+		}
+		err := r.repository.UpsertColumnLineage(r.ctx, assetURN, edges)
+		r.Require().NoError(err)
+
+		err = r.repository.UpsertColumnLineage(r.ctx, assetURN, edges)
+		r.Require().NoError(err)
+
+		graph, err := r.repository.GetColumnGraph(r.ctx, assetURN, asset.LineageQuery{
+			Direction:    asset.LineageDirectionUpstream,
+			TargetColumn: "col-q",
+		})
+		r.Require().NoError(err)
+		r.Require().Len(graph, 1)
+		r.Equal("upstream-x", graph[0].Source)
+		r.Equal("col-p", graph[0].SourceColumn)
+	})
+
+	r.Run("should remove all edges when new edges are empty", func() {
+		assetURN := "upsert-col-lineage-target-4"
+
+		initial := asset.LineageGraph{
+			{Source: "upstream-m", SourceColumn: "col-1", Target: assetURN, TargetColumn: "col-2"},
+		}
+		err := r.repository.UpsertColumnLineage(r.ctx, assetURN, initial)
+		r.Require().NoError(err)
+
+		err = r.repository.UpsertColumnLineage(r.ctx, assetURN, asset.LineageGraph{})
+		r.Require().NoError(err)
+
+		graph, err := r.repository.GetColumnGraph(r.ctx, assetURN, asset.LineageQuery{
+			Direction:    asset.LineageDirectionUpstream,
+			TargetColumn: "col-2",
+		})
+		r.Require().NoError(err)
+		r.Len(graph, 0)
+	})
+
+	r.Run("should restore soft-deleted edges on upsert", func() {
+		assetURN := "upsert-col-lineage-target-5"
+
+		initial := asset.LineageGraph{
+			{Source: "upstream-s", SourceColumn: "col-s1", Target: assetURN, TargetColumn: "col-t1", Prop: prop},
+		}
+		err := r.repository.InsertColumnGraph(r.ctx, initial)
+		r.Require().NoError(err)
+
+		err = r.repository.SoftDeleteByURN(r.ctx, assetURN)
+		r.Require().NoError(err)
+
+		err = r.repository.UpsertColumnLineage(r.ctx, assetURN, initial)
+		r.Require().NoError(err)
+
+		graph, err := r.repository.GetColumnGraph(r.ctx, assetURN, asset.LineageQuery{
+			Direction:    asset.LineageDirectionUpstream,
+			TargetColumn: "col-t1",
+		})
+		r.Require().NoError(err)
+		r.Require().Len(graph, 1)
+		r.Equal("upstream-s", graph[0].Source)
+	})
+
+	r.Run("should not return error when asset has no existing column lineage", func() {
+		assetURN := "upsert-col-lineage-target-no-existing"
+
+		err := r.repository.UpsertColumnLineage(r.ctx, assetURN, asset.LineageGraph{
+			{Source: "upstream-new", SourceColumn: "col-new", Target: assetURN, TargetColumn: "col-out"},
+		})
+		r.Require().NoError(err)
+	})
+
+	r.Run("should return error when context is canceled", func() {
+		ctx, cancel := context.WithCancel(r.ctx)
+		cancel()
+
+		err := r.repository.UpsertColumnLineage(ctx, "some-urn", asset.LineageGraph{
+			{Source: "upstream-1", SourceColumn: "col-a", Target: "some-urn", TargetColumn: "col-b"},
+		})
+		r.Error(err)
+	})
+}
+
+func (r *LineageRepositoryTestSuite) TestNewLineageRepository() {
+	r.Run("should return error when client is nil", func() {
+		repo, err := postgres.NewLineageRepository(nil)
+		r.Error(err)
+		r.Nil(repo)
+	})
 }
 
 func TestLineageRepository(t *testing.T) {
