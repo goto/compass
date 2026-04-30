@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"sort"
 	"strconv"
@@ -1551,6 +1553,285 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 			optimus := insertedAsset.Data["optimus"].(map[string]interface{})
 			r.Equal(asset.BaseVersion, optimus["sql_version"])
 			r.Equal(asset.BaseVersion, optimus["resolved_sql_version"])
+		})
+
+		r.Run("should call column lineage producer on insert when host provided", func() {
+			// setup mock server to assert request and return a valid lineage response
+			called := false
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				if req.URL.Path != "/api/v1/lineage/columns" {
+					w.WriteHeader(404)
+					return
+				}
+				var payload map[string]string
+				if err := json.NewDecoder(req.Body).Decode(&payload); err != nil {
+					w.WriteHeader(400)
+					return
+				}
+				// ensure query exists in payload
+				if _, ok := payload["query"]; !ok {
+					w.WriteHeader(400)
+					return
+				}
+				called = true
+				resp := map[string]interface{}{
+					"target_table": "project.schema.table",
+					"columns": []map[string]interface{}{
+						{
+							"target_column": "jakarta_transaction_date",
+							"sources":       []map[string]string{{"table": "pproject.schema.upstream_table", "column": "date_detail"}},
+						},
+					},
+				}
+				w.Header().Set("Content-Type", "application/json")
+				_ = json.NewEncoder(w).Encode(resp)
+			}))
+			defer srv.Close()
+
+			// first insert baseline asset with only sql so update flow will produce a changelog
+			ast := asset.Asset{
+				URN:     uuid.NewString() + "urn-optimus-produce-on-insert",
+				Name:    "optimus-produce-on-insert",
+				Type:    "table",
+				Service: "bigquery",
+				Data: map[string]interface{}{"optimus": map[string]interface{}{
+					"sql": "SELECT 1",
+				}},
+				UpdatedBy: r.users[0],
+			}
+
+			_, _, err := r.repository.Upsert(r.ctx, &ast, false, asset.Config{})
+			r.Require().NoError(err)
+
+			// now update asset to include resolved_sql which should generate a changelog and producer
+			ast.Data = map[string]interface{}{"optimus": map[string]interface{}{
+				"sql":          "SELECT 1",
+				"resolved_sql": "SELECT 1 resolved",
+			}}
+
+			cfg := asset.Config{ColumnLineageHost: srv.URL, ColumnLineageChangeIdentifier: "data.optimus.resolved_sql"}
+			updatedAsset, producer, err := r.repository.Upsert(r.ctx, &ast, false, cfg)
+			r.Require().NoError(err)
+			r.Require().NotNil(updatedAsset)
+			r.Require().NotNil(producer)
+
+			// call producer which should perform HTTP request to mock server
+			g, err := producer(context.Background())
+			r.Require().NoError(err)
+			r.True(called, "expected lineage service to be called")
+			r.NotNil(g)
+			r.Greater(len(g), 0)
+		})
+
+		r.Run("should return error when lineage service returns 500 and context timeout", func() {
+			// server that returns 500
+			srvErr := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(500)
+				_ = json.NewEncoder(w).Encode(map[string]string{"error": "failed to produce column lineage"})
+			}))
+			defer srvErr.Close()
+
+			// first insert baseline asset with only sql so update flow will produce a changelog
+			ast := asset.Asset{
+				URN:     uuid.NewString() + "urn-optimus-produce-err",
+				Name:    "optimus-produce-err",
+				Type:    "table",
+				Service: "bigquery",
+				Data: map[string]interface{}{"optimus": map[string]interface{}{
+					"sql": "SELECT 1",
+				}},
+				UpdatedBy: r.users[0],
+			}
+
+			_, _, err := r.repository.Upsert(r.ctx, &ast, false, asset.Config{})
+			r.Require().NoError(err)
+
+			// now update asset to include resolved_sql which should generate a changelog and producer
+			ast.Data = map[string]interface{}{"optimus": map[string]interface{}{
+				"sql":          "SELECT 1",
+				"resolved_sql": "SELECT 1 resolved",
+			}}
+
+			cfg := asset.Config{ColumnLineageHost: srvErr.URL, ColumnLineageChangeIdentifier: "data.optimus.resolved_sql"}
+			updatedAsset, producer, err := r.repository.Upsert(r.ctx, &ast, false, cfg)
+			r.Require().NoError(err)
+			r.Require().NotNil(updatedAsset)
+			r.Require().NotNil(producer)
+
+			// call producer which should perform HTTP request to mock server and return an error
+			_, err = producer(context.Background())
+			r.Require().Error(err)
+
+			// server that blocks until signaled; using a blocking handler ensures the client
+			// request will be waiting and a canceled context will deterministically cancel it.
+			blockCh := make(chan struct{})
+			srvSlow := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				<-blockCh
+				w.WriteHeader(200)
+				_ = json.NewEncoder(w).Encode(map[string]interface{}{"target_table": "a.b.c", "columns": []interface{}{}})
+			}))
+			defer srvSlow.Close()
+
+			// modify both sql and resolved_sql so changelog includes resolved_sql and sql_version
+			// will be bumped, ensuring a ColumnLineageProducer is created and the resolved_sql
+			// entry is sent to the lineage service.
+			ast.Data = map[string]interface{}{"optimus": map[string]interface{}{
+				"sql":          "SELECT 2",
+				"resolved_sql": "SELECT 1 resolved again",
+			}}
+
+			cfg2 := asset.Config{ColumnLineageHost: srvSlow.URL, ColumnLineageChangeIdentifier: "data.optimus.resolved_sql"}
+			updatedAsset2, producer2, err := r.repository.Upsert(r.ctx, &ast, false, cfg2)
+			r.Require().NoError(err)
+			r.Require().NotNil(updatedAsset2)
+			r.Require().NotNil(producer2)
+
+			// force a canceled context to deterministically trigger cancellation inside producer
+			cancelledCtx, cancel := context.WithCancel(context.Background())
+			cancel()
+
+			_, err = producer2(cancelledCtx)
+			r.Require().Error(err)
+
+			// unblock server to allow cleanup
+			close(blockCh)
+		})
+
+		// Cover traversal of nested maps in changelog.To (multi-segment nestedKey)
+		r.Run("should traverse nested maps in changelog.To and extract nested query", func() {
+			// mock server to assert received query
+			called := false
+			var receivedQuery string
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				if req.URL.Path != "/api/v1/lineage/columns" {
+					w.WriteHeader(404)
+					return
+				}
+				var payload map[string]string
+				if err := json.NewDecoder(req.Body).Decode(&payload); err != nil {
+					w.WriteHeader(400)
+					return
+				}
+				q, ok := payload["query"]
+				if !ok {
+					w.WriteHeader(400)
+					return
+				}
+				called = true
+				receivedQuery = q
+				w.Header().Set("Content-Type", "application/json")
+				_ = json.NewEncoder(w).Encode(map[string]interface{}{"target_table": "p.s.t", "columns": []map[string]interface{}{}})
+			}))
+			defer srv.Close()
+
+			// insert baseline asset without optimus to ensure changelog.Path is "data.optimus"
+			ast := asset.Asset{
+				URN:       uuid.NewString() + "urn-optimus-nested-traverse",
+				Name:      "optimus-nested-traverse",
+				Type:      "table",
+				Service:   "bigquery",
+				Data:      map[string]interface{}{},
+				UpdatedBy: r.users[0],
+			}
+			_, _, err := r.repository.Upsert(r.ctx, &ast, false, asset.Config{})
+			r.Require().NoError(err)
+
+			// now update asset: set sql (so producer condition is met) and nested map for traversal
+			nestedQuery := "SELECT nested FROM deep"
+			ast.Data = map[string]interface{}{"optimus": map[string]interface{}{
+				"sql": "SELECT 1",
+				"some": map[string]interface{}{
+					"path": map[string]interface{}{
+						"query": nestedQuery,
+					},
+				},
+			}}
+
+			cfg := asset.Config{ColumnLineageHost: srv.URL, ColumnLineageChangeIdentifier: "data.optimus.some.path.query"}
+			updatedAsset, producer, err := r.repository.Upsert(r.ctx, &ast, false, cfg)
+			r.Require().NoError(err)
+			r.Require().NotNil(updatedAsset)
+			r.Require().NotNil(producer)
+
+			_, err = producer(context.Background())
+			r.Require().NoError(err)
+			r.True(called, "expected lineage service to be called")
+			r.Equal(nestedQuery, receivedQuery)
+		})
+
+		r.Run("should return error when changelog.To is non-map but identifier expects nested keys", func() {
+			// insert baseline asset with optimus as a map containing sql
+			ast := asset.Asset{
+				URN:       uuid.NewString() + "urn-optimus-nonmap-traverse",
+				Name:      "optimus-nonmap-traverse",
+				Type:      "table",
+				Service:   "bigquery",
+				Data:      map[string]interface{}{"optimus": map[string]interface{}{"sql": "SELECT 1"}},
+				UpdatedBy: r.users[0],
+			}
+			_, _, err := r.repository.Upsert(r.ctx, &ast, false, asset.Config{})
+			r.Require().NoError(err)
+
+			// update optimus to be a non-map (string) so changelog.To will be a string
+			ast.Data = map[string]interface{}{"optimus": "not-a-map"}
+
+			cfg := asset.Config{ColumnLineageHost: "http://example.invalid", ColumnLineageChangeIdentifier: "data.optimus.some.path.query"}
+			updatedAsset, producer, err := r.repository.Upsert(r.ctx, &ast, false, cfg)
+			r.Require().NoError(err)
+			r.Require().NotNil(updatedAsset)
+			r.Require().NotNil(producer)
+
+			// calling producer should return an error from extractColumnLineageQuery because it
+			// expects a map while traversing nested keys
+			_, err = producer(context.Background())
+			r.Require().Error(err)
+			r.ErrorContains(err, "expected map while traversing")
+		})
+
+		r.Run("should return empty graph when lineage response contains invalid entries", func() {
+			// server returns invalid target_table or invalid source table
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.WriteHeader(200)
+				resp := map[string]interface{}{
+					"target_table": "",
+					"columns": []map[string]interface{}{{
+						"target_column": "c",
+						"sources":       []map[string]string{{"table": "", "column": "c1"}},
+					}},
+				}
+				_ = json.NewEncoder(w).Encode(resp)
+			}))
+			defer srv.Close()
+
+			ast := asset.Asset{
+				URN:     uuid.NewString() + "urn-optimus-invalid-response",
+				Name:    "optimus-invalid-response",
+				Type:    "table",
+				Service: "bigquery",
+				Data: map[string]interface{}{"optimus": map[string]interface{}{
+					"sql": "SELECT 1",
+				}},
+				UpdatedBy: r.users[0],
+			}
+
+			_, _, err := r.repository.Upsert(r.ctx, &ast, false, asset.Config{})
+			r.Require().NoError(err)
+
+			ast.Data = map[string]interface{}{"optimus": map[string]interface{}{
+				"sql":          "SELECT 1",
+				"resolved_sql": "SELECT 1 resolved",
+			}}
+
+			cfg := asset.Config{ColumnLineageHost: srv.URL, ColumnLineageChangeIdentifier: "data.optimus.resolved_sql"}
+			updatedAsset, producer, err := r.repository.Upsert(r.ctx, &ast, false, cfg)
+			r.Require().NoError(err)
+			r.Require().NotNil(updatedAsset)
+			r.Require().NotNil(producer)
+
+			g, err := producer(context.Background())
+			r.Require().NoError(err)
+			// parser should produce empty graph for invalid entries
+			r.Equal(0, len(g))
 		})
 
 		r.Run("should not set sql_version when optimus has no sql", func() {
