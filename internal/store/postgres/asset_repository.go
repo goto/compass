@@ -1,12 +1,16 @@
 package postgres
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -34,6 +38,19 @@ var (
 	// quotedStringRegexp matches a path segment wrapped in double quotes, e.g. `"0"`.
 	// Quoted segments are always treated as literal string keys, even if they look like integers.
 	quotedStringRegexp = regexp.MustCompile(`^"(.*)"$`)
+)
+
+const (
+	optimusDataKey               = "optimus"
+	optimusSQLKey                = "sql"
+	optimusResolvedSQLKey        = "resolved_sql"
+	optimusSQLVersionKey         = "sql_version"
+	optimusResolvedSQLVersionKey = "resolved_sql_version"
+
+	changelogPathOptimusSQL         = "data.optimus.sql"
+	changelogPathOptimusResolvedSQL = "data.optimus.resolved_sql"
+
+	jsonbPathOptimusResolvedSQLVersion = "{optimus,resolved_sql_version}"
 )
 
 // AssetRepository is a type that manages user operation to the primary database
@@ -429,8 +446,10 @@ func (r *AssetRepository) Upsert(
 	ctx context.Context,
 	ast *asset.Asset,
 	isUpdateOnly bool,
-	excludedChangelogPaths []string,
-) (upsertedAsset *asset.Asset, err error) {
+	assetConfig asset.Config,
+) (upsertedAsset *asset.Asset, columnLineageProducer asset.ColumnLineageProducer, err error) {
+	var capturedChangelog diff.Changelog
+	var resolvedSQLInitialized bool
 	err = r.client.RunWithinTx(ctx, func(tx *sqlx.Tx) (err error) {
 		fetchedAsset, err := r.GetByURNWithTx(ctx, tx, ast.URN)
 		if errors.As(err, new(asset.NotFoundError)) {
@@ -439,7 +458,17 @@ func (r *AssetRepository) Upsert(
 			}
 
 			// insert flow
-			upsertedAsset, err = r.insert(ctx, tx, ast)
+			if err := r.validateAsset(*ast); err != nil {
+				return err
+			}
+
+			resolvedSQLInitialized = initOptimusQueryVersions(ast.Data)
+			_, simplifiedChangelog, err := new(asset.Asset).Diff(ast, assetConfig.ExcludedChangelogPaths)
+			if err != nil {
+				return fmt.Errorf("error diffing two assets: %w", err)
+			}
+
+			upsertedAsset, err = r.insert(ctx, tx, ast, simplifiedChangelog)
 			if err != nil {
 				return fmt.Errorf("error inserting asset to DB: %w", err)
 			}
@@ -453,13 +482,14 @@ func (r *AssetRepository) Upsert(
 		// reset IsDeleted flag if asset is resync'd
 		ast.IsDeleted = false
 
-		changelog, err := fetchedAsset.Diff(ast, excludedChangelogPaths)
+		fullChangelog, simplifiedChangelog, err := fetchedAsset.Diff(ast, assetConfig.ExcludedChangelogPaths)
 		if err != nil {
 			return fmt.Errorf("error diffing two assets: %w", err)
 		}
+		capturedChangelog = fullChangelog
 
-		ast.ID = fetchedAsset.ID
-		upsertedAsset, err = r.update(ctx, tx, ast, &fetchedAsset, changelog)
+		resolvedSQLInitialized = bumpOptimusQueryVersions(fetchedAsset.Data, ast.Data, fullChangelog)
+		upsertedAsset, err = r.update(ctx, tx, ast, &fetchedAsset, simplifiedChangelog)
 		if err != nil {
 			return fmt.Errorf("error updating asset to DB: %w", err)
 		}
@@ -467,10 +497,14 @@ func (r *AssetRepository) Upsert(
 		return nil
 	})
 	if err != nil {
-		return upsertedAsset, err
+		return upsertedAsset, nil, err
 	}
 
-	return upsertedAsset, nil
+	if capturedChangelog != nil {
+		columnLineageProducer = r.buildColumnLineageProducer(capturedChangelog, ast, resolvedSQLInitialized, assetConfig)
+	}
+
+	return upsertedAsset, columnLineageProducer, nil
 }
 
 // UpsertPatch creates a new asset if it does not exist yet.
@@ -482,8 +516,10 @@ func (r *AssetRepository) UpsertPatch( //nolint:gocognit
 	ast *asset.Asset,
 	patchData map[string]interface{},
 	isUpdateOnly bool,
-	excludedChangelogPaths []string,
-) (upsertedAsset *asset.Asset, err error) {
+	assetConfig asset.Config,
+) (upsertedAsset *asset.Asset, columnLineageProducer asset.ColumnLineageProducer, err error) {
+	var capturedChangelog diff.Changelog
+	var resolvedSQLInitialized bool
 	err = r.client.RunWithinTx(ctx, func(tx *sqlx.Tx) (err error) {
 		fetchedAsset, err := r.GetByURNWithTx(ctx, tx, ast.URN)
 		if errors.As(err, new(asset.NotFoundError)) {
@@ -495,7 +531,15 @@ func (r *AssetRepository) UpsertPatch( //nolint:gocognit
 			if err := r.validateAsset(*ast); err != nil {
 				return err
 			}
-			upsertedAsset, err = r.insert(ctx, tx, ast)
+
+			resolvedSQLInitialized = initOptimusQueryVersions(ast.Data)
+			fullChangelog, simplifiedChangelog, err := new(asset.Asset).Diff(ast, assetConfig.ExcludedChangelogPaths)
+			if err != nil {
+				return fmt.Errorf("error diffing two assets: %w", err)
+			}
+			capturedChangelog = fullChangelog
+
+			upsertedAsset, err = r.insert(ctx, tx, ast, simplifiedChangelog)
 			if err != nil {
 				return fmt.Errorf("error inserting asset to DB: %w", err)
 			}
@@ -519,12 +563,15 @@ func (r *AssetRepository) UpsertPatch( //nolint:gocognit
 		if err := r.validateAsset(newAsset); err != nil {
 			return err
 		}
-		changelog, err := fetchedAsset.Diff(&newAsset, excludedChangelogPaths)
+
+		fullChangelog, simplifiedChangelog, err := fetchedAsset.Diff(&newAsset, assetConfig.ExcludedChangelogPaths)
 		if err != nil {
 			return fmt.Errorf("error diffing two assets: %w", err)
 		}
+		capturedChangelog = fullChangelog
 
-		upsertedAsset, err = r.update(ctx, tx, &newAsset, &fetchedAsset, changelog)
+		resolvedSQLInitialized = bumpOptimusQueryVersions(fetchedAsset.Data, newAsset.Data, fullChangelog)
+		upsertedAsset, err = r.update(ctx, tx, &newAsset, &fetchedAsset, simplifiedChangelog)
 		if err != nil {
 			return fmt.Errorf("error updating asset to DB: %w", err)
 		}
@@ -532,10 +579,330 @@ func (r *AssetRepository) UpsertPatch( //nolint:gocognit
 		return nil
 	})
 	if err != nil {
-		return upsertedAsset, err
+		return upsertedAsset, nil, err
 	}
 
-	return upsertedAsset, nil
+	if capturedChangelog != nil {
+		columnLineageProducer = r.buildColumnLineageProducer(capturedChangelog, upsertedAsset, resolvedSQLInitialized, assetConfig)
+	}
+
+	return upsertedAsset, columnLineageProducer, nil
+}
+
+func (r *AssetRepository) buildColumnLineageProducer(
+	changelog diff.Changelog,
+	upsertedAsset *asset.Asset,
+	resolvedSQLInitialized bool,
+	assetConfig asset.Config,
+) asset.ColumnLineageProducer {
+	sqlVer, resolvedSQLVer := extractOptimusQueryVersions(upsertedAsset.Data)
+	if !((sqlVer != "" && asset.IsGreaterThan(sqlVer, resolvedSQLVer)) || resolvedSQLInitialized) {
+		return nil
+	}
+	return func(ctx context.Context) (asset.LineageGraph, error) {
+		graph, err := r.produceColumnLevelLineage(ctx, changelog, assetConfig.ColumnLineageChangeIdentifier, assetConfig.ColumnLineageHost)
+		if err != nil {
+			return nil, err
+		}
+		if graph != nil {
+			if err := r.updateResolvedSQLVersion(ctx, upsertedAsset.URN, sqlVer); err != nil {
+				return graph, fmt.Errorf("error update resolved sql version: %w", err)
+			}
+		}
+		return graph, nil
+	}
+}
+
+func (r *AssetRepository) produceColumnLevelLineage(
+	ctx context.Context,
+	changelogs diff.Changelog,
+	columnLineageIdentifier,
+	columnLineageHost string,
+) (asset.LineageGraph, error) {
+	if columnLineageHost == "" || columnLineageIdentifier == "" {
+		return nil, nil
+	}
+
+	for _, changelog := range changelogs {
+		query, err := extractColumnLineageQuery(changelog, columnLineageIdentifier)
+		if err != nil {
+			return nil, err
+		}
+		if query == "" {
+			continue
+		}
+
+		jsonifyPayload, err := json.Marshal(map[string]string{"query": query})
+		if err != nil {
+			return nil, fmt.Errorf("failed to encode the payload JSON: %w", err)
+		}
+
+		columnLineageURL := fmt.Sprintf("%s/api/v1/lineage/columns", columnLineageHost)
+
+		data, err := r.performColumnLineageRequest(ctx, columnLineageURL, jsonifyPayload)
+		if err != nil {
+			return nil, err
+		}
+
+		var response columnLineageResponse
+		if err := json.Unmarshal(data, &response); err != nil {
+			return nil, fmt.Errorf("parse column lineage response: %w", err)
+		}
+
+		return parseColumnLineageResponse(response), nil
+	}
+
+	return nil, nil
+}
+
+func (*AssetRepository) performColumnLineageRequest(ctx context.Context, url string, payload []byte) ([]byte, error) {
+	const maxAttempts = 2
+	var lastErr error
+
+	for attempt := range maxAttempts {
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(payload))
+		if err != nil {
+			return nil, fmt.Errorf("failed to create column lineage request: %w", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
+
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			lastErr = fmt.Errorf("attempt %d: failed to send column lineage request: %w", attempt+1, err)
+			continue
+		}
+
+		body, err := io.ReadAll(res.Body)
+		res.Body.Close()
+		if err != nil {
+			lastErr = fmt.Errorf("attempt %d: read column lineage response body: %w", attempt+1, err)
+			continue
+		}
+
+		if res.StatusCode >= 300 {
+			lastErr = fmt.Errorf("attempt %d: column lineage response status code %d: %s", attempt+1, res.StatusCode, string(body))
+			continue
+		}
+
+		return body, nil
+	}
+
+	return nil, lastErr
+}
+
+type columnLineageResponse struct {
+	TargetTable string                      `json:"target_table"`
+	Columns     []columnLineageColumnDetail `json:"columns"`
+}
+
+type columnLineageColumnDetail struct {
+	TargetColumn string                      `json:"target_column"`
+	Sources      []columnLineageSourceDetail `json:"sources"`
+}
+
+type columnLineageSourceDetail struct {
+	Table  string `json:"table"`
+	Column string `json:"column"`
+}
+
+func toMaxComputeURN(fullTableName string) string {
+	tableParts := strings.Split(fullTableName, ".")
+	return fmt.Sprintf("urn:%s:%s:%s:%s", "maxcompute", tableParts[0], "table", fullTableName)
+}
+
+func parseColumnLineageResponse(response columnLineageResponse) asset.LineageGraph {
+	seen := make(map[string]struct{})
+	var graph asset.LineageGraph
+
+	if response.TargetTable == "" || len(strings.Split(response.TargetTable, ".")) != 3 {
+		return graph
+	}
+	for _, col := range response.Columns {
+		for _, src := range col.Sources {
+			if src.Table == "" || len(strings.Split(src.Table, ".")) != 3 {
+				continue
+			}
+			key := src.Table + "." + src.Column + "->" + response.TargetTable + "." + col.TargetColumn
+			if _, exists := seen[key]; exists {
+				continue
+			}
+			seen[key] = struct{}{}
+			graph = append(graph, asset.LineageEdge{
+				Source:       toMaxComputeURN(src.Table),
+				SourceColumn: src.Column,
+				Target:       toMaxComputeURN(response.TargetTable),
+				TargetColumn: col.TargetColumn,
+			})
+		}
+	}
+
+	return graph
+}
+
+// extractColumnLineageQuery extracts the SQL query string from a changelog To value.
+func extractColumnLineageQuery(changelog diff.Change, columnLineageIdentifier string) (string, error) {
+	var (
+		changelogPath = strings.Join(changelog.Path, ".")
+		nestedKey     string
+	)
+
+	if strings.HasPrefix(columnLineageIdentifier, changelogPath+".") {
+		nestedKey = strings.TrimPrefix(columnLineageIdentifier, changelogPath+".")
+	} else if changelogPath != columnLineageIdentifier {
+		return "", nil
+	}
+
+	if changelog.To == nil {
+		return "", nil
+	}
+
+	if nestedKey == "" {
+		query, ok := changelog.To.(string)
+		if !ok {
+			return "", fmt.Errorf("query value is not a string")
+		}
+		return query, nil
+	}
+
+	traversedChange := changelog.To
+	for _, key := range strings.Split(nestedKey, ".") {
+		change, ok := traversedChange.(map[string]interface{})
+		if !ok {
+			return "", fmt.Errorf("expected map while traversing %q", key)
+		}
+		traversedChange, ok = change[key]
+		if !ok {
+			return "", nil
+		}
+	}
+
+	query, ok := traversedChange.(string)
+	if !ok {
+		return "", fmt.Errorf("resolved field %q is not a string", nestedKey)
+	}
+
+	return query, nil
+}
+
+func extractOptimusQueryVersions(data map[string]interface{}) (sqlVersion, resolvedSQLVersion string) {
+	optimus, ok := data[optimusDataKey].(map[string]interface{})
+	if !ok {
+		return "", ""
+	}
+
+	sqlVersion, _ = optimus[optimusSQLVersionKey].(string)
+	resolvedSQLVersion, _ = optimus[optimusResolvedSQLVersionKey].(string)
+	return sqlVersion, resolvedSQLVersion
+}
+
+func initOptimusQueryVersions(data map[string]interface{}) (resolvedSQLInitialized bool) {
+	optimus, ok := data[optimusDataKey].(map[string]interface{})
+	if !ok || optimus == nil {
+		return false
+	}
+
+	if baseQuery, _ := optimus[optimusSQLKey].(string); baseQuery != "" {
+		optimus[optimusSQLVersionKey] = asset.BaseVersion
+	}
+
+	if resolvedQuery, _ := optimus[optimusResolvedSQLKey].(string); resolvedQuery != "" {
+		optimus[optimusResolvedSQLVersionKey] = asset.BaseVersion
+		resolvedSQLInitialized = true
+	}
+
+	return resolvedSQLInitialized
+}
+
+func bumpOptimusQueryVersions(oldData, newData map[string]interface{}, changelog diff.Changelog) bool {
+	oldOptimus, _ := oldData[optimusDataKey].(map[string]interface{})
+	newOptimus, _ := newData[optimusDataKey].(map[string]interface{})
+
+	baseChanged := isOptimusFieldChanged(oldOptimus, newOptimus, optimusSQLKey, changelog, changelogPathOptimusSQL)
+	resolvedChanged := isOptimusFieldChanged(oldOptimus, newOptimus, optimusResolvedSQLKey, changelog, changelogPathOptimusResolvedSQL)
+
+	if !baseChanged && !resolvedChanged {
+		return false
+	}
+
+	if newOptimus == nil {
+		newOptimus = make(map[string]interface{})
+		newData[optimusDataKey] = newOptimus
+	}
+
+	preserveOptimusVersions(oldOptimus, newOptimus)
+	return applyOptimusVersionBumps(oldOptimus, newOptimus, baseChanged, resolvedChanged)
+}
+
+func preserveOptimusVersions(oldOptimus, newOptimus map[string]interface{}) {
+	for _, key := range []string{optimusSQLVersionKey, optimusResolvedSQLVersionKey} {
+		if existing, _ := oldOptimus[key].(string); existing != "" {
+			if _, alreadySet := newOptimus[key]; !alreadySet {
+				newOptimus[key] = existing
+			}
+		}
+	}
+}
+
+func applyOptimusVersionBumps(oldOptimus, newOptimus map[string]interface{}, baseChanged, resolvedChanged bool) bool {
+	if baseChanged {
+		newOptimus[optimusSQLVersionKey] = nextOptimusVersion(oldOptimus, optimusSQLVersionKey)
+	}
+
+	if resolvedChanged {
+		if existing, _ := oldOptimus[optimusResolvedSQLVersionKey].(string); existing == "" {
+			newOptimus[optimusResolvedSQLVersionKey] = asset.BaseVersion
+			return true
+		}
+	}
+
+	return false
+}
+
+func nextOptimusVersion(optimus map[string]interface{}, key string) string {
+	current, _ := optimus[key].(string)
+	if current == "" {
+		return asset.BaseVersion
+	}
+	return bumpMinorVersion(current)
+}
+
+func isOptimusFieldChanged(oldOptimus, newOptimus map[string]interface{}, field string, changelog diff.Changelog, changelogPath string) bool {
+	for _, c := range changelog {
+		if strings.Join(c.Path, ".") == changelogPath {
+			return true
+		}
+	}
+	oldVal, _ := oldOptimus[field].(string)
+	newVal, _ := newOptimus[field].(string)
+	return oldVal != newVal
+}
+
+func bumpMinorVersion(v string) string {
+	if v == "" {
+		v = "0.0"
+	}
+	parts := strings.SplitN(v, ".", 2)
+	major := parts[0]
+	minor, _ := strconv.Atoi(parts[1])
+	return fmt.Sprintf("%s.%d", major, minor+1)
+}
+
+// updateResolvedSQLVersion sets data.optimus.resolved_sql_version = sqlVersion for the given URN.
+func (r *AssetRepository) updateResolvedSQLVersion(ctx context.Context, urn, sqlVersion string) error {
+	query, args, err := sq.Update("assets").
+		Set("data", sq.Expr("jsonb_set(coalesce(data, '{}'::jsonb), '"+jsonbPathOptimusResolvedSQLVersion+"', to_jsonb(?::text))", sqlVersion)).
+		Where(sq.Eq{"urn": urn}).
+		PlaceholderFormat(sq.Dollar).
+		ToSql()
+	if err != nil {
+		return fmt.Errorf("build update query: %w", err)
+	}
+
+	if _, err := r.client.db.ExecContext(ctx, query, args...); err != nil {
+		return fmt.Errorf("execute update query: %w", err)
+	}
+
+	return nil
 }
 
 func (*AssetRepository) validateAsset(ast asset.Asset) error {
@@ -986,7 +1353,7 @@ func (r *AssetRepository) softDeleteWithPredicate(ctx context.Context, tx *sqlx.
 	return r.insertAssetVersion(ctx, tx, &newAsset, newAsset.Changelog)
 }
 
-func (r *AssetRepository) insert(ctx context.Context, tx *sqlx.Tx, ast *asset.Asset) (*asset.Asset, error) {
+func (r *AssetRepository) insert(ctx context.Context, tx *sqlx.Tx, ast *asset.Asset, clog diff.Changelog) (*asset.Asset, error) {
 	currentTime := time.Now()
 	if ast.RefreshedAt != nil {
 		currentTime = *ast.RefreshedAt
@@ -1031,7 +1398,7 @@ func (r *AssetRepository) insert(ctx context.Context, tx *sqlx.Tx, ast *asset.As
 
 	insertedAsset := am.toAsset(users)
 
-	if err := r.insertAssetVersion(ctx, tx, &insertedAsset, diff.Changelog{}); err != nil {
+	if err := r.insertAssetVersion(ctx, tx, &insertedAsset, clog); err != nil {
 		return nil, err
 	}
 

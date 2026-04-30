@@ -114,20 +114,36 @@ func (s *Service) UpsertAssetWithoutLineage(ctx context.Context, ast *Asset, isU
 	currentTime := time.Now()
 	ast.RefreshedAt = &currentTime
 
-	asset, err := s.assetRepository.Upsert(ctx, ast, isUpdateOnly, s.config.ExcludedChangelogPaths)
-	// retry due to race condition possibility on insert
+	upsertedAsset, columnLineageProducer, err := s.assetRepository.Upsert(ctx, ast, isUpdateOnly, s.config)
 	if errors.Is(err, ErrURNExist) {
-		asset, err = s.assetRepository.Upsert(ctx, ast, isUpdateOnly, s.config.ExcludedChangelogPaths)
+		upsertedAsset, columnLineageProducer, err = s.assetRepository.Upsert(ctx, ast, isUpdateOnly, s.config)
 	}
+
 	if err != nil {
 		return "", err
 	}
 
-	if err := s.worker.EnqueueIndexAssetJob(ctx, *asset); err != nil {
+	if err := s.worker.EnqueueIndexAssetJob(ctx, *upsertedAsset); err != nil {
 		return "", err
 	}
 
-	return asset.ID, nil
+	if columnLineageProducer != nil {
+		go func(urn string, columnLineageProducer ColumnLineageProducer) {
+			edges, err := columnLineageProducer(context.Background())
+			if err != nil {
+				s.logger.Warn("column lineage producer failed, skipping upsert", "urn", urn, "err", err)
+				return
+			}
+			if len(edges) == 0 {
+				return
+			}
+			if err := s.lineageRepository.UpsertColumnLineage(context.Background(), urn, edges); err != nil {
+				s.logger.Warn("failed to upsert column lineage", "urn", urn, "err", err)
+			}
+		}(ast.URN, columnLineageProducer)
+	}
+
+	return upsertedAsset.ID, nil
 }
 
 func (s *Service) UpsertPatchAsset( //nolint:revive
@@ -153,20 +169,36 @@ func (s *Service) UpsertPatchAssetWithoutLineage(ctx context.Context, ast *Asset
 	currentTime := time.Now()
 	ast.RefreshedAt = &currentTime
 
-	asset, err := s.assetRepository.UpsertPatch(ctx, ast, patchData, isUpdateOnly, s.config.ExcludedChangelogPaths)
-	// retry due to race condition possibility on insert
+	upsertedAsset, columnLineageProducer, err := s.assetRepository.UpsertPatch(ctx, ast, patchData, isUpdateOnly, s.config)
 	if errors.Is(err, ErrURNExist) {
-		asset, err = s.assetRepository.UpsertPatch(ctx, ast, patchData, isUpdateOnly, s.config.ExcludedChangelogPaths)
+		upsertedAsset, columnLineageProducer, err = s.assetRepository.UpsertPatch(ctx, ast, patchData, isUpdateOnly, s.config)
 	}
+
 	if err != nil {
 		return "", err
 	}
 
-	if err := s.worker.EnqueueIndexAssetJob(ctx, *asset); err != nil {
+	if err := s.worker.EnqueueIndexAssetJob(ctx, *upsertedAsset); err != nil {
 		return "", err
 	}
 
-	return asset.ID, nil
+	if columnLineageProducer != nil {
+		go func(urn string, columnLineageProducer ColumnLineageProducer) {
+			edges, err := columnLineageProducer(context.Background())
+			if err != nil {
+				s.logger.Warn("column lineage producer failed, skipping upsert", "urn", urn, "err", err)
+				return
+			}
+			if len(edges) == 0 {
+				return
+			}
+			if err := s.lineageRepository.UpsertColumnLineage(context.Background(), urn, edges); err != nil {
+				s.logger.Warn("failed to upsert column lineage", "urn", urn, "err", err)
+			}
+		}(ast.URN, columnLineageProducer)
+	}
+
+	return upsertedAsset.ID, nil
 }
 
 // DeleteAsset is hard-deletion that can accept ID or URN of asset
