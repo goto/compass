@@ -114,11 +114,9 @@ func (s *Service) UpsertAssetWithoutLineage(ctx context.Context, ast *Asset, isU
 	currentTime := time.Now()
 	ast.RefreshedAt = &currentTime
 
-	asset, err := s.assetRepository.Upsert(ctx, ast, isUpdateOnly, s.config.ExcludedChangelogPaths)
-	// retry due to race condition possibility on insert
-	if errors.Is(err, ErrURNExist) {
-		asset, err = s.assetRepository.Upsert(ctx, ast, isUpdateOnly, s.config.ExcludedChangelogPaths)
-	}
+	asset, err := upsertWithRetry(func() (*Asset, error) {
+		return s.assetRepository.Upsert(ctx, ast, isUpdateOnly, s.config.ExcludedChangelogPaths)
+	})
 	if err != nil {
 		return "", err
 	}
@@ -128,6 +126,15 @@ func (s *Service) UpsertAssetWithoutLineage(ctx context.Context, ast *Asset, isU
 	}
 
 	return asset.ID, nil
+}
+
+// upsertWithRetry calls fn and retries once on ErrURNExist to handle insert race conditions.
+func upsertWithRetry(fn func() (*Asset, error)) (*Asset, error) {
+	asset, err := fn()
+	if errors.Is(err, ErrURNExist) {
+		asset, err = fn()
+	}
+	return asset, err
 }
 
 func (s *Service) UpsertPatchAsset( //nolint:revive
@@ -153,11 +160,9 @@ func (s *Service) UpsertPatchAssetWithoutLineage(ctx context.Context, ast *Asset
 	currentTime := time.Now()
 	ast.RefreshedAt = &currentTime
 
-	asset, err := s.assetRepository.UpsertPatch(ctx, ast, patchData, isUpdateOnly, s.config.ExcludedChangelogPaths)
-	// retry due to race condition possibility on insert
-	if errors.Is(err, ErrURNExist) {
-		asset, err = s.assetRepository.UpsertPatch(ctx, ast, patchData, isUpdateOnly, s.config.ExcludedChangelogPaths)
-	}
+	asset, err := upsertWithRetry(func() (*Asset, error) {
+		return s.assetRepository.UpsertPatch(ctx, ast, patchData, isUpdateOnly, s.config.ExcludedChangelogPaths)
+	})
 	if err != nil {
 		return "", err
 	}
@@ -418,31 +423,7 @@ func (s *Service) GetLineage(ctx context.Context, urn string, query LineageQuery
 	if err != nil {
 		return Lineage{}, fmt.Errorf("get lineage: get graph edges: %w", err)
 	}
-
-	if !query.WithAttributes {
-		return Lineage{
-			Edges: edges,
-		}, nil
-	}
-
-	urns := newUniqueStrings(len(edges))
-	urns.add(urn)
-	for _, edge := range edges {
-		urns.add(edge.Source, edge.Target)
-	}
-
-	assetProbes, err := s.assetRepository.GetProbesWithFilter(ctx, ProbesFilter{
-		AssetURNs: urns.list(),
-		MaxRows:   1,
-	})
-	if err != nil {
-		return Lineage{}, fmt.Errorf("get lineage: get latest probes: %w", err)
-	}
-
-	return Lineage{
-		Edges:     edges,
-		NodeAttrs: buildNodeAttrs(assetProbes),
-	}, nil
+	return s.buildLineageResponse(ctx, urn, query, edges)
 }
 
 func (s *Service) GetColumnLineage(ctx context.Context, urn string, query LineageQuery) (Lineage, error) {
@@ -450,11 +431,12 @@ func (s *Service) GetColumnLineage(ctx context.Context, urn string, query Lineag
 	if err != nil {
 		return Lineage{}, fmt.Errorf("get lineage: get column graph edges: %w", err)
 	}
+	return s.buildLineageResponse(ctx, urn, query, edges)
+}
 
+func (s *Service) buildLineageResponse(ctx context.Context, urn string, query LineageQuery, edges LineageGraph) (Lineage, error) {
 	if !query.WithAttributes {
-		return Lineage{
-			Edges: edges,
-		}, nil
+		return Lineage{Edges: edges}, nil
 	}
 
 	urns := newUniqueStrings(len(edges))
@@ -478,11 +460,7 @@ func (s *Service) GetColumnLineage(ctx context.Context, urn string, query Lineag
 }
 
 func (s *Service) GetTypes(ctx context.Context, flt Filter) (map[Type]int, error) {
-	result, err := s.assetRepository.GetTypes(ctx, flt)
-	if err != nil {
-		return nil, err
-	}
-	return result, nil
+	return s.assetRepository.GetTypes(ctx, flt)
 }
 
 func (s *Service) SearchAssets(ctx context.Context, cfg SearchConfig) (results []SearchResult, err error) {

@@ -5,6 +5,12 @@ import (
 	"github.com/goto/compass/pkg/mergemap"
 )
 
+// lookupPatchField returns (value, true) if key exists in patchData.
+func lookupPatchField(key string, patchData map[string]interface{}) (interface{}, bool) {
+	v, ok := patchData[key]
+	return v, ok
+}
+
 // patch appends asset with data from map. It mutates the asset itself.
 func patchAsset(a *Asset, patchData map[string]interface{}) {
 	a.URN = patchString("urn", patchData, a.URN)
@@ -15,16 +21,13 @@ func patchAsset(a *Asset, patchData map[string]interface{}) {
 	a.URL = patchString("url", patchData, a.URL)
 	a.UpdatedBy.ID = patchString("updated_by", patchData, a.UpdatedBy.ID)
 
-	labels, exists := patchData["labels"]
-	if exists {
+	if labels, ok := lookupPatchField("labels", patchData); ok {
 		a.Labels = buildLabels(labels)
 	}
-	owners, exists := patchData["owners"]
-	if exists {
+	if owners, ok := lookupPatchField("owners", patchData); ok {
 		a.Owners = buildOwners(owners)
 	}
-	data, exists := patchData["data"]
-	if exists {
+	if data, ok := lookupPatchField("data", patchData); ok {
 		patchAssetData(a, data)
 	}
 }

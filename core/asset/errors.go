@@ -3,7 +3,6 @@ package asset
 import (
 	"errors"
 	"fmt"
-	"strings"
 )
 
 const AllServicesCleanupConfig = "all"
@@ -53,20 +52,19 @@ type DiscoveryError struct {
 }
 
 func (err DiscoveryError) Error() string {
-	var s strings.Builder
-	s.WriteString("discovery error: ")
+	msg := "discovery error: "
 	if err.Op != "" {
-		s.WriteString(err.Op + ": ")
+		msg += err.Op + ": "
 	}
 	if err.ID != "" {
-		s.WriteString("doc ID '" + err.ID + "': ")
+		msg += fmt.Sprintf("doc ID '%s': ", err.ID)
 	}
 	if err.Index != "" {
-		s.WriteString("index '" + err.Index + "': ")
+		msg += fmt.Sprintf("index '%s': ", err.Index)
 	}
 	if err.ESCode != "" {
-		s.WriteString("elasticsearch code '" + err.ESCode + "': ")
+		msg += fmt.Sprintf("elasticsearch code '%s': ", err.ESCode)
 	}
-	s.WriteString(err.Err.Error())
-	return s.String()
+	msg += err.Err.Error()
+	return msg
 }

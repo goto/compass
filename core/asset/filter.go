@@ -90,6 +90,14 @@ func (fb *filterBuilder) IsDeleted(isDeleted bool) *filterBuilder {
 	return fb
 }
 
+// splitComma splits a comma-separated string, returning nil for empty input.
+func splitComma(s string) []string {
+	if s == "" {
+		return nil
+	}
+	return strings.Split(s, ",")
+}
+
 func (fb *filterBuilder) Build() (Filter, error) {
 	flt := Filter{
 		Size:          fb.size,
@@ -98,27 +106,19 @@ func (fb *filterBuilder) Build() (Filter, error) {
 		SortDirection: fb.sortDirection,
 		Query:         fb.q,
 		IsDeleted:     fb.isDeleted,
+		Services:      splitComma(fb.services),
+		QueryFields:   splitComma(fb.qFields),
 	}
 
 	if len(fb.data) != 0 {
 		flt.Data = make(map[string][]string)
 		for k, v := range fb.data {
-			flt.Data[k] = strings.Split(v, ",")
+			flt.Data[k] = splitComma(v)
 		}
 	}
 
-	if fb.types != "" {
-		typs := strings.Split(fb.types, ",")
-		for _, typeVal := range typs {
-			flt.Types = append(flt.Types, Type(typeVal))
-		}
-	}
-	if fb.services != "" {
-		flt.Services = strings.Split(fb.services, ",")
-	}
-
-	if fb.qFields != "" {
-		flt.QueryFields = strings.Split(fb.qFields, ",")
+	for _, typeVal := range splitComma(fb.types) {
+		flt.Types = append(flt.Types, Type(typeVal))
 	}
 
 	if err := flt.Validate(); err != nil {
