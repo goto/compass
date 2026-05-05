@@ -47,7 +47,7 @@ const (
 	optimusResolvedSQLKey        = "resolved_sql"
 	optimusSQLVersionKey         = "sql_version"
 	optimusResolvedSQLVersionKey = "resolved_sql_version"
-	optimusSqlBaseVersion        = "1"
+	optimusSQLBaseVersion        = "1"
 
 	changelogPathOptimusSQL         = "data.optimus.sql"
 	changelogPathOptimusResolvedSQL = "data.optimus.resolved_sql"
@@ -807,11 +807,11 @@ func initOptimusQueryVersions(data map[string]interface{}) (resolvedSQLInitializ
 	}
 
 	if baseQuery, _ := optimus[optimusSQLKey].(string); baseQuery != "" {
-		optimus[optimusSQLVersionKey] = optimusSqlBaseVersion
+		optimus[optimusSQLVersionKey] = optimusSQLBaseVersion
 	}
 
 	if resolvedQuery, _ := optimus[optimusResolvedSQLKey].(string); resolvedQuery != "" {
-		optimus[optimusResolvedSQLVersionKey] = optimusSqlBaseVersion
+		optimus[optimusResolvedSQLVersionKey] = optimusSQLBaseVersion
 		resolvedSQLInitialized = true
 	}
 
@@ -855,7 +855,7 @@ func applyOptimusVersionBumps(oldOptimus, newOptimus map[string]interface{}, bas
 
 	if resolvedChanged {
 		if existing, _ := oldOptimus[optimusResolvedSQLVersionKey].(string); existing == "" {
-			newOptimus[optimusResolvedSQLVersionKey] = optimusSqlBaseVersion
+			newOptimus[optimusResolvedSQLVersionKey] = optimusSQLBaseVersion
 			return true
 		}
 	}
@@ -866,9 +866,9 @@ func applyOptimusVersionBumps(oldOptimus, newOptimus map[string]interface{}, bas
 func nextOptimusVersion(optimus map[string]interface{}, key string) string {
 	current, _ := optimus[key].(string)
 	if current == "" {
-		return optimusSqlBaseVersion
+		return optimusSQLBaseVersion
 	}
-	return bumpSqlVersion(current)
+	return bumpSQLVersion(current)
 }
 
 func isOptimusFieldChanged(oldOptimus, newOptimus map[string]interface{}, field string, changelog diff.Changelog, changelogPath string) bool {
@@ -882,7 +882,7 @@ func isOptimusFieldChanged(oldOptimus, newOptimus map[string]interface{}, field 
 	return oldVal != newVal
 }
 
-func bumpSqlVersion(v string) string {
+func bumpSQLVersion(v string) string {
 	if v == "" {
 		v = "0"
 	}
