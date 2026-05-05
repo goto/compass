@@ -126,7 +126,7 @@ func runServer(ctx context.Context, cfg *Config) error {
 	}
 	userService := user.NewService(logger, userRepository)
 
-	assetRepository, err := postgres.NewAssetRepository(pgClient, userRepository, 0, cfg.Service.Identity.ProviderDefaultName)
+	assetRepository, err := postgres.NewAssetRepository(pgClient, userRepository, 0, cfg.Service.Identity.ProviderDefaultName, logger)
 	if err != nil {
 		return fmt.Errorf("create new asset repository: %w", err)
 	}

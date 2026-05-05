@@ -82,7 +82,7 @@ func runCleanUp(ctx context.Context, cfg *Config) (uint32, error) {
 	if err != nil {
 		return 0, fmt.Errorf("create new user repository: %w", err)
 	}
-	assetRepository, err := postgres.NewAssetRepository(pgClient, userRepository, 0, cfg.Service.Identity.ProviderDefaultName)
+	assetRepository, err := postgres.NewAssetRepository(pgClient, userRepository, 0, cfg.Service.Identity.ProviderDefaultName, logger)
 	if err != nil {
 		return 0, fmt.Errorf("create new asset repository: %w", err)
 	}

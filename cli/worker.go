@@ -73,7 +73,7 @@ func runWorker(ctx context.Context, cfg *Config) error {
 		return err
 	}
 
-	assetRepository, err := postgres.NewAssetRepository(pgClient, nil, 0, cfg.Service.Identity.ProviderDefaultName)
+	assetRepository, err := postgres.NewAssetRepository(pgClient, nil, 0, cfg.Service.Identity.ProviderDefaultName, logger)
 	if err != nil {
 		return fmt.Errorf("create new asset repository: %w", err)
 	}

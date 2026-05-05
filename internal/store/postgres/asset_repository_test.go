@@ -54,7 +54,7 @@ func (r *AssetRepositoryTestSuite) SetupSuite() {
 		r.T().Fatal(err)
 	}
 
-	r.repository, err = postgres.NewAssetRepository(r.client, r.userRepo, defaultGetMaxSize, defaultProviderName)
+	r.repository, err = postgres.NewAssetRepository(r.client, r.userRepo, defaultGetMaxSize, defaultProviderName, logger)
 	if err != nil {
 		r.T().Fatal(err)
 	}
@@ -1379,19 +1379,19 @@ func (r *AssetRepositoryTestSuite) TestVersions() {
 
 func (r *AssetRepositoryTestSuite) TestNewAssetRepository() {
 	r.Run("should return error when client is nil", func() {
-		repo, err := postgres.NewAssetRepository(nil, r.userRepo, 0, "shield")
+		repo, err := postgres.NewAssetRepository(nil, r.userRepo, 0, "shield", log.NewLogrus())
 		r.Error(err)
 		r.Nil(repo)
 	})
 
 	r.Run("should use default max size when zero is passed", func() {
-		repo, err := postgres.NewAssetRepository(r.client, r.userRepo, 0, "shield")
+		repo, err := postgres.NewAssetRepository(r.client, r.userRepo, 0, "shield", log.NewLogrus())
 		r.Require().NoError(err)
 		r.NotNil(repo)
 	})
 
 	r.Run("should use default provider when empty is passed", func() {
-		repo, err := postgres.NewAssetRepository(r.client, r.userRepo, 10, "")
+		repo, err := postgres.NewAssetRepository(r.client, r.userRepo, 10, "", log.NewLogrus())
 		r.Require().NoError(err)
 		r.NotNil(repo)
 	})
@@ -1531,7 +1531,7 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 			r.Require().NoError(err)
 			r.Require().NotNil(insertedAsset)
 			optimus := insertedAsset.Data["optimus"].(map[string]interface{})
-			r.Equal(asset.BaseVersion, optimus["sql_version"])
+			r.Equal("1", optimus["sql_version"])
 			r.Nil(optimus["resolved_sql_version"])
 		})
 
@@ -1551,8 +1551,8 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 			r.Require().NoError(err)
 			r.Require().NotNil(insertedAsset)
 			optimus := insertedAsset.Data["optimus"].(map[string]interface{})
-			r.Equal(asset.BaseVersion, optimus["sql_version"])
-			r.Equal(asset.BaseVersion, optimus["resolved_sql_version"])
+			r.Equal("1", optimus["sql_version"])
+			r.Equal("1", optimus["resolved_sql_version"])
 		})
 
 		r.Run("should call column lineage producer on insert when host provided", func() {
@@ -2091,7 +2091,7 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 			r.Require().NoError(err)
 			r.Require().NotNil(updatedAsset)
 			optimus := updatedAsset.Data["optimus"].(map[string]interface{})
-			r.Equal("0.2", optimus["sql_version"])
+			r.Equal("2", optimus["sql_version"])
 		})
 
 		r.Run("should not change sql_version when sql is unchanged", func() {
@@ -2111,7 +2111,7 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 			r.Require().NoError(err)
 			r.Require().NotNil(updatedAsset)
 			optimus := updatedAsset.Data["optimus"].(map[string]interface{})
-			r.Equal(asset.BaseVersion, optimus["sql_version"])
+			r.Equal("1", optimus["sql_version"])
 		})
 
 		r.Run("should initialize resolved_sql_version when resolved_sql appears for the first time", func() {
@@ -2134,8 +2134,8 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 			r.Require().NoError(err)
 			r.Require().NotNil(updatedAsset)
 			optimus := updatedAsset.Data["optimus"].(map[string]interface{})
-			r.Equal(asset.BaseVersion, optimus["sql_version"])
-			r.Equal(asset.BaseVersion, optimus["resolved_sql_version"])
+			r.Equal("1", optimus["sql_version"])
+			r.Equal("1", optimus["resolved_sql_version"])
 		})
 
 		r.Run("should not bump resolved_sql_version when resolved_sql already exists", func() {
@@ -2162,8 +2162,8 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 			r.Require().NoError(err)
 			r.Require().NotNil(updatedAsset)
 			optimus := updatedAsset.Data["optimus"].(map[string]interface{})
-			r.Equal(asset.BaseVersion, optimus["sql_version"])
-			r.Equal(asset.BaseVersion, optimus["resolved_sql_version"])
+			r.Equal("1", optimus["sql_version"])
+			r.Equal("1", optimus["resolved_sql_version"])
 		})
 
 		r.Run("should bump sql_version and initialize resolved_sql_version when both change together", func() {
@@ -2186,8 +2186,8 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 			r.Require().NoError(err)
 			r.Require().NotNil(updatedAsset)
 			optimus := updatedAsset.Data["optimus"].(map[string]interface{})
-			r.Equal("0.2", optimus["sql_version"])
-			r.Equal(asset.BaseVersion, optimus["resolved_sql_version"])
+			r.Equal("2", optimus["sql_version"])
+			r.Equal("1", optimus["resolved_sql_version"])
 		})
 	})
 }
@@ -2405,7 +2405,7 @@ func (r *AssetRepositoryTestSuite) TestUpsertPatch() {
 			r.Require().NoError(err)
 			r.Require().NotNil(insertedAsset)
 			optimus := insertedAsset.Data["optimus"].(map[string]interface{})
-			r.Equal(asset.BaseVersion, optimus["sql_version"])
+			r.Equal("1", optimus["sql_version"])
 			r.Nil(optimus["resolved_sql_version"])
 		})
 
@@ -2425,8 +2425,8 @@ func (r *AssetRepositoryTestSuite) TestUpsertPatch() {
 			r.Require().NoError(err)
 			r.Require().NotNil(insertedAsset)
 			optimus := insertedAsset.Data["optimus"].(map[string]interface{})
-			r.Equal(asset.BaseVersion, optimus["sql_version"])
-			r.Equal(asset.BaseVersion, optimus["resolved_sql_version"])
+			r.Equal("1", optimus["sql_version"])
+			r.Equal("1", optimus["resolved_sql_version"])
 		})
 
 		r.Run("should not set sql_version when optimus has no sql", func() {
@@ -2740,7 +2740,7 @@ func (r *AssetRepositoryTestSuite) TestUpsertPatch() {
 			r.Require().NoError(err)
 			r.Require().NotNil(updatedAsset)
 			optimus := updatedAsset.Data["optimus"].(map[string]interface{})
-			r.Equal("0.2", optimus["sql_version"])
+			r.Equal("2", optimus["sql_version"])
 		})
 
 		r.Run("should not change sql_version when sql is unchanged", func() {
@@ -2760,7 +2760,7 @@ func (r *AssetRepositoryTestSuite) TestUpsertPatch() {
 			r.Require().NoError(err)
 			r.Require().NotNil(updatedAsset)
 			optimus := updatedAsset.Data["optimus"].(map[string]interface{})
-			r.Equal(asset.BaseVersion, optimus["sql_version"])
+			r.Equal("1", optimus["sql_version"])
 		})
 
 		r.Run("should initialize resolved_sql_version when resolved_sql appears for the first time", func() {
@@ -2785,8 +2785,8 @@ func (r *AssetRepositoryTestSuite) TestUpsertPatch() {
 			r.Require().NoError(err)
 			r.Require().NotNil(updatedAsset)
 			optimus := updatedAsset.Data["optimus"].(map[string]interface{})
-			r.Equal(asset.BaseVersion, optimus["sql_version"])
-			r.Equal(asset.BaseVersion, optimus["resolved_sql_version"])
+			r.Equal("1", optimus["sql_version"])
+			r.Equal("1", optimus["resolved_sql_version"])
 		})
 
 		r.Run("should not bump resolved_sql_version when resolved_sql already exists", func() {
@@ -2814,8 +2814,8 @@ func (r *AssetRepositoryTestSuite) TestUpsertPatch() {
 			r.Require().NoError(err)
 			r.Require().NotNil(updatedAsset)
 			optimus := updatedAsset.Data["optimus"].(map[string]interface{})
-			r.Equal(asset.BaseVersion, optimus["sql_version"])
-			r.Equal(asset.BaseVersion, optimus["resolved_sql_version"])
+			r.Equal("1", optimus["sql_version"])
+			r.Equal("1", optimus["resolved_sql_version"])
 		})
 
 		r.Run("should bump sql_version and initialize resolved_sql_version when both change together", func() {
@@ -2840,8 +2840,8 @@ func (r *AssetRepositoryTestSuite) TestUpsertPatch() {
 			r.Require().NoError(err)
 			r.Require().NotNil(updatedAsset)
 			optimus := updatedAsset.Data["optimus"].(map[string]interface{})
-			r.Equal("0.2", optimus["sql_version"])
-			r.Equal(asset.BaseVersion, optimus["resolved_sql_version"])
+			r.Equal("2", optimus["sql_version"])
+			r.Equal("1", optimus["resolved_sql_version"])
 		})
 	})
 }

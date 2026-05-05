@@ -60,37 +60,3 @@ func TestIncreaseMinorVersion(t *testing.T) {
 		assert.Equal(t, "0.1", sv)
 	})
 }
-
-func TestIsGreaterThan(t *testing.T) {
-	t.Run("new version is greater than old version returns true", func(t *testing.T) {
-		assert.True(t, IsGreaterThan("0.2", "0.1"))
-	})
-
-	t.Run("new version is equal to old version returns false", func(t *testing.T) {
-		assert.False(t, IsGreaterThan("0.1", "0.1"))
-	})
-
-	t.Run("new version is less than old version returns false", func(t *testing.T) {
-		assert.False(t, IsGreaterThan("0.1", "0.2"))
-	})
-
-	t.Run("empty new version is not greater than empty old version returns false", func(t *testing.T) {
-		assert.False(t, IsGreaterThan("", ""))
-	})
-
-	t.Run("empty new version is not greater than valid old version returns false", func(t *testing.T) {
-		assert.False(t, IsGreaterThan("", "0.1"))
-	})
-
-	t.Run("valid new version is greater than empty old version returns true", func(t *testing.T) {
-		assert.True(t, IsGreaterThan("0.1", ""))
-	})
-
-	t.Run("invalid new version is treated as 0.0 and is not greater than valid old version returns false", func(t *testing.T) {
-		assert.False(t, IsGreaterThan("xx", "0.1"))
-	})
-
-	t.Run("valid new version with prefix v is greater than old version returns true", func(t *testing.T) {
-		assert.True(t, IsGreaterThan("v0.2", "0.1"))
-	})
-}

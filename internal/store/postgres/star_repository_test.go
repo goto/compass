@@ -40,7 +40,7 @@ func (r *StarRepositoryTestSuite) SetupSuite() {
 	if err != nil {
 		r.T().Fatal(err)
 	}
-	r.assetRepository, err = postgres.NewAssetRepository(r.client, r.userRepository, postgres.DEFAULT_MAX_RESULT_SIZE, "")
+	r.assetRepository, err = postgres.NewAssetRepository(r.client, r.userRepository, postgres.DEFAULT_MAX_RESULT_SIZE, "", logger)
 	if err != nil {
 		r.T().Fatal(err)
 	}

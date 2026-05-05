@@ -19,6 +19,7 @@ import (
 	"github.com/goto/compass/core/user"
 	"github.com/goto/compass/pkg/generichelper"
 	"github.com/goto/compass/pkg/queryexpr"
+	"github.com/goto/salt/log"
 	"github.com/jinzhu/copier"
 	"github.com/jmoiron/sqlx"
 	"github.com/r3labs/diff/v2"
@@ -46,6 +47,7 @@ const (
 	optimusResolvedSQLKey        = "resolved_sql"
 	optimusSQLVersionKey         = "sql_version"
 	optimusResolvedSQLVersionKey = "resolved_sql_version"
+	optimusSqlBaseVersion        = "1"
 
 	changelogPathOptimusSQL         = "data.optimus.sql"
 	changelogPathOptimusResolvedSQL = "data.optimus.resolved_sql"
@@ -59,6 +61,7 @@ type AssetRepository struct {
 	userRepo            *UserRepository
 	defaultGetMaxSize   int
 	defaultUserProvider string
+	logger              log.Logger
 }
 
 // GetAll retrieves list of assets with filters
@@ -596,11 +599,11 @@ func (r *AssetRepository) buildColumnLineageProducer(
 	assetConfig asset.Config,
 ) asset.ColumnLineageProducer {
 	sqlVer, resolvedSQLVer := extractOptimusQueryVersions(upsertedAsset.Data)
-	if !((sqlVer != "" && asset.IsGreaterThan(sqlVer, resolvedSQLVer)) || resolvedSQLInitialized) {
+	if !((sqlVer != "" && isGreaterThan(sqlVer, resolvedSQLVer)) || resolvedSQLInitialized) {
 		return nil
 	}
 	return func(ctx context.Context) (asset.LineageGraph, error) {
-		graph, err := r.produceColumnLevelLineage(ctx, changelog, assetConfig.ColumnLineageChangeIdentifier, assetConfig.ColumnLineageHost)
+		graph, err := r.produceColumnLevelLineage(ctx, changelog, assetConfig.ColumnLineageChangeIdentifier, assetConfig.ColumnLineageHost, upsertedAsset.URN)
 		if err != nil {
 			return nil, err
 		}
@@ -617,7 +620,8 @@ func (r *AssetRepository) produceColumnLevelLineage(
 	ctx context.Context,
 	changelogs diff.Changelog,
 	columnLineageIdentifier,
-	columnLineageHost string,
+	columnLineageHost,
+	urn string,
 ) (asset.LineageGraph, error) {
 	if columnLineageHost == "" || columnLineageIdentifier == "" {
 		return nil, nil
@@ -632,6 +636,7 @@ func (r *AssetRepository) produceColumnLevelLineage(
 			continue
 		}
 
+		r.logger.Info("Produce column lineage", "target asset", urn)
 		jsonifyPayload, err := json.Marshal(map[string]string{"query": query})
 		if err != nil {
 			return nil, fmt.Errorf("failed to encode the payload JSON: %w", err)
@@ -802,11 +807,11 @@ func initOptimusQueryVersions(data map[string]interface{}) (resolvedSQLInitializ
 	}
 
 	if baseQuery, _ := optimus[optimusSQLKey].(string); baseQuery != "" {
-		optimus[optimusSQLVersionKey] = asset.BaseVersion
+		optimus[optimusSQLVersionKey] = optimusSqlBaseVersion
 	}
 
 	if resolvedQuery, _ := optimus[optimusResolvedSQLKey].(string); resolvedQuery != "" {
-		optimus[optimusResolvedSQLVersionKey] = asset.BaseVersion
+		optimus[optimusResolvedSQLVersionKey] = optimusSqlBaseVersion
 		resolvedSQLInitialized = true
 	}
 
@@ -850,7 +855,7 @@ func applyOptimusVersionBumps(oldOptimus, newOptimus map[string]interface{}, bas
 
 	if resolvedChanged {
 		if existing, _ := oldOptimus[optimusResolvedSQLVersionKey].(string); existing == "" {
-			newOptimus[optimusResolvedSQLVersionKey] = asset.BaseVersion
+			newOptimus[optimusResolvedSQLVersionKey] = optimusSqlBaseVersion
 			return true
 		}
 	}
@@ -861,9 +866,9 @@ func applyOptimusVersionBumps(oldOptimus, newOptimus map[string]interface{}, bas
 func nextOptimusVersion(optimus map[string]interface{}, key string) string {
 	current, _ := optimus[key].(string)
 	if current == "" {
-		return asset.BaseVersion
+		return optimusSqlBaseVersion
 	}
-	return bumpMinorVersion(current)
+	return bumpSqlVersion(current)
 }
 
 func isOptimusFieldChanged(oldOptimus, newOptimus map[string]interface{}, field string, changelog diff.Changelog, changelogPath string) bool {
@@ -877,14 +882,23 @@ func isOptimusFieldChanged(oldOptimus, newOptimus map[string]interface{}, field 
 	return oldVal != newVal
 }
 
-func bumpMinorVersion(v string) string {
+func bumpSqlVersion(v string) string {
 	if v == "" {
-		v = "0.0"
+		v = "0"
 	}
-	parts := strings.SplitN(v, ".", 2)
-	major := parts[0]
-	minor, _ := strconv.Atoi(parts[1])
-	return fmt.Sprintf("%s.%d", major, minor+1)
+	version, _ := strconv.Atoi(v)
+	return fmt.Sprintf("%d", version+1)
+}
+
+func isGreaterThan(newVersion, oldVersion string) bool {
+	parse := func(v string) int {
+		if v == "" {
+			v = "0"
+		}
+		version, _ := strconv.Atoi(v)
+		return version
+	}
+	return parse(newVersion) > (parse(oldVersion))
 }
 
 // updateResolvedSQLVersion sets data.optimus.resolved_sql_version = sqlVersion for the given URN.
@@ -2056,7 +2070,7 @@ func (r *AssetRepository) buildDataField(key string, asJsonB bool) (finalQuery s
 }
 
 // NewAssetRepository initializes user repository clients
-func NewAssetRepository(c *Client, userRepo *UserRepository, defaultGetMaxSize int, defaultUserProvider string) (*AssetRepository, error) {
+func NewAssetRepository(c *Client, userRepo *UserRepository, defaultGetMaxSize int, defaultUserProvider string, logger log.Logger) (*AssetRepository, error) {
 	if c == nil {
 		return nil, errors.New("postgres client is nil")
 	}
@@ -2072,5 +2086,6 @@ func NewAssetRepository(c *Client, userRepo *UserRepository, defaultGetMaxSize i
 		defaultGetMaxSize:   defaultGetMaxSize,
 		defaultUserProvider: defaultUserProvider,
 		userRepo:            userRepo,
+		logger:              logger,
 	}, nil
 }
