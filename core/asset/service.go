@@ -25,6 +25,9 @@ type Service struct {
 	config              Config
 	cancelFnMap         *sync.Map
 	assetOpCounter      metric.Int64Counter
+	shutdownCtx         context.Context
+	shutdownCancel      context.CancelFunc
+	goroutineWg         sync.WaitGroup
 }
 
 //go:generate mockery --name=Worker -r --case underscore --with-expecter --structname Worker --filename worker_mock.go --output=./mocks
@@ -56,6 +59,7 @@ func NewService(deps ServiceDeps) (service *Service, cancel func()) {
 		otel.Handle(err)
 	}
 
+	shutdownCtx, shutdownCancel := context.WithCancel(context.Background())
 	newService := &Service{
 		assetRepository:     deps.AssetRepo,
 		discoveryRepository: deps.DiscoveryRepo,
@@ -65,18 +69,22 @@ func NewService(deps ServiceDeps) (service *Service, cancel func()) {
 		config:              deps.Config,
 		cancelFnMap:         new(sync.Map),
 		assetOpCounter:      assetOpCounter,
+		shutdownCtx:         shutdownCtx,
+		shutdownCancel:      shutdownCancel,
 	}
 	if newService.config.ExcludedChangelogPaths == nil {
 		newService.config.ExcludedChangelogPaths = []string{}
 	}
 
 	return newService, func() {
+		shutdownCancel()
 		newService.cancelFnMap.Range(func(_, value interface{}) bool {
 			if cancelFn, ok := value.(func()); ok {
 				cancelFn()
 			}
 			return true
 		})
+		newService.goroutineWg.Wait()
 	}
 }
 
@@ -128,19 +136,7 @@ func (s *Service) UpsertAssetWithoutLineage(ctx context.Context, ast *Asset, isU
 	}
 
 	if columnLineageProducer != nil {
-		go func(urn string, columnLineageProducer ColumnLineageProducer) {
-			edges, err := columnLineageProducer(context.Background())
-			if err != nil {
-				s.logger.Warn("column lineage producer failed, skipping upsert", "urn", urn, "err", err)
-				return
-			}
-			if len(edges) == 0 {
-				return
-			}
-			if err := s.lineageRepository.UpsertColumnLineage(context.Background(), urn, edges); err != nil {
-				s.logger.Warn("failed to upsert column lineage", "urn", urn, "err", err)
-			}
-		}(ast.URN, columnLineageProducer)
+		s.dispatchColumnLineage(ast.URN, columnLineageProducer)
 	}
 
 	return upsertedAsset.ID, nil
@@ -183,19 +179,7 @@ func (s *Service) UpsertPatchAssetWithoutLineage(ctx context.Context, ast *Asset
 	}
 
 	if columnLineageProducer != nil {
-		go func(urn string, columnLineageProducer ColumnLineageProducer) {
-			edges, err := columnLineageProducer(context.Background())
-			if err != nil {
-				s.logger.Warn("column lineage producer failed, skipping upsert", "urn", urn, "err", err)
-				return
-			}
-			if len(edges) == 0 {
-				return
-			}
-			if err := s.lineageRepository.UpsertColumnLineage(context.Background(), urn, edges); err != nil {
-				s.logger.Warn("failed to upsert column lineage", "urn", urn, "err", err)
-			}
-		}(ast.URN, columnLineageProducer)
+		s.dispatchColumnLineage(ast.URN, columnLineageProducer)
 	}
 
 	return upsertedAsset.ID, nil
@@ -272,10 +256,12 @@ func (s *Service) DeleteAssets(ctx context.Context, request DeleteAssetsRequest)
 	}
 
 	if !request.DryRun && total > 0 {
-		newCtx, cancel := context.WithTimeout(context.Background(), s.config.DeleteAssetsTimeout)
+		newCtx, cancel := context.WithTimeout(s.shutdownCtx, s.config.DeleteAssetsTimeout)
 		cancelID := uuid.New().String()
 		s.cancelFnMap.Store(cancelID, cancel)
+		s.goroutineWg.Add(1)
 		go func(id string) {
+			defer s.goroutineWg.Done()
 			s.executeDeleteAssets(newCtx, deleteSQLExpr)
 			cancel()
 			s.cancelFnMap.Delete(id)
@@ -350,10 +336,12 @@ func (s *Service) SoftDeleteAssets(ctx context.Context, request DeleteAssetsRequ
 
 	if !request.DryRun && total > 0 {
 		executedTime := time.Now()
-		newCtx, cancel := context.WithTimeout(context.Background(), s.config.DeleteAssetsTimeout)
+		newCtx, cancel := context.WithTimeout(s.shutdownCtx, s.config.DeleteAssetsTimeout)
 		cancelID := uuid.New().String()
 		s.cancelFnMap.Store(cancelID, cancel)
+		s.goroutineWg.Add(1)
 		go func(id string) {
+			defer s.goroutineWg.Done()
 			s.executeSoftDeleteAssets(newCtx, executedTime, updatedBy, deleteSQLExpr)
 			cancel()
 			s.cancelFnMap.Delete(id)
@@ -536,6 +524,27 @@ func (s *Service) SyncAssets(ctx context.Context, services []string) error {
 		}
 	}
 	return nil
+}
+
+func (s *Service) dispatchColumnLineage(urn string, producer ColumnLineageProducer) {
+	if producer == nil {
+		return
+	}
+	s.goroutineWg.Add(1)
+	go func() {
+		defer s.goroutineWg.Done()
+		edges, err := producer(s.shutdownCtx)
+		if err != nil {
+			s.logger.Warn("column lineage producer failed, skipping upsert", "urn", urn, "err", err)
+			return
+		}
+		if len(edges) == 0 {
+			return
+		}
+		if err := s.lineageRepository.UpsertColumnLineage(s.shutdownCtx, urn, edges); err != nil {
+			s.logger.Warn("failed to upsert column lineage", "urn", urn, "err", err)
+		}
+	}()
 }
 
 func (s *Service) instrumentAssetOp(ctx context.Context, op, id string, err error) {

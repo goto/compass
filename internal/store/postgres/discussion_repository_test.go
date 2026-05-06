@@ -41,7 +41,11 @@ func (r *DiscussionRepositoryTestSuite) SetupSuite() {
 	}
 
 	r.ctx = context.TODO()
-	r.assetRepo, err = postgres.NewAssetRepository(r.client, r.userRepo, defaultGetMaxSize, defaultProviderName, logger)
+	r.assetRepo, err = postgres.NewAssetRepository(r.client, r.userRepo, postgres.AssetRepositoryConfig{
+		DefaultGetMaxSize:   defaultGetMaxSize,
+		DefaultUserProvider: defaultProviderName,
+		Logger:              logger,
+	})
 	if err != nil {
 		r.T().Fatal(err)
 	}

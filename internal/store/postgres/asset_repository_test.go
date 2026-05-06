@@ -19,6 +19,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/goto/compass/core/asset"
 	"github.com/goto/compass/core/user"
+	"github.com/goto/compass/internal/lineageparser"
 	"github.com/goto/compass/internal/store/postgres"
 	"github.com/goto/compass/internal/testutils"
 	"github.com/goto/compass/pkg/queryexpr"
@@ -54,7 +55,11 @@ func (r *AssetRepositoryTestSuite) SetupSuite() {
 		r.T().Fatal(err)
 	}
 
-	r.repository, err = postgres.NewAssetRepository(r.client, r.userRepo, defaultGetMaxSize, defaultProviderName, logger)
+	r.repository, err = postgres.NewAssetRepository(r.client, r.userRepo, postgres.AssetRepositoryConfig{
+		DefaultGetMaxSize:   defaultGetMaxSize,
+		DefaultUserProvider: defaultProviderName,
+		Logger:              logger,
+	})
 	if err != nil {
 		r.T().Fatal(err)
 	}
@@ -1379,19 +1384,19 @@ func (r *AssetRepositoryTestSuite) TestVersions() {
 
 func (r *AssetRepositoryTestSuite) TestNewAssetRepository() {
 	r.Run("should return error when client is nil", func() {
-		repo, err := postgres.NewAssetRepository(nil, r.userRepo, 0, "shield", log.NewLogrus())
+		repo, err := postgres.NewAssetRepository(nil, r.userRepo, postgres.AssetRepositoryConfig{DefaultUserProvider: "shield", Logger: log.NewLogrus()})
 		r.Error(err)
 		r.Nil(repo)
 	})
 
 	r.Run("should use default max size when zero is passed", func() {
-		repo, err := postgres.NewAssetRepository(r.client, r.userRepo, 0, "shield", log.NewLogrus())
+		repo, err := postgres.NewAssetRepository(r.client, r.userRepo, postgres.AssetRepositoryConfig{DefaultUserProvider: "shield", Logger: log.NewLogrus()})
 		r.Require().NoError(err)
 		r.NotNil(repo)
 	})
 
 	r.Run("should use default provider when empty is passed", func() {
-		repo, err := postgres.NewAssetRepository(r.client, r.userRepo, 10, "", log.NewLogrus())
+		repo, err := postgres.NewAssetRepository(r.client, r.userRepo, postgres.AssetRepositoryConfig{DefaultGetMaxSize: 10, Logger: log.NewLogrus()})
 		r.Require().NoError(err)
 		r.NotNil(repo)
 	})
@@ -1531,7 +1536,7 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 			r.Require().NoError(err)
 			r.Require().NotNil(insertedAsset)
 			optimus := insertedAsset.Data["optimus"].(map[string]interface{})
-			r.Equal("1", optimus["sql_version"])
+			r.EqualValues(1, optimus["sql_version"])
 			r.Nil(optimus["resolved_sql_version"])
 		})
 
@@ -1551,8 +1556,8 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 			r.Require().NoError(err)
 			r.Require().NotNil(insertedAsset)
 			optimus := insertedAsset.Data["optimus"].(map[string]interface{})
-			r.Equal("1", optimus["sql_version"])
-			r.Equal("1", optimus["resolved_sql_version"])
+			r.EqualValues(1, optimus["sql_version"])
+			r.EqualValues(1, optimus["resolved_sql_version"])
 		})
 
 		r.Run("should call column lineage producer on insert when host provided", func() {
@@ -1588,6 +1593,14 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 			}))
 			defer srv.Close()
 
+			repoWithClient, err := postgres.NewAssetRepository(r.client, r.userRepo, postgres.AssetRepositoryConfig{
+				DefaultGetMaxSize:   defaultGetMaxSize,
+				DefaultUserProvider: defaultProviderName,
+				Logger:              log.NewLogrus(),
+				LineageParserClient: lineageparser.NewHTTPClient(srv.URL),
+			})
+			r.Require().NoError(err)
+
 			// first insert baseline asset with only sql so update flow will produce a changelog
 			ast := asset.Asset{
 				URN:     uuid.NewString() + "urn-optimus-produce-on-insert",
@@ -1600,7 +1613,7 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 				UpdatedBy: r.users[0],
 			}
 
-			_, _, err := r.repository.Upsert(r.ctx, &ast, false, asset.Config{})
+			_, _, err = repoWithClient.Upsert(r.ctx, &ast, false, asset.Config{})
 			r.Require().NoError(err)
 
 			// now update asset to include resolved_sql which should generate a changelog and producer
@@ -1609,8 +1622,8 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 				"resolved_sql": "SELECT 1 resolved",
 			}}
 
-			cfg := asset.Config{ColumnLineageHost: srv.URL, ColumnLineageChangeIdentifier: "data.optimus.resolved_sql"}
-			updatedAsset, producer, err := r.repository.Upsert(r.ctx, &ast, false, cfg)
+			cfg := asset.Config{ColumnLineageChangeIdentifier: "data.optimus.resolved_sql"}
+			updatedAsset, producer, err := repoWithClient.Upsert(r.ctx, &ast, false, cfg)
 			r.Require().NoError(err)
 			r.Require().NotNil(updatedAsset)
 			r.Require().NotNil(producer)
@@ -1631,6 +1644,14 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 			}))
 			defer srvErr.Close()
 
+			repoWithErrClient, err := postgres.NewAssetRepository(r.client, r.userRepo, postgres.AssetRepositoryConfig{
+				DefaultGetMaxSize:   defaultGetMaxSize,
+				DefaultUserProvider: defaultProviderName,
+				Logger:              log.NewLogrus(),
+				LineageParserClient: lineageparser.NewHTTPClient(srvErr.URL),
+			})
+			r.Require().NoError(err)
+
 			// first insert baseline asset with only sql so update flow will produce a changelog
 			ast := asset.Asset{
 				URN:     uuid.NewString() + "urn-optimus-produce-err",
@@ -1643,7 +1664,7 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 				UpdatedBy: r.users[0],
 			}
 
-			_, _, err := r.repository.Upsert(r.ctx, &ast, false, asset.Config{})
+			_, _, err = repoWithErrClient.Upsert(r.ctx, &ast, false, asset.Config{})
 			r.Require().NoError(err)
 
 			// now update asset to include resolved_sql which should generate a changelog and producer
@@ -1652,8 +1673,8 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 				"resolved_sql": "SELECT 1 resolved",
 			}}
 
-			cfg := asset.Config{ColumnLineageHost: srvErr.URL, ColumnLineageChangeIdentifier: "data.optimus.resolved_sql"}
-			updatedAsset, producer, err := r.repository.Upsert(r.ctx, &ast, false, cfg)
+			cfg := asset.Config{ColumnLineageChangeIdentifier: "data.optimus.resolved_sql"}
+			updatedAsset, producer, err := repoWithErrClient.Upsert(r.ctx, &ast, false, cfg)
 			r.Require().NoError(err)
 			r.Require().NotNil(updatedAsset)
 			r.Require().NotNil(producer)
@@ -1672,6 +1693,14 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 			}))
 			defer srvSlow.Close()
 
+			repoWithSlowClient, err := postgres.NewAssetRepository(r.client, r.userRepo, postgres.AssetRepositoryConfig{
+				DefaultGetMaxSize:   defaultGetMaxSize,
+				DefaultUserProvider: defaultProviderName,
+				Logger:              log.NewLogrus(),
+				LineageParserClient: lineageparser.NewHTTPClient(srvSlow.URL),
+			})
+			r.Require().NoError(err)
+
 			// modify both sql and resolved_sql so changelog includes resolved_sql and sql_version
 			// will be bumped, ensuring a ColumnLineageProducer is created and the resolved_sql
 			// entry is sent to the lineage service.
@@ -1680,8 +1709,8 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 				"resolved_sql": "SELECT 1 resolved again",
 			}}
 
-			cfg2 := asset.Config{ColumnLineageHost: srvSlow.URL, ColumnLineageChangeIdentifier: "data.optimus.resolved_sql"}
-			updatedAsset2, producer2, err := r.repository.Upsert(r.ctx, &ast, false, cfg2)
+			cfg2 := asset.Config{ColumnLineageChangeIdentifier: "data.optimus.resolved_sql"}
+			updatedAsset2, producer2, err := repoWithSlowClient.Upsert(r.ctx, &ast, false, cfg2)
 			r.Require().NoError(err)
 			r.Require().NotNil(updatedAsset2)
 			r.Require().NotNil(producer2)
@@ -1724,6 +1753,14 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 			}))
 			defer srv.Close()
 
+			repoWithClient, err := postgres.NewAssetRepository(r.client, r.userRepo, postgres.AssetRepositoryConfig{
+				DefaultGetMaxSize:   defaultGetMaxSize,
+				DefaultUserProvider: defaultProviderName,
+				Logger:              log.NewLogrus(),
+				LineageParserClient: lineageparser.NewHTTPClient(srv.URL),
+			})
+			r.Require().NoError(err)
+
 			// insert baseline asset without optimus to ensure changelog.Path is "data.optimus"
 			ast := asset.Asset{
 				URN:       uuid.NewString() + "urn-optimus-nested-traverse",
@@ -1733,7 +1770,7 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 				Data:      map[string]interface{}{},
 				UpdatedBy: r.users[0],
 			}
-			_, _, err := r.repository.Upsert(r.ctx, &ast, false, asset.Config{})
+			_, _, err = repoWithClient.Upsert(r.ctx, &ast, false, asset.Config{})
 			r.Require().NoError(err)
 
 			// now update asset: set sql (so producer condition is met) and nested map for traversal
@@ -1747,8 +1784,8 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 				},
 			}}
 
-			cfg := asset.Config{ColumnLineageHost: srv.URL, ColumnLineageChangeIdentifier: "data.optimus.some.path.query"}
-			updatedAsset, producer, err := r.repository.Upsert(r.ctx, &ast, false, cfg)
+			cfg := asset.Config{ColumnLineageChangeIdentifier: "data.optimus.some.path.query"}
+			updatedAsset, producer, err := repoWithClient.Upsert(r.ctx, &ast, false, cfg)
 			r.Require().NoError(err)
 			r.Require().NotNil(updatedAsset)
 			r.Require().NotNil(producer)
@@ -1760,6 +1797,14 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 		})
 
 		r.Run("should return error when changelog.To is non-map but identifier expects nested keys", func() {
+			repoWithClient, err := postgres.NewAssetRepository(r.client, r.userRepo, postgres.AssetRepositoryConfig{
+				DefaultGetMaxSize:   defaultGetMaxSize,
+				DefaultUserProvider: defaultProviderName,
+				Logger:              log.NewLogrus(),
+				LineageParserClient: lineageparser.NewHTTPClient("http://example.invalid"),
+			})
+			r.Require().NoError(err)
+
 			// insert baseline asset with optimus as a map containing sql
 			ast := asset.Asset{
 				URN:       uuid.NewString() + "urn-optimus-nonmap-traverse",
@@ -1769,14 +1814,14 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 				Data:      map[string]interface{}{"optimus": map[string]interface{}{"sql": "SELECT 1"}},
 				UpdatedBy: r.users[0],
 			}
-			_, _, err := r.repository.Upsert(r.ctx, &ast, false, asset.Config{})
+			_, _, err = repoWithClient.Upsert(r.ctx, &ast, false, asset.Config{})
 			r.Require().NoError(err)
 
 			// update optimus to be a non-map (string) so changelog.To will be a string
 			ast.Data = map[string]interface{}{"optimus": "not-a-map"}
 
-			cfg := asset.Config{ColumnLineageHost: "http://example.invalid", ColumnLineageChangeIdentifier: "data.optimus.some.path.query"}
-			updatedAsset, producer, err := r.repository.Upsert(r.ctx, &ast, false, cfg)
+			cfg := asset.Config{ColumnLineageChangeIdentifier: "data.optimus.some.path.query"}
+			updatedAsset, producer, err := repoWithClient.Upsert(r.ctx, &ast, false, cfg)
 			r.Require().NoError(err)
 			r.Require().NotNil(updatedAsset)
 			r.Require().NotNil(producer)
@@ -1803,6 +1848,14 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 			}))
 			defer srv.Close()
 
+			repoWithClient, err := postgres.NewAssetRepository(r.client, r.userRepo, postgres.AssetRepositoryConfig{
+				DefaultGetMaxSize:   defaultGetMaxSize,
+				DefaultUserProvider: defaultProviderName,
+				Logger:              log.NewLogrus(),
+				LineageParserClient: lineageparser.NewHTTPClient(srv.URL),
+			})
+			r.Require().NoError(err)
+
 			ast := asset.Asset{
 				URN:     uuid.NewString() + "urn-optimus-invalid-response",
 				Name:    "optimus-invalid-response",
@@ -1814,7 +1867,7 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 				UpdatedBy: r.users[0],
 			}
 
-			_, _, err := r.repository.Upsert(r.ctx, &ast, false, asset.Config{})
+			_, _, err = repoWithClient.Upsert(r.ctx, &ast, false, asset.Config{})
 			r.Require().NoError(err)
 
 			ast.Data = map[string]interface{}{"optimus": map[string]interface{}{
@@ -1822,8 +1875,8 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 				"resolved_sql": "SELECT 1 resolved",
 			}}
 
-			cfg := asset.Config{ColumnLineageHost: srv.URL, ColumnLineageChangeIdentifier: "data.optimus.resolved_sql"}
-			updatedAsset, producer, err := r.repository.Upsert(r.ctx, &ast, false, cfg)
+			cfg := asset.Config{ColumnLineageChangeIdentifier: "data.optimus.resolved_sql"}
+			updatedAsset, producer, err := repoWithClient.Upsert(r.ctx, &ast, false, cfg)
 			r.Require().NoError(err)
 			r.Require().NotNil(updatedAsset)
 			r.Require().NotNil(producer)
@@ -2091,7 +2144,7 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 			r.Require().NoError(err)
 			r.Require().NotNil(updatedAsset)
 			optimus := updatedAsset.Data["optimus"].(map[string]interface{})
-			r.Equal("2", optimus["sql_version"])
+			r.EqualValues(2, optimus["sql_version"])
 		})
 
 		r.Run("should not change sql_version when sql is unchanged", func() {
@@ -2111,7 +2164,7 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 			r.Require().NoError(err)
 			r.Require().NotNil(updatedAsset)
 			optimus := updatedAsset.Data["optimus"].(map[string]interface{})
-			r.Equal("1", optimus["sql_version"])
+			r.EqualValues(1, optimus["sql_version"])
 		})
 
 		r.Run("should initialize resolved_sql_version when resolved_sql appears for the first time", func() {
@@ -2134,8 +2187,8 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 			r.Require().NoError(err)
 			r.Require().NotNil(updatedAsset)
 			optimus := updatedAsset.Data["optimus"].(map[string]interface{})
-			r.Equal("1", optimus["sql_version"])
-			r.Equal("1", optimus["resolved_sql_version"])
+			r.EqualValues(1, optimus["sql_version"])
+			r.EqualValues(1, optimus["resolved_sql_version"])
 		})
 
 		r.Run("should not bump resolved_sql_version when resolved_sql already exists", func() {
@@ -2162,8 +2215,8 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 			r.Require().NoError(err)
 			r.Require().NotNil(updatedAsset)
 			optimus := updatedAsset.Data["optimus"].(map[string]interface{})
-			r.Equal("1", optimus["sql_version"])
-			r.Equal("1", optimus["resolved_sql_version"])
+			r.EqualValues(1, optimus["sql_version"])
+			r.EqualValues(1, optimus["resolved_sql_version"])
 		})
 
 		r.Run("should bump sql_version and initialize resolved_sql_version when both change together", func() {
@@ -2186,8 +2239,8 @@ func (r *AssetRepositoryTestSuite) TestUpsert() {
 			r.Require().NoError(err)
 			r.Require().NotNil(updatedAsset)
 			optimus := updatedAsset.Data["optimus"].(map[string]interface{})
-			r.Equal("2", optimus["sql_version"])
-			r.Equal("1", optimus["resolved_sql_version"])
+			r.EqualValues(2, optimus["sql_version"])
+			r.EqualValues(1, optimus["resolved_sql_version"])
 		})
 	})
 }
@@ -2405,7 +2458,7 @@ func (r *AssetRepositoryTestSuite) TestUpsertPatch() {
 			r.Require().NoError(err)
 			r.Require().NotNil(insertedAsset)
 			optimus := insertedAsset.Data["optimus"].(map[string]interface{})
-			r.Equal("1", optimus["sql_version"])
+			r.EqualValues(1, optimus["sql_version"])
 			r.Nil(optimus["resolved_sql_version"])
 		})
 
@@ -2425,8 +2478,8 @@ func (r *AssetRepositoryTestSuite) TestUpsertPatch() {
 			r.Require().NoError(err)
 			r.Require().NotNil(insertedAsset)
 			optimus := insertedAsset.Data["optimus"].(map[string]interface{})
-			r.Equal("1", optimus["sql_version"])
-			r.Equal("1", optimus["resolved_sql_version"])
+			r.EqualValues(1, optimus["sql_version"])
+			r.EqualValues(1, optimus["resolved_sql_version"])
 		})
 
 		r.Run("should not set sql_version when optimus has no sql", func() {
@@ -2740,7 +2793,7 @@ func (r *AssetRepositoryTestSuite) TestUpsertPatch() {
 			r.Require().NoError(err)
 			r.Require().NotNil(updatedAsset)
 			optimus := updatedAsset.Data["optimus"].(map[string]interface{})
-			r.Equal("2", optimus["sql_version"])
+			r.EqualValues(2, optimus["sql_version"])
 		})
 
 		r.Run("should not change sql_version when sql is unchanged", func() {
@@ -2760,7 +2813,7 @@ func (r *AssetRepositoryTestSuite) TestUpsertPatch() {
 			r.Require().NoError(err)
 			r.Require().NotNil(updatedAsset)
 			optimus := updatedAsset.Data["optimus"].(map[string]interface{})
-			r.Equal("1", optimus["sql_version"])
+			r.EqualValues(1, optimus["sql_version"])
 		})
 
 		r.Run("should initialize resolved_sql_version when resolved_sql appears for the first time", func() {
@@ -2785,8 +2838,8 @@ func (r *AssetRepositoryTestSuite) TestUpsertPatch() {
 			r.Require().NoError(err)
 			r.Require().NotNil(updatedAsset)
 			optimus := updatedAsset.Data["optimus"].(map[string]interface{})
-			r.Equal("1", optimus["sql_version"])
-			r.Equal("1", optimus["resolved_sql_version"])
+			r.EqualValues(1, optimus["sql_version"])
+			r.EqualValues(1, optimus["resolved_sql_version"])
 		})
 
 		r.Run("should not bump resolved_sql_version when resolved_sql already exists", func() {
@@ -2814,8 +2867,8 @@ func (r *AssetRepositoryTestSuite) TestUpsertPatch() {
 			r.Require().NoError(err)
 			r.Require().NotNil(updatedAsset)
 			optimus := updatedAsset.Data["optimus"].(map[string]interface{})
-			r.Equal("1", optimus["sql_version"])
-			r.Equal("1", optimus["resolved_sql_version"])
+			r.EqualValues(1, optimus["sql_version"])
+			r.EqualValues(1, optimus["resolved_sql_version"])
 		})
 
 		r.Run("should bump sql_version and initialize resolved_sql_version when both change together", func() {
@@ -2840,8 +2893,8 @@ func (r *AssetRepositoryTestSuite) TestUpsertPatch() {
 			r.Require().NoError(err)
 			r.Require().NotNil(updatedAsset)
 			optimus := updatedAsset.Data["optimus"].(map[string]interface{})
-			r.Equal("2", optimus["sql_version"])
-			r.Equal("1", optimus["resolved_sql_version"])
+			r.EqualValues(2, optimus["sql_version"])
+			r.EqualValues(1, optimus["resolved_sql_version"])
 		})
 	})
 }

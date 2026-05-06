@@ -8,6 +8,7 @@ import (
 	"github.com/MakeNowJust/heredoc"
 	"github.com/goto/compass/core/asset"
 	"github.com/goto/compass/internal/cleanup"
+	"github.com/goto/compass/internal/lineageparser"
 	"github.com/goto/compass/internal/store/elasticsearch"
 	"github.com/goto/compass/internal/store/postgres"
 	"github.com/goto/compass/internal/workermanager"
@@ -82,7 +83,12 @@ func runCleanUp(ctx context.Context, cfg *Config) (uint32, error) {
 	if err != nil {
 		return 0, fmt.Errorf("create new user repository: %w", err)
 	}
-	assetRepository, err := postgres.NewAssetRepository(pgClient, userRepository, 0, cfg.Service.Identity.ProviderDefaultName, logger)
+	assetRepository, err := postgres.NewAssetRepository(
+		pgClient, userRepository, postgres.AssetRepositoryConfig{
+			DefaultUserProvider: cfg.Service.Identity.ProviderDefaultName,
+			Logger:              logger,
+			LineageParserClient: lineageparser.NewHTTPClient(cfg.Asset.ColumnLineageHost),
+		})
 	if err != nil {
 		return 0, fmt.Errorf("create new asset repository: %w", err)
 	}
