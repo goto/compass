@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -200,6 +201,30 @@ func (repo *LineageRepository) Upsert(ctx context.Context, urn string, upstreams
 
 		if err := repo.removeGraph(ctx, tx, toRemoves); err != nil {
 			return fmt.Errorf("error removing graph: %w", err)
+		}
+
+		return nil
+	})
+}
+
+func (repo *LineageRepository) UpsertColumnLineage(ctx context.Context, assetURN string, newEdges asset.LineageGraph) error {
+	currentEdges, err := repo.getDirectColumnLineage(ctx, assetURN)
+	if err != nil {
+		return fmt.Errorf("error getting node's direct column lineage: %w", err)
+	}
+	toInserts, toRemoves := repo.compareColumnLineage(currentEdges, newEdges)
+
+	return repo.client.RunWithinTx(ctx, func(tx *sqlx.Tx) error {
+		if err := repo.restoreColumnLineage(ctx, tx, assetURN); err != nil {
+			return fmt.Errorf("error restoring column lineage: %w", err)
+		}
+
+		if err := repo.insertColumnLineage(ctx, tx, toInserts); err != nil {
+			return fmt.Errorf("error inserting column lineage: %w", err)
+		}
+
+		if err := repo.removeColumnLineage(ctx, tx, toRemoves); err != nil {
+			return fmt.Errorf("error removing column lineage: %w", err)
 		}
 
 		return nil
@@ -675,4 +700,136 @@ func (b *recursiveCTEBuilder) toSQL() (string, []interface{}, error) {
 		b.alias, cols, query)
 
 	return query, args, nil
+}
+
+func (repo *LineageRepository) getDirectColumnLineage(ctx context.Context, assetURN string) (asset.LineageGraph, error) {
+	query, args, err := sq.Select("source_asset as source", "source_column", "target_asset as target", "target_column").
+		From("column_lineage_graph").
+		Where(sq.Eq{"target_asset": assetURN}).
+		PlaceholderFormat(sq.Dollar).
+		ToSql()
+	if err != nil {
+		return nil, fmt.Errorf("build query to fetch direct column nodes: %w", err)
+	}
+
+	var gm LineageGraphModel
+	if err := repo.client.db.SelectContext(ctx, &gm, query, args...); err != nil {
+		return nil, fmt.Errorf("run query to fetch direct column nodes: %w", err)
+	}
+
+	return gm.toGraph(), nil
+}
+
+func (*LineageRepository) compareColumnLineage(currentGraph, newGraph asset.LineageGraph) (toInserts, toRemoves asset.LineageGraph) {
+	currMap := make(map[string]asset.LineageEdge, len(currentGraph))
+	for _, e := range currentGraph {
+		key := e.Source + "." + e.SourceColumn + "->" + e.Target + "." + e.TargetColumn
+		currMap[key] = e
+	}
+
+	for _, e := range newGraph {
+		key := e.Source + "." + e.SourceColumn + "->" + e.Target + "." + e.TargetColumn
+		if _, exists := currMap[key]; exists {
+			delete(currMap, key)
+		} else {
+			toInserts = append(toInserts, e)
+		}
+	}
+
+	for _, e := range currMap {
+		toRemoves = append(toRemoves, e)
+	}
+
+	return toInserts, toRemoves
+}
+
+func (repo *LineageRepository) restoreColumnLineage(ctx context.Context, execer sqlx.ExecerContext, assetURN string) error {
+	if err := repo.restoreColumnLineageByProp(ctx, execer, assetURN, true); err != nil {
+		return err
+	}
+	return repo.restoreColumnLineageByProp(ctx, execer, assetURN, false)
+}
+
+func (*LineageRepository) restoreColumnLineageByProp(ctx context.Context, execer sqlx.ExecerContext, assetURN string, isSource bool) error {
+	field := "target_is_deleted"
+	whereColumn := "target_asset"
+	if isSource {
+		field = "source_is_deleted"
+		whereColumn = "source_asset"
+	}
+
+	sql, args, err := sq.Update("column_lineage_graph").
+		Set("prop", sq.Expr(fmt.Sprintf("jsonb_set(coalesce(prop, '{}'::jsonb), '{%s}', to_jsonb(false))", field))).
+		Where(sq.Eq{whereColumn: assetURN}).
+		PlaceholderFormat(sq.Dollar).
+		ToSql()
+	if err != nil {
+		return fmt.Errorf("build restore column lineage query: %w", err)
+	}
+
+	if _, err := execer.ExecContext(ctx, sql, args...); err != nil {
+		return fmt.Errorf("execute restore column lineage query: %w", err)
+	}
+
+	return nil
+}
+
+func (*LineageRepository) insertColumnLineage(ctx context.Context, execer sqlx.ExecerContext, edges asset.LineageGraph) error {
+	if len(edges) == 0 {
+		return nil
+	}
+
+	insert := sq.Insert("column_lineage_graph").
+		Columns("source_asset", "source_column", "target_asset", "target_column", "prop")
+	for _, e := range edges {
+		prop, _ := json.Marshal(map[string]interface{}{
+			"target_is_deleted": false,
+			"source_is_deleted": false,
+		})
+		insert = insert.Values(e.Source, e.SourceColumn, e.Target, e.TargetColumn, string(prop))
+	}
+
+	query, args, err := insert.
+		Suffix("ON CONFLICT (source_asset, source_column, target_asset, target_column) DO NOTHING").
+		PlaceholderFormat(sq.Dollar).
+		ToSql()
+	if err != nil {
+		return fmt.Errorf("build insert query: %w", err)
+	}
+
+	if _, err := execer.ExecContext(ctx, query, args...); err != nil {
+		return fmt.Errorf("execute insert query: %w", err)
+	}
+
+	return nil
+}
+
+func (*LineageRepository) removeColumnLineage(ctx context.Context, execer sqlx.ExecerContext, edges asset.LineageGraph) error {
+	if len(edges) == 0 {
+		return nil
+	}
+
+	conditions := sq.Or{}
+	for _, e := range edges {
+		conditions = append(conditions, sq.Eq{
+			"source_asset":  e.Source,
+			"source_column": e.SourceColumn,
+			"target_asset":  e.Target,
+			"target_column": e.TargetColumn,
+		})
+	}
+
+	query, args, err := sq.Delete("column_lineage_graph").
+		Where(conditions).
+		PlaceholderFormat(sq.Dollar).
+		ToSql()
+	if err != nil {
+		return fmt.Errorf("build delete query: %w", err)
+	}
+
+	if _, err := execer.ExecContext(ctx, query, args...); err != nil {
+		return fmt.Errorf("execute delete query: %w", err)
+	}
+
+	return nil
 }

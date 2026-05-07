@@ -22,8 +22,8 @@ type Repository interface {
 	GetByVersionWithID(ctx context.Context, id, version string) (Asset, error)
 	GetByVersionWithURN(ctx context.Context, urn, version string) (Asset, error)
 	GetTypes(ctx context.Context, flt Filter) (map[Type]int, error)
-	Upsert(ctx context.Context, ast *Asset, isUpdateOnly bool, excludedChangelogPaths []string) (*Asset, error)
-	UpsertPatch(ctx context.Context, ast *Asset, patchData map[string]interface{}, isUpdateOnly bool, excludedChangelogPaths []string) (*Asset, error)
+	Upsert(ctx context.Context, ast *Asset, isUpdateOnly bool, assetConfig Config) (*Asset, ColumnLineageProducer, error)
+	UpsertPatch(ctx context.Context, ast *Asset, patchData map[string]interface{}, isUpdateOnly bool, assetConfig Config) (*Asset, ColumnLineageProducer, error)
 	DeleteByID(ctx context.Context, id string) (string, error)
 	DeleteByURN(ctx context.Context, urn string) error
 	SoftDeleteByID(ctx context.Context, executedAt time.Time, id, updatedByID string) (string, string, error)
@@ -35,6 +35,10 @@ type Repository interface {
 	GetProbes(ctx context.Context, assetURN string) ([]Probe, error)
 	GetProbesWithFilter(ctx context.Context, flt ProbesFilter) (map[string][]Probe, error)
 }
+
+// ColumnLineageProducer is a deferred function that performs the slow column lineage HTTP call.
+// It is returned from Upsert/UpsertPatch so that callers can invoke it asynchronously.
+type ColumnLineageProducer func(ctx context.Context) (LineageGraph, error)
 
 // Asset is a model that wraps arbitrary data with Compass' context
 type Asset struct {
@@ -68,17 +72,24 @@ type SoftDeleteAssetParams struct {
 
 // Diff returns nil changelog with nil error if equal
 // returns wrapped r3labs/diff Changelog struct with nil error if not equal
-func (a *Asset) Diff(otherAsset *Asset, excludedChangelogPaths []string) (diff.Changelog, error) {
-	changelog, err := diff.Diff(a, otherAsset, diff.DiscardComplexOrigin(), diff.AllowTypeMismatch(true))
+func (a *Asset) Diff(otherAsset *Asset, excludedChangelogPaths []string) (fullChangelog, simplifiedChangelog diff.Changelog, err error) {
+	fullChangelog, err = diff.Diff(a, otherAsset, diff.DiscardComplexOrigin(), diff.AllowTypeMismatch(true))
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
+
+	if len(excludedChangelogPaths) == 0 {
+		return fullChangelog, fullChangelog, nil
+	}
+
+	simplifiedChangelog = make(diff.Changelog, len(fullChangelog))
+	copy(simplifiedChangelog, fullChangelog)
 
 	for _, path := range excludedChangelogPaths {
-		changelog = changelog.FilterOut(strings.Split(path, "."))
+		simplifiedChangelog = simplifiedChangelog.FilterOut(strings.Split(path, "."))
 	}
 
-	return changelog, nil
+	return fullChangelog, simplifiedChangelog, nil
 }
 
 // Patch appends asset with data from map. It mutates the asset itself.

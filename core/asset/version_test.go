@@ -52,4 +52,11 @@ func TestIncreaseMinorVersion(t *testing.T) {
 		assert.Nil(t, err)
 		assert.Equal(t, "1.1", sv)
 	})
+
+	t.Run("increase minor version of empty version will return nil error", func(t *testing.T) {
+		v := ""
+		sv, err := IncreaseMinorVersion(v)
+		assert.Nil(t, err)
+		assert.Equal(t, "0.1", sv)
+	})
 }

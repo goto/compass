@@ -25,6 +25,9 @@ type Service struct {
 	config              Config
 	cancelFnMap         *sync.Map
 	assetOpCounter      metric.Int64Counter
+	shutdownCtx         context.Context
+	shutdownCancel      context.CancelFunc
+	goroutineWg         sync.WaitGroup
 }
 
 //go:generate mockery --name=Worker -r --case underscore --with-expecter --structname Worker --filename worker_mock.go --output=./mocks
@@ -56,6 +59,7 @@ func NewService(deps ServiceDeps) (service *Service, cancel func()) {
 		otel.Handle(err)
 	}
 
+	shutdownCtx, shutdownCancel := context.WithCancel(context.Background())
 	newService := &Service{
 		assetRepository:     deps.AssetRepo,
 		discoveryRepository: deps.DiscoveryRepo,
@@ -65,18 +69,22 @@ func NewService(deps ServiceDeps) (service *Service, cancel func()) {
 		config:              deps.Config,
 		cancelFnMap:         new(sync.Map),
 		assetOpCounter:      assetOpCounter,
+		shutdownCtx:         shutdownCtx,
+		shutdownCancel:      shutdownCancel,
 	}
 	if newService.config.ExcludedChangelogPaths == nil {
 		newService.config.ExcludedChangelogPaths = []string{}
 	}
 
 	return newService, func() {
+		shutdownCancel()
 		newService.cancelFnMap.Range(func(_, value interface{}) bool {
 			if cancelFn, ok := value.(func()); ok {
 				cancelFn()
 			}
 			return true
 		})
+		newService.goroutineWg.Wait()
 	}
 }
 
@@ -114,20 +122,24 @@ func (s *Service) UpsertAssetWithoutLineage(ctx context.Context, ast *Asset, isU
 	currentTime := time.Now()
 	ast.RefreshedAt = &currentTime
 
-	asset, err := s.assetRepository.Upsert(ctx, ast, isUpdateOnly, s.config.ExcludedChangelogPaths)
-	// retry due to race condition possibility on insert
+	upsertedAsset, columnLineageProducer, err := s.assetRepository.Upsert(ctx, ast, isUpdateOnly, s.config)
 	if errors.Is(err, ErrURNExist) {
-		asset, err = s.assetRepository.Upsert(ctx, ast, isUpdateOnly, s.config.ExcludedChangelogPaths)
+		upsertedAsset, columnLineageProducer, err = s.assetRepository.Upsert(ctx, ast, isUpdateOnly, s.config)
 	}
+
 	if err != nil {
 		return "", err
 	}
 
-	if err := s.worker.EnqueueIndexAssetJob(ctx, *asset); err != nil {
+	if err := s.worker.EnqueueIndexAssetJob(ctx, *upsertedAsset); err != nil {
 		return "", err
 	}
 
-	return asset.ID, nil
+	if columnLineageProducer != nil {
+		s.dispatchColumnLineage(ast.URN, columnLineageProducer)
+	}
+
+	return upsertedAsset.ID, nil
 }
 
 func (s *Service) UpsertPatchAsset( //nolint:revive
@@ -153,20 +165,24 @@ func (s *Service) UpsertPatchAssetWithoutLineage(ctx context.Context, ast *Asset
 	currentTime := time.Now()
 	ast.RefreshedAt = &currentTime
 
-	asset, err := s.assetRepository.UpsertPatch(ctx, ast, patchData, isUpdateOnly, s.config.ExcludedChangelogPaths)
-	// retry due to race condition possibility on insert
+	upsertedAsset, columnLineageProducer, err := s.assetRepository.UpsertPatch(ctx, ast, patchData, isUpdateOnly, s.config)
 	if errors.Is(err, ErrURNExist) {
-		asset, err = s.assetRepository.UpsertPatch(ctx, ast, patchData, isUpdateOnly, s.config.ExcludedChangelogPaths)
+		upsertedAsset, columnLineageProducer, err = s.assetRepository.UpsertPatch(ctx, ast, patchData, isUpdateOnly, s.config)
 	}
+
 	if err != nil {
 		return "", err
 	}
 
-	if err := s.worker.EnqueueIndexAssetJob(ctx, *asset); err != nil {
+	if err := s.worker.EnqueueIndexAssetJob(ctx, *upsertedAsset); err != nil {
 		return "", err
 	}
 
-	return asset.ID, nil
+	if columnLineageProducer != nil {
+		s.dispatchColumnLineage(ast.URN, columnLineageProducer)
+	}
+
+	return upsertedAsset.ID, nil
 }
 
 // DeleteAsset is hard-deletion that can accept ID or URN of asset
@@ -240,10 +256,12 @@ func (s *Service) DeleteAssets(ctx context.Context, request DeleteAssetsRequest)
 	}
 
 	if !request.DryRun && total > 0 {
-		newCtx, cancel := context.WithTimeout(context.Background(), s.config.DeleteAssetsTimeout)
+		newCtx, cancel := context.WithTimeout(s.shutdownCtx, s.config.DeleteAssetsTimeout)
 		cancelID := uuid.New().String()
 		s.cancelFnMap.Store(cancelID, cancel)
+		s.goroutineWg.Add(1)
 		go func(id string) {
+			defer s.goroutineWg.Done()
 			s.executeDeleteAssets(newCtx, deleteSQLExpr)
 			cancel()
 			s.cancelFnMap.Delete(id)
@@ -318,10 +336,12 @@ func (s *Service) SoftDeleteAssets(ctx context.Context, request DeleteAssetsRequ
 
 	if !request.DryRun && total > 0 {
 		executedTime := time.Now()
-		newCtx, cancel := context.WithTimeout(context.Background(), s.config.DeleteAssetsTimeout)
+		newCtx, cancel := context.WithTimeout(s.shutdownCtx, s.config.DeleteAssetsTimeout)
 		cancelID := uuid.New().String()
 		s.cancelFnMap.Store(cancelID, cancel)
+		s.goroutineWg.Add(1)
 		go func(id string) {
+			defer s.goroutineWg.Done()
 			s.executeSoftDeleteAssets(newCtx, executedTime, updatedBy, deleteSQLExpr)
 			cancel()
 			s.cancelFnMap.Delete(id)
@@ -504,6 +524,27 @@ func (s *Service) SyncAssets(ctx context.Context, services []string) error {
 		}
 	}
 	return nil
+}
+
+func (s *Service) dispatchColumnLineage(urn string, producer ColumnLineageProducer) {
+	if producer == nil {
+		return
+	}
+	s.goroutineWg.Add(1)
+	go func() {
+		defer s.goroutineWg.Done()
+		edges, err := producer(s.shutdownCtx)
+		if err != nil {
+			s.logger.Warn("column lineage producer failed, skipping upsert", "urn", urn, "err", err)
+			return
+		}
+		if len(edges) == 0 {
+			return
+		}
+		if err := s.lineageRepository.UpsertColumnLineage(s.shutdownCtx, urn, edges); err != nil {
+			s.logger.Warn("failed to upsert column lineage", "urn", urn, "err", err)
+		}
+	}()
 }
 
 func (s *Service) instrumentAssetOp(ctx context.Context, op, id string, err error) {

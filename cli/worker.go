@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/MakeNowJust/heredoc"
+	"github.com/goto/compass/internal/lineageparser"
 	"github.com/goto/compass/internal/store/elasticsearch"
 	"github.com/goto/compass/internal/store/postgres"
 	"github.com/goto/compass/internal/workermanager"
@@ -73,7 +74,12 @@ func runWorker(ctx context.Context, cfg *Config) error {
 		return err
 	}
 
-	assetRepository, err := postgres.NewAssetRepository(pgClient, nil, 0, cfg.Service.Identity.ProviderDefaultName)
+	assetRepository, err := postgres.NewAssetRepository(
+		pgClient, nil, postgres.AssetRepositoryConfig{
+			DefaultUserProvider: cfg.Service.Identity.ProviderDefaultName,
+			Logger:              logger,
+			LineageParserClient: lineageparser.NewHTTPClient(cfg.Asset.ColumnLineageHost),
+		})
 	if err != nil {
 		return fmt.Errorf("create new asset repository: %w", err)
 	}

@@ -17,8 +17,12 @@ func ParseVersion(v string) (*semver.Version, error) {
 	return semverVersion, nil
 }
 
-// IncreaseMinorVersion bumps up the minor version +0.1
+// IncreaseMinorVersion bumps up the minor version +0.1.
+// If v is empty it is treated as "0.0", yielding "0.1".
 func IncreaseMinorVersion(v string) (string, error) {
+	if v == "" {
+		v = "0.0"
+	}
 	oldVersion, err := ParseVersion(v)
 	if err != nil {
 		return "", err

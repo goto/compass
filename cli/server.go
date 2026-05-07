@@ -12,6 +12,7 @@ import (
 	"github.com/goto/compass/core/star"
 	"github.com/goto/compass/core/tag"
 	"github.com/goto/compass/core/user"
+	"github.com/goto/compass/internal/lineageparser"
 	compassserver "github.com/goto/compass/internal/server"
 	esStore "github.com/goto/compass/internal/store/elasticsearch"
 	"github.com/goto/compass/internal/store/postgres"
@@ -126,7 +127,12 @@ func runServer(ctx context.Context, cfg *Config) error {
 	}
 	userService := user.NewService(logger, userRepository)
 
-	assetRepository, err := postgres.NewAssetRepository(pgClient, userRepository, 0, cfg.Service.Identity.ProviderDefaultName)
+	assetRepository, err := postgres.NewAssetRepository(
+		pgClient, userRepository, postgres.AssetRepositoryConfig{
+			DefaultUserProvider: cfg.Service.Identity.ProviderDefaultName,
+			Logger:              logger,
+			LineageParserClient: lineageparser.NewHTTPClient(cfg.Asset.ColumnLineageHost),
+		})
 	if err != nil {
 		return fmt.Errorf("create new asset repository: %w", err)
 	}

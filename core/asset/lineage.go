@@ -53,6 +53,7 @@ type LineageRepository interface {
 	GetGraph(ctx context.Context, urn string, query LineageQuery) (LineageGraph, error)
 	GetColumnGraph(ctx context.Context, urn string, query LineageQuery) (LineageGraph, error)
 	Upsert(ctx context.Context, urn string, upstreams, downstreams []string) error
+	UpsertColumnLineage(ctx context.Context, assetURN string, newEdges LineageGraph) error
 	DeleteByURN(ctx context.Context, urn string) error
 	SoftDeleteByURN(ctx context.Context, urn string) error
 	DeleteByURNs(ctx context.Context, urns []string) error

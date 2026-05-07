@@ -82,6 +82,8 @@ asset:
     delete_assets_timeout: 5m
     excluded_changelog_paths:
         - data.update_time
+    column_lineage_host: http://localhost:8086
+    column_lineage_change_identifier: data.optimus.resolved_sql
 
 cleanup:
     dry_run: true
