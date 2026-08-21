@@ -325,7 +325,7 @@ func (s *Service) executeDeleteAssetsByServicesAndUpdatedAt(ctx context.Context,
 }
 
 func (s *Service) SoftDeleteAssets(ctx context.Context, request DeleteAssetsRequest, updatedBy string) (affectedRows uint32, err error) {
-	queryExprStr := request.QueryExpr + " && is_deleted == false"
+	queryExprStr := "(" + request.QueryExpr + ") && is_deleted == false"
 	deleteSQLExpr := DeleteAssetExpr{
 		ExprStr: queryexpr.SQLExpr(queryExprStr),
 	}
@@ -354,7 +354,11 @@ func (s *Service) SoftDeleteAssets(ctx context.Context, request DeleteAssetsRequ
 func (s *Service) executeSoftDeleteAssets(ctx context.Context, executedTime time.Time, updatedByID string, queryExpr queryexpr.ExprStr) {
 	updatedAssets, err := s.assetRepository.SoftDeleteByQueryExpr(ctx, executedTime, updatedByID, queryExpr)
 	if err != nil {
-		s.logger.Error("asset deletion failed, skipping elasticsearch and lineage soft deletions", "err:", err)
+		s.logger.Error("asset deletion incomplete, propagating the assets already deleted",
+			"err:", err, "deleted so far", len(updatedAssets))
+	}
+
+	if len(updatedAssets) == 0 {
 		return
 	}
 

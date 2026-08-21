@@ -144,16 +144,23 @@ func (repo *LineageRepository) DeleteByURNs(ctx context.Context, urns []string) 
 }
 
 func (repo *LineageRepository) SoftDeleteByURNs(ctx context.Context, urns []string) error {
-	// Process source soft deletion
-	if err := repo.softDeleteByURNsAndProp(ctx, urns, true); err != nil {
-		return err
-	}
+	return repo.client.RunWithinTx(ctx, func(tx *sqlx.Tx) error {
+		// Process source soft deletion
+		if err := repo.softDeleteByURNsAndProp(ctx, tx, urns, true); err != nil {
+			return err
+		}
 
-	// Process target soft deletion
-	return repo.softDeleteByURNsAndProp(ctx, urns, false)
+		// Process target soft deletion
+		return repo.softDeleteByURNsAndProp(ctx, tx, urns, false)
+	})
 }
 
-func (repo *LineageRepository) softDeleteByURNsAndProp(ctx context.Context, urns []string, isSource bool) error {
+func (*LineageRepository) softDeleteByURNsAndProp(
+	ctx context.Context,
+	execer sqlx.ExecerContext,
+	urns []string,
+	isSource bool,
+) error {
 	// Determine which field and column to use based on isSource
 	field := "target_is_deleted"
 	whereColumn := "target"
@@ -173,7 +180,7 @@ func (repo *LineageRepository) softDeleteByURNsAndProp(ctx context.Context, urns
 		return fmt.Errorf("build soft delete %s lineage query: URNs = %v: %w", whereColumn, urns, err)
 	}
 
-	if _, err := repo.client.db.ExecContext(ctx, qry, args...); err != nil {
+	if _, err := execer.ExecContext(ctx, qry, args...); err != nil {
 		return fmt.Errorf("soft delete %s lineage: URNs = %v: %w", whereColumn, urns, err)
 	}
 

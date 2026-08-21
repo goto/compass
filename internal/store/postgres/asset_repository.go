@@ -11,6 +11,7 @@ import (
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
+	"github.com/google/uuid"
 	"github.com/goto/compass/core/asset"
 	"github.com/goto/compass/core/user"
 	"github.com/goto/compass/pkg/generichelper"
@@ -37,7 +38,10 @@ var (
 	quotedStringRegexp = regexp.MustCompile(`^"(.*)"$`)
 )
 
-const jsonbPathOptimusResolvedSQLVersion = "{optimus,resolved_sql_version}"
+const (
+	jsonbPathOptimusResolvedSQLVersion = "{optimus,resolved_sql_version}"
+	softDeleteBatchSize                = 5000
+)
 
 // AssetRepository is a type that manages user operation to the primary database
 type AssetRepository struct {
@@ -590,29 +594,45 @@ func (r *AssetRepository) buildColumnLineageProducer(
 	if !((sqlVer != 0 && sqlVer > resolvedSQLVer) || resolvedSQLInitialized) {
 		return nil
 	}
+
 	return func(ctx context.Context) (asset.LineageGraph, error) {
-		for _, change := range changelog {
-			query, err := asset.ExtractColumnLineageQuery(change, assetConfig.ColumnLineageChangeIdentifier)
-			if err != nil {
-				return nil, err
-			}
-			if query == "" {
-				continue
-			}
-			r.logger.Info("Producing column lineage", "target asset", upsertedAsset.URN)
-			graph, err := r.lineageParserClient.FetchColumnLineage(ctx, query)
-			if err != nil {
-				return nil, err
-			}
-			if graph != nil {
-				if err := r.updateResolvedSQLVersion(ctx, upsertedAsset.URN, sqlVer); err != nil {
-					return graph, fmt.Errorf("error update resolved sql version: %w", err)
-				}
-			}
-			return graph, nil
-		}
-		return nil, nil
+		return r.produceColumnLineage(
+			ctx, changelog, upsertedAsset.URN, sqlVer, assetConfig.ColumnLineageChangeIdentifier,
+		)
 	}
+}
+
+func (r *AssetRepository) produceColumnLineage(
+	ctx context.Context,
+	changelog diff.Changelog,
+	urn string,
+	sqlVersion int,
+	changeIdentifier string,
+) (asset.LineageGraph, error) {
+	for _, change := range changelog {
+		query, err := asset.ExtractColumnLineageQuery(change, changeIdentifier)
+		if err != nil {
+			return nil, err
+		}
+		if query == "" {
+			continue
+		}
+
+		r.logger.Info("Producing column lineage", "target asset", urn)
+		graph, err := r.lineageParserClient.FetchColumnLineage(ctx, query)
+		if err != nil {
+			return nil, err
+		}
+		if graph != nil {
+			if err := r.updateResolvedSQLVersion(ctx, urn, sqlVersion); err != nil {
+				return graph, fmt.Errorf("error update resolved sql version: %w", err)
+			}
+		}
+
+		return graph, nil
+	}
+
+	return nil, nil
 }
 
 // updateResolvedSQLVersion sets data.optimus.resolved_sql_version = sqlVersion for the given URN.
@@ -852,30 +872,33 @@ func (r *AssetRepository) SoftDeleteByQueryExpr(
 	executedAt time.Time,
 	updatedByID string,
 	queryExpr queryexpr.ExprStr,
-) (updatedAssets []asset.Asset, err error) {
-	err = r.client.RunWithinTx(ctx, func(tx *sqlx.Tx) error {
-		query, err := queryexpr.ValidateAndGetQueryFromExpr(queryExpr)
+) ([]asset.Asset, error) {
+	query, err := queryexpr.ValidateAndGetQueryFromExpr(queryExpr)
+	if err != nil {
+		return nil, err
+	}
+
+	var (
+		updatedAssets []asset.Asset
+		lastID        = uuid.Nil.String()
+	)
+	for {
+		batch, err := r.softDeleteByQuery(ctx, query, executedAt, updatedByID, lastID)
 		if err != nil {
-			return err
+			return updatedAssets, fmt.Errorf("error soft deleting assets by query: %w", err)
 		}
 
-		updatedAssets, err = r.softDeleteByQuery(ctx, tx, query, executedAt, updatedByID)
-		if err != nil {
-			return fmt.Errorf("error soft deleting assets by query: %w", err)
+		for i := range batch {
+			if batch[i].ID > lastID {
+				lastID = batch[i].ID
+			}
 		}
 
-		softDeleteChangelog := diff.Changelog{
-			{
-				Type: "delete",
-				Path: []string{"is_deleted"},
-				From: false,
-				To:   true,
-			},
+		updatedAssets = append(updatedAssets, batch...)
+		if len(batch) < softDeleteBatchSize {
+			return updatedAssets, nil
 		}
-		return r.insertAssetVersions(ctx, tx, updatedAssets, softDeleteChangelog)
-	})
-
-	return updatedAssets, err
+	}
 }
 
 // deleteByQueryAndReturnURNS remove all assets that match to query and return array of urn of asset that deleted.
@@ -897,47 +920,87 @@ func (r *AssetRepository) deleteByQueryAndReturnURNS(ctx context.Context, whereC
 	return urns, nil
 }
 
-// softDeleteByQuery soft delete all assets that match to query
+// softDeleteByQuery soft deletes all assets that match to query and snapshots each updated
+// row into assets_versions within the same statement.
 func (r *AssetRepository) softDeleteByQuery(
 	ctx context.Context,
-	tx *sqlx.Tx,
 	whereCondition string,
 	executedAt time.Time,
 	updatedByID string,
+	afterID string,
 ) ([]asset.Asset, error) {
+	clog, err := json.Marshal(diff.Changelog{
+		{
+			Type: "delete",
+			Path: []string{"is_deleted"},
+			From: false,
+			To:   true,
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("marshal changelog: %w", err)
+	}
+
 	updateCTE := sq.Update("assets").
 		Set("is_deleted", true).
 		Set("updated_at", executedAt).
 		Set("refreshed_at", executedAt).
 		Set("updated_by", updatedByID).
 		Set("version", sq.Expr("bump_minor_version(version)")).
-		Where(whereCondition).
+		Where(sq.Expr(
+			"id IN (SELECT id FROM assets WHERE "+whereCondition+" AND id > ?::uuid ORDER BY id LIMIT ?)",
+			afterID, softDeleteBatchSize,
+		)).
 		Suffix("RETURNING *").
 		Prefix("WITH assets AS (").
 		Suffix(")")
 
-	returnQuery := r.getAssetSQLWithIsDeleted(true, false)
+	versionCTE := sq.Expr(`
+		, owners AS (
+			SELECT ao.asset_id,
+			       jsonb_agg(jsonb_build_object('id', u.id, 'email', u.email, 'provider', u.provider)) AS owners
+			FROM asset_owners ao
+			JOIN users u ON ao.user_id = u.id
+			WHERE ao.asset_id IN (SELECT id FROM assets)
+			GROUP BY ao.asset_id
+		), versioned AS (
+			INSERT INTO assets_versions (
+				asset_id, urn, type, service, name, description, data, labels,
+				created_at, updated_at, updated_by, version, owners, is_deleted, changelog)
+			SELECT a.id, a.urn, a.type, a.service, a.name, a.description, a.data, a.labels,
+			       a.created_at, a.updated_at, a.updated_by, a.version,
+			       COALESCE(o.owners, '[]'::jsonb), a.is_deleted, ?::jsonb
+			FROM assets a LEFT JOIN owners o ON o.asset_id = a.id
+		)`, string(clog))
 
-	fullQuery := returnQuery.PrefixExpr(updateCTE)
+	returnQuery := sq.Select(
+		"a.id AS id",
+		"a.urn AS urn",
+		"a.service AS service",
+		"a.version AS version",
+		"a.updated_at AS updated_at",
+		"a.refreshed_at AS refreshed_at",
+		`u.id AS "updated_by.id"`,
+		`u.email AS "updated_by.email"`,
+		`u.provider AS "updated_by.provider"`,
+	).
+		From("assets a").
+		LeftJoin("users u ON a.updated_by = u.id")
+
+	fullQuery := returnQuery.PrefixExpr(updateCTE).PrefixExpr(versionCTE)
 	query, args, err := fullQuery.PlaceholderFormat(sq.Dollar).ToSql()
 	if err != nil {
 		return nil, fmt.Errorf("build query: %w", err)
 	}
 
 	var ams []AssetModel
-	err = sqlx.SelectContext(ctx, tx, &ams, query, args...)
-	if err != nil {
+	if err := r.client.db.SelectContext(ctx, &ams, query, args...); err != nil {
 		return nil, fmt.Errorf("error executing query: %w", err)
 	}
 
 	assets := make([]asset.Asset, 0, len(ams))
 	for _, am := range ams {
-		owners, err := r.getOwnersWithTx(ctx, tx, am.ID)
-		if err != nil {
-			return nil, fmt.Errorf("get owners with ID: %s, %w", am.ID, err)
-		}
-
-		assets = append(assets, am.toAsset(owners))
+		assets = append(assets, am.toAsset(nil))
 	}
 
 	return assets, nil
@@ -1291,74 +1354,6 @@ func (r *AssetRepository) insertAssetVersion(ctx context.Context, execer sqlx.Ex
 
 	if err = r.execContext(ctx, execer, query, args...); err != nil {
 		return fmt.Errorf("insert asset version: %w", err)
-	}
-
-	return nil
-}
-
-// insertAssetVersions run same as insertAssetVersion, but for bulk insert with same changelogs
-func (r *AssetRepository) insertAssetVersions(
-	ctx context.Context,
-	execer sqlx.ExecerContext,
-	newAssets []asset.Asset,
-	clog diff.Changelog,
-) error {
-	if len(newAssets) == 0 {
-		return nil // nothing to insert
-	}
-
-	// PostgreSQL has a limit of 65535 parameters per query
-	// With 15 columns per asset, we can safely insert 4000 assets per batch
-	// (4000 * 15 = 60000 parameters, well below the limit)
-	const chunkSize = 4000
-
-	return generichelper.ProcessInChunksConcurrently(ctx, newAssets, chunkSize, 3, func(chunk []asset.Asset) error {
-		return r.insertAssetVersionsChunk(ctx, execer, chunk, clog)
-	})
-}
-
-func (r *AssetRepository) insertAssetVersionsChunk(
-	ctx context.Context,
-	execer sqlx.ExecerContext,
-	assets []asset.Asset,
-	clog diff.Changelog,
-) error {
-	builder := sq.Insert("assets_versions").
-		Columns("asset_id", "urn", "type", "service", "name", "description", "data", "labels",
-			"created_at", "updated_at", "updated_by", "version", "owners", "is_deleted", "changelog").
-		PlaceholderFormat(sq.Dollar)
-
-	for _, newAsset := range assets {
-		if newAsset.ID == "" {
-			return asset.ErrNilAsset
-		}
-
-		builder = builder.Values(
-			newAsset.ID,
-			newAsset.URN,
-			newAsset.Type,
-			newAsset.Service,
-			newAsset.Name,
-			newAsset.Description,
-			newAsset.Data,
-			newAsset.Labels,
-			newAsset.CreatedAt,
-			newAsset.UpdatedAt,
-			newAsset.UpdatedBy.ID,
-			newAsset.Version,
-			newAsset.Owners,
-			newAsset.IsDeleted,
-			clog,
-		)
-	}
-
-	query, args, err := builder.ToSql()
-	if err != nil {
-		return fmt.Errorf("build bulk insert query: %w", err)
-	}
-
-	if err := r.execContext(ctx, execer, query, args...); err != nil {
-		return fmt.Errorf("bulk insert asset versions: %w", err)
 	}
 
 	return nil

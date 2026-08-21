@@ -993,8 +993,36 @@ func TestService_SoftDeleteAssets(t *testing.T) {
 				ar.EXPECT().GetCountByQueryExpr(ctx, mock.AnythingOfType("asset.DeleteAssetExpr")).
 					Return(2, nil)
 				ar.EXPECT().SoftDeleteByQueryExpr(mock.Anything, mock.Anything, mock.Anything, mock.Anything).
-					Return([]asset.Asset{}, nil)
-				lr.EXPECT().SoftDeleteByURNs(mock.Anything, mock.Anything).
+					Return([]asset.Asset{{URN: "urn-1"}, {URN: "urn-2"}}, nil)
+				lr.EXPECT().SoftDeleteByURNs(mock.Anything, []string{"urn-1", "urn-2"}).
+					Return(nil)
+				w.EXPECT().EnqueueSoftDeleteAssetsJob(mock.Anything, mock.Anything).
+					Return(nil)
+			},
+			ExpectAffectedRows: 2,
+			ExpectErr:          nil,
+		},
+		{
+			Description: `should skip lineage and index propagation when nothing was deleted`,
+			Request:     dummyRequestDryRunFalse,
+			Setup: func(ctx context.Context, ar *mocks.AssetRepository, _ *mocks.LineageRepository, _ *mocks.Worker) {
+				ar.EXPECT().GetCountByQueryExpr(ctx, mock.AnythingOfType("asset.DeleteAssetExpr")).
+					Return(2, nil)
+				ar.EXPECT().SoftDeleteByQueryExpr(mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return(nil, errors.New("something wrong"))
+			},
+			ExpectAffectedRows: 2,
+			ExpectErr:          nil,
+		},
+		{
+			Description: `should propagate the assets already committed when a later batch fails`,
+			Request:     dummyRequestDryRunFalse,
+			Setup: func(ctx context.Context, ar *mocks.AssetRepository, lr *mocks.LineageRepository, w *mocks.Worker) {
+				ar.EXPECT().GetCountByQueryExpr(ctx, mock.AnythingOfType("asset.DeleteAssetExpr")).
+					Return(2, nil)
+				ar.EXPECT().SoftDeleteByQueryExpr(mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+					Return([]asset.Asset{{URN: "urn-1"}}, errors.New("something wrong"))
+				lr.EXPECT().SoftDeleteByURNs(mock.Anything, []string{"urn-1"}).
 					Return(nil)
 				w.EXPECT().EnqueueSoftDeleteAssetsJob(mock.Anything, mock.Anything).
 					Return(nil)
@@ -1020,6 +1048,7 @@ func TestService_SoftDeleteAssets(t *testing.T) {
 				DiscoveryRepo: discoveryRepo,
 				LineageRepo:   lineageRepo,
 				Worker:        worker,
+				Logger:        log.NewLogrus(),
 			})
 			defer cancel()
 
