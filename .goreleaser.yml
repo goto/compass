@@ -81,7 +81,7 @@ nfpms:
     description: Metadata Discovery and Lineage Service
     homepage: https://github.com/goto/compass
     license: Apache 2.0
-    ids:
+    builds:
       - linux
     formats:
       - deb
