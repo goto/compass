@@ -11,6 +11,7 @@ import (
 	"github.com/goto/compass/core/asset"
 	"github.com/goto/compass/pkg/generichelper"
 	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 )
 
 const defaultColumnLevel = 1
@@ -173,7 +174,7 @@ func (*LineageRepository) softDeleteByURNsAndProp(
 		Set("prop", sq.Expr(
 			fmt.Sprintf("jsonb_set(prop, '{%s}', to_jsonb(true))", field),
 		)).
-		Where(sq.Eq{whereColumn: urns}).
+		Where(sq.Expr(whereColumn+" = ANY(?)", pq.StringArray(urns))).
 		PlaceholderFormat(sq.Dollar).
 		ToSql()
 	if err != nil {

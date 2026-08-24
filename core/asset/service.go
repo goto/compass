@@ -373,6 +373,9 @@ func (s *Service) executeSoftDeleteAssets(ctx context.Context, executedTime time
 	if err := s.worker.EnqueueSoftDeleteAssetsJob(ctx, updatedAssets); err != nil {
 		s.logger.Error("error occurred during elasticsearch soft deletion", "err:", err)
 	}
+
+	s.logger.Info("soft delete assets completed",
+		"deleted", len(updatedAssets), "executed at", executedTime, "query", queryExpr.String())
 }
 
 func (s *Service) GetAssetByID(ctx context.Context, id string) (Asset, error) {
