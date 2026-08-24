@@ -1,8 +1,10 @@
 package workermanager_test
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -14,6 +16,8 @@ import (
 	"github.com/goto/compass/pkg/queryexpr"
 	"github.com/goto/compass/pkg/worker"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 func TestManager_EnqueueIndexAssetJob(t *testing.T) {
@@ -464,6 +468,83 @@ func TestManager_EnqueueSoftDeleteAssetsJob(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestManager_EnqueueSoftDeleteAssetsJobChunking(t *testing.T) {
+	currentTime := time.Now().UTC()
+	newAssets := func(n int) []asset.Asset {
+		assets := make([]asset.Asset, n)
+		for i := range assets {
+			assets[i] = asset.Asset{
+				ID:          fmt.Sprintf("asset-%d", i),
+				URN:         fmt.Sprintf("urn:asset:%d", i),
+				Service:     "test-service",
+				UpdatedAt:   currentTime,
+				RefreshedAt: &currentTime,
+				UpdatedBy:   user.User{ID: "some-user"},
+			}
+		}
+		return assets
+	}
+
+	cases := []struct {
+		name         string
+		assetCount   int
+		expectedJobs int
+	}{
+		{name: "SingleChunk", assetCount: 10, expectedJobs: 1},
+		{name: "ExactlyOneChunk", assetCount: 1000, expectedJobs: 1},
+		{name: "SpillsIntoSecondChunk", assetCount: 1001, expectedJobs: 2},
+		{name: "MultipleChunks", assetCount: 2500, expectedJobs: 3},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			assets := newAssets(tc.assetCount)
+
+			anyJobs := make([]interface{}, tc.expectedJobs)
+			for i := range anyJobs {
+				anyJobs[i] = mock.Anything
+			}
+
+			var enqueued []worker.JobSpec
+			wrkr := mocks.NewWorker(t)
+			wrkr.EXPECT().
+				Enqueue(ctx, anyJobs...).
+				Run(func(_ context.Context, jobs ...worker.JobSpec) {
+					enqueued = jobs
+				}).
+				Return(nil).
+				Once()
+
+			mgr := workermanager.NewWithWorker(wrkr, workermanager.Deps{})
+			require.NoError(t, mgr.EnqueueSoftDeleteAssetsJob(ctx, assets))
+
+			require.Len(t, enqueued, tc.expectedJobs)
+
+			var gotURNs []string
+			for _, job := range enqueued {
+				assert.Equal(t, "soft-delete-assets", job.Type)
+
+				var chunk []asset.Asset
+				require.NoError(t, json.Unmarshal(job.Payload, &chunk))
+				assert.LessOrEqual(t, len(chunk), 1000)
+				for _, ast := range chunk {
+					gotURNs = append(gotURNs, ast.URN)
+				}
+			}
+
+			wantURNs := make([]string, 0, len(assets))
+			for _, ast := range assets {
+				wantURNs = append(wantURNs, ast.URN)
+			}
+			assert.Equal(t, wantURNs, gotURNs)
+		})
+	}
+
+	t.Run("NoAssets", func(t *testing.T) {
+		mgr := workermanager.NewWithWorker(mocks.NewWorker(t), workermanager.Deps{})
+		assert.NoError(t, mgr.EnqueueSoftDeleteAssetsJob(ctx, nil))
+	})
 }
 
 func TestManager_DeleteAssets(t *testing.T) {

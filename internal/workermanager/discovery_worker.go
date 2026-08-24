@@ -8,9 +8,12 @@ import (
 	"time"
 
 	"github.com/goto/compass/core/asset"
+	"github.com/goto/compass/pkg/generichelper"
 	"github.com/goto/compass/pkg/queryexpr"
 	"github.com/goto/compass/pkg/worker"
 )
+
+const softDeleteAssetsChunkSize = 1000
 
 //go:generate mockery --name=DiscoveryRepository -r --case underscore --with-expecter --structname DiscoveryRepository --filename discovery_repository_mock.go --output=./mocks
 
@@ -277,16 +280,25 @@ func (m *Manager) DeleteAssetsByServicesAndUpdatedAt(ctx context.Context, job wo
 }
 
 func (m *Manager) EnqueueSoftDeleteAssetsJob(ctx context.Context, assets []asset.Asset) error {
-	payload, err := json.Marshal(assets)
-	if err != nil {
-		return fmt.Errorf("enqueue soft delete assets job: serialize payload: %w", err)
+	if len(assets) == 0 {
+		return nil
 	}
 
-	err = m.worker.Enqueue(ctx, worker.JobSpec{
-		Type:    jobSoftDeleteAssets,
-		Payload: payload,
-	})
-	if err != nil {
+	chunks := generichelper.ChunkSlice(assets, softDeleteAssetsChunkSize)
+	jobs := make([]worker.JobSpec, 0, len(chunks))
+	for _, chunk := range chunks {
+		payload, err := json.Marshal(chunk)
+		if err != nil {
+			return fmt.Errorf("enqueue soft delete assets job: serialize payload: %w", err)
+		}
+
+		jobs = append(jobs, worker.JobSpec{
+			Type:    jobSoftDeleteAssets,
+			Payload: payload,
+		})
+	}
+
+	if err := m.worker.Enqueue(ctx, jobs...); err != nil {
 		return fmt.Errorf("enqueue soft delete assets job: %w", err)
 	}
 

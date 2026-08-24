@@ -3363,6 +3363,132 @@ func (r *AssetRepositoryTestSuite) TestSoftDeleteByQueryExpr() {
 		err = r.repository.DeleteByURN(r.ctx, asset2.URN)
 		r.NoError(err)
 	})
+
+	r.Run("should snapshot the deleted asset into its version history", func() {
+		userID := r.users[0].ID
+		oneYearAgoRefreshedAtTime := refreshedAtTime.AddDate(-1, 0, 0)
+		ast := asset.Asset{
+			URN:         "urn-del-version-1",
+			Name:        "del-version-1",
+			Type:        "table",
+			Service:     "bigquery",
+			UpdatedBy:   user.User{ID: userID},
+			Owners:      []user.User{r.users[1]},
+			RefreshedAt: &oneYearAgoRefreshedAtTime,
+			Data:        map[string]interface{}{"schema": "public"},
+		}
+
+		_, _, err := r.repository.Upsert(r.ctx, &ast, false, asset.Config{})
+		r.Require().NoError(err)
+
+		query := "refreshed_at <= '" + refreshedAtTime.Format("2006-01-02T15:04:05Z") +
+			"' && service == '" + ast.Service +
+			"' && type == '" + ast.Type.String() +
+			"' && urn == '" + ast.URN +
+			"' && is_deleted == false"
+		deleted, err := r.repository.SoftDeleteByQueryExpr(r.ctx, currentTime, userID,
+			asset.DeleteAssetExpr{ExprStr: queryexpr.SQLExpr(query)})
+		r.Require().NoError(err)
+		r.Require().Len(deleted, 1)
+
+		r.Equal(ast.URN, deleted[0].URN)
+		r.Equal(ast.Service, deleted[0].Service)
+		r.Equal(userID, deleted[0].UpdatedBy.ID)
+		r.NotEmpty(deleted[0].UpdatedBy.Email)
+		r.NotEmpty(deleted[0].Version)
+		r.WithinDuration(currentTime, deleted[0].UpdatedAt, time.Second)
+		r.Require().NotNil(deleted[0].RefreshedAt)
+		r.WithinDuration(currentTime, *deleted[0].RefreshedAt, time.Second)
+		r.Nil(deleted[0].Data)
+		r.Nil(deleted[0].Labels)
+
+		versions, err := r.repository.GetVersionHistory(r.ctx, asset.Filter{}, deleted[0].ID, nil)
+		r.Require().NoError(err)
+
+		var deletedVersion *asset.Asset
+		for i := range versions {
+			if versions[i].Version == deleted[0].Version {
+				deletedVersion = &versions[i]
+				break
+			}
+		}
+		r.Require().NotNil(deletedVersion, "no version row recorded for the soft delete")
+		r.True(deletedVersion.IsDeleted)
+		r.Equal(diff.Changelog{
+			{Type: "delete", Path: []string{"is_deleted"}, From: false, To: true},
+		}, deletedVersion.Changelog)
+
+		r.NoError(r.repository.DeleteByURN(r.ctx, ast.URN))
+	})
+
+	r.Run("should skip assets that are already deleted", func() {
+		userID := r.users[0].ID
+		oneYearAgoRefreshedAtTime := refreshedAtTime.AddDate(-1, 0, 0)
+		ast := asset.Asset{
+			URN:         "urn-del-twice-1",
+			Name:        "del-twice-1",
+			Type:        "table",
+			Service:     "bigquery",
+			UpdatedBy:   user.User{ID: userID},
+			RefreshedAt: &oneYearAgoRefreshedAtTime,
+			Data:        map[string]interface{}{},
+		}
+
+		_, _, err := r.repository.Upsert(r.ctx, &ast, false, asset.Config{})
+		r.Require().NoError(err)
+
+		query := "refreshed_at <= '" + refreshedAtTime.Format("2006-01-02T15:04:05Z") +
+			"' && service == '" + ast.Service +
+			"' && type == '" + ast.Type.String() +
+			"' && urn == '" + ast.URN +
+			"' && is_deleted == false"
+		queryExpr := asset.DeleteAssetExpr{ExprStr: queryexpr.SQLExpr(query)}
+
+		deleted, err := r.repository.SoftDeleteByQueryExpr(r.ctx, currentTime, userID, queryExpr)
+		r.Require().NoError(err)
+		r.Require().Len(deleted, 1)
+		versionAfterFirstDelete := deleted[0].Version
+
+		deleted, err = r.repository.SoftDeleteByQueryExpr(r.ctx, currentTime, userID, queryExpr)
+		r.Require().NoError(err)
+		r.Empty(deleted)
+
+		fromDB, err := r.repository.GetByURN(r.ctx, ast.URN)
+		r.Require().NoError(err)
+		r.Equal(versionAfterFirstDelete, fromDB.Version, "version bumped a second time")
+
+		r.NoError(r.repository.DeleteByURN(r.ctx, ast.URN))
+	})
+
+	r.Run("should process assets that span more than one batch", func() {
+		userID := r.users[0].ID
+		const total = 5001
+		const service = "batched-service"
+
+		err := r.client.ExecQueries(r.ctx, []string{fmt.Sprintf(`
+			INSERT INTO assets (urn, type, service, name, version, updated_by, refreshed_at, is_deleted, data)
+			SELECT 'urn-batched-' || i, 'table', '%s', 'batched-' || i, '0.1',
+			       '%s', TIMESTAMP '2020-01-01 00:00:00', false, '{}'::jsonb
+			FROM generate_series(1, %d) AS i`, service, userID, total)})
+		r.Require().NoError(err)
+
+		query := "refreshed_at <= '2021-01-01T00:00:00Z' && service == '" + service +
+			"' && type == 'table' && is_deleted == false"
+		deleted, err := r.repository.SoftDeleteByQueryExpr(r.ctx, currentTime, userID,
+			asset.DeleteAssetExpr{ExprStr: queryexpr.SQLExpr(query)})
+		r.Require().NoError(err)
+		r.Len(deleted, total, "assets beyond the first batch were not deleted")
+
+		urns := make(map[string]struct{}, len(deleted))
+		for _, deletedAsset := range deleted {
+			urns[deletedAsset.URN] = struct{}{}
+		}
+		r.Len(urns, total, "the same asset was returned by more than one batch")
+
+		r.NoError(r.client.ExecQueries(r.ctx, []string{
+			fmt.Sprintf("DELETE FROM assets WHERE service = '%s'", service),
+		}))
+	})
 }
 
 func (r *AssetRepositoryTestSuite) TestAddProbe() {
