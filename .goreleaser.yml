@@ -6,16 +6,40 @@ before:
     - go mod tidy
     - make clean
 builds:
-  - id: compass
-    main: ./main.go
+  - main: ./main.go
+    id: "linux"
     binary: compass
     flags: [-a]
     ldflags:
       - -X github.com/goto/compass/cli.Version={{.Tag}}
       - -X github.com/goto/compass/cli.BuildCommit={{.FullCommit}}
       - -X github.com/goto/compass/cli.BuildDate={{.Date}}
-    goos: [linux, darwin, windows]
-    goarch: [amd64, 386, arm, arm64] # skip goarch 386 and arm due to conflicts with "github.com/blastrain/vitess-sqlparser" library
+    goos: [linux]
+    goarch: [amd64, arm64]
+    env:
+      - CGO_ENABLED=0
+  - main: ./main.go
+    id: "darwin"
+    binary: compass
+    flags: [-a]
+    ldflags:
+      - -X github.com/goto/compass/cli.Version={{.Tag}}
+      - -X github.com/goto/compass/cli.BuildCommit={{.FullCommit}}
+      - -X github.com/goto/compass/cli.BuildDate={{.Date}}
+    goos: [darwin]
+    goarch: [amd64, 386, arm, arm64]
+    env:
+      - CGO_ENABLED=0
+  - main: ./main.go
+    id: "windows"
+    binary: compass
+    flags: [-a]
+    ldflags:
+      - -X github.com/goto/compass/cli.Version={{.Tag}}
+      - -X github.com/goto/compass/cli.BuildCommit={{.FullCommit}}
+      - -X github.com/goto/compass/cli.BuildDate={{.Date}}
+    goos: [windows]
+    goarch: [amd64, arm64]
     env:
       - CGO_ENABLED=0
 archives:
@@ -46,7 +70,7 @@ dockers:
   - goos: linux
     goarch: amd64
     ids:
-      - compass
+      - linux
     dockerfile: Dockerfile
     image_templates:
       - "docker.io/gotocompany/{{.ProjectName}}:latest"
@@ -57,6 +81,8 @@ nfpms:
     description: Metadata Discovery and Lineage Service
     homepage: https://github.com/goto/compass
     license: Apache 2.0
+    ids:
+      - linux
     formats:
       - deb
       - rpm
