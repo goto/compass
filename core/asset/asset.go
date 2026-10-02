@@ -82,9 +82,7 @@ func (a *Asset) Diff(otherAsset *Asset, excludedChangelogPaths []string) (fullCh
 		return fullChangelog, fullChangelog, nil
 	}
 
-	simplifiedChangelog = make(diff.Changelog, len(fullChangelog))
-	copy(simplifiedChangelog, fullChangelog)
-
+	simplifiedChangelog = fullChangelog
 	for _, path := range excludedChangelogPaths {
 		simplifiedChangelog = simplifiedChangelog.FilterOut(strings.Split(path, "."))
 	}

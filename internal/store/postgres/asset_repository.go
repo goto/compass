@@ -17,7 +17,6 @@ import (
 	"github.com/goto/compass/pkg/generichelper"
 	"github.com/goto/compass/pkg/queryexpr"
 	"github.com/goto/salt/log"
-	"github.com/jinzhu/copier"
 	"github.com/jmoiron/sqlx"
 	"github.com/r3labs/diff/v2"
 )
@@ -481,7 +480,7 @@ func (r *AssetRepository) Upsert(
 		capturedChangelog = fullChangelog
 
 		resolvedSQLInitialized = asset.BumpOptimusQueryVersions(fetchedAsset.Data, ast.Data, fullChangelog)
-		upsertedAsset, err = r.update(ctx, tx, ast, &fetchedAsset, simplifiedChangelog)
+		upsertedAsset, err = r.update(ctx, tx, ast, &fetchedAsset, simplifiedChangelog, fullChangelog)
 		if err != nil {
 			return fmt.Errorf("error updating asset to DB: %w", err)
 		}
@@ -542,10 +541,7 @@ func (r *AssetRepository) UpsertPatch( //nolint:gocognit
 		}
 
 		// update flow
-		var newAsset asset.Asset
-		if err := copier.CopyWithOption(&newAsset, fetchedAsset, copier.Option{DeepCopy: true}); err != nil {
-			return err
-		}
+		newAsset := fetchedAsset.CopyForPatch()
 		newAsset.Patch(patchData)
 		newAsset.RefreshedAt = ast.RefreshedAt
 
@@ -563,7 +559,7 @@ func (r *AssetRepository) UpsertPatch( //nolint:gocognit
 		capturedChangelog = fullChangelog
 
 		resolvedSQLInitialized = asset.BumpOptimusQueryVersions(fetchedAsset.Data, newAsset.Data, fullChangelog)
-		upsertedAsset, err = r.update(ctx, tx, &newAsset, &fetchedAsset, simplifiedChangelog)
+		upsertedAsset, err = r.update(ctx, tx, &newAsset, &fetchedAsset, simplifiedChangelog, fullChangelog)
 		if err != nil {
 			return fmt.Errorf("error updating asset to DB: %w", err)
 		}
@@ -1196,7 +1192,15 @@ func (r *AssetRepository) insert(ctx context.Context, tx *sqlx.Tx, ast *asset.As
 	return &insertedAsset, nil
 }
 
-func (r *AssetRepository) update(ctx context.Context, tx *sqlx.Tx, newAsset, oldAsset *asset.Asset, clog diff.Changelog) (*asset.Asset, error) {
+// update persists newAsset. clog is the changelog stored against the new
+// version; fullChangelog is the unfiltered one, which is what decides whether
+// the asset changed at all.
+func (r *AssetRepository) update(
+	ctx context.Context,
+	tx *sqlx.Tx,
+	newAsset, oldAsset *asset.Asset,
+	clog, fullChangelog diff.Changelog,
+) (*asset.Asset, error) {
 	assetID := oldAsset.ID
 	if !isValidUUID(assetID) {
 		return nil, asset.InvalidError{AssetID: assetID}
@@ -1207,6 +1211,17 @@ func (r *AssetRepository) update(ctx context.Context, tx *sqlx.Tx, newAsset, old
 	// the currentTime already filled in UpsertPatchAssetWithoutLineage/UpsertAssetWithoutLineage
 	if newAsset.RefreshedAt != nil {
 		currentTime = *newAsset.RefreshedAt
+	}
+
+	// Nothing about the asset changed, so only record that it was seen again
+	// rather than rewriting the whole row and its data blob.
+	if len(fullChangelog) == 0 {
+		refreshedAsset, err := r.updateAssetRefreshedAt(ctx, tx, assetID, currentTime)
+		if err != nil {
+			return nil, err
+		}
+
+		return &refreshedAsset, nil
 	}
 
 	// managing owners
