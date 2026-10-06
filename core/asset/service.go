@@ -72,9 +72,7 @@ func NewService(deps ServiceDeps) (service *Service, cancel func()) {
 		shutdownCtx:         shutdownCtx,
 		shutdownCancel:      shutdownCancel,
 	}
-	if newService.config.ExcludedChangelogPaths == nil {
-		newService.config.ExcludedChangelogPaths = []string{}
-	}
+	newService.config.prepareExcludedChangelog()
 
 	return newService, func() {
 		shutdownCancel()

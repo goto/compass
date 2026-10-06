@@ -83,7 +83,7 @@ func TestDiffTopLevel(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			_, cl, err := sourceAsset.Diff(&targetAsset, []string{})
+			_, cl, err := sourceAsset.Diff(&targetAsset, nil)
 
 			assert.Equal(t, tc.Error, err)
 			require.Equal(t, len(tc.Changelog), len(cl))
@@ -247,7 +247,7 @@ func TestDiffData(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			_, cl, err := sourceAsset.Diff(&targetAsset, []string{"update_time"})
+			_, cl, err := sourceAsset.Diff(&targetAsset, asset.ParseExcludedChangelogPathSegments([]string{"update_time"}))
 
 			assert.Equal(t, tc.Error, err)
 			require.Equal(t, len(tc.Changelog), len(cl))

@@ -3,7 +3,6 @@ package asset
 //go:generate mockery --name=Repository -r --case underscore --with-expecter --structname AssetRepository --filename asset_repository.go --output=./mocks
 import (
 	"context"
-	"strings"
 	"time"
 
 	"github.com/goto/compass/core/user"
@@ -72,21 +71,13 @@ type SoftDeleteAssetParams struct {
 
 // Diff returns nil changelog with nil error if equal
 // returns wrapped r3labs/diff Changelog struct with nil error if not equal
-func (a *Asset) Diff(otherAsset *Asset, excludedChangelogPaths []string) (fullChangelog, simplifiedChangelog diff.Changelog, err error) {
+func (a *Asset) Diff(otherAsset *Asset, excludedChangelogPathSegments [][]string) (fullChangelog, simplifiedChangelog diff.Changelog, err error) {
 	fullChangelog, err = diff.Diff(a, otherAsset, diff.DiscardComplexOrigin(), diff.AllowTypeMismatch(true))
 	if err != nil {
 		return nil, nil, err
 	}
 
-	if len(excludedChangelogPaths) == 0 {
-		return fullChangelog, fullChangelog, nil
-	}
-
-	simplifiedChangelog = fullChangelog
-	for _, path := range excludedChangelogPaths {
-		simplifiedChangelog = simplifiedChangelog.FilterOut(strings.Split(path, "."))
-	}
-
+	simplifiedChangelog = filterExcludedChangelog(fullChangelog, excludedChangelogPathSegments)
 	return fullChangelog, simplifiedChangelog, nil
 }
 
