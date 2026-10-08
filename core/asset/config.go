@@ -11,11 +11,21 @@ type Config struct {
 	AdditionalTypes               []string      `mapstructure:"additional_types"`
 	DeleteAssetsTimeout           time.Duration `mapstructure:"delete_assets_timeout" default:"5m"`
 	ExcludedChangelogPaths        []string      `mapstructure:"excluded_changelog_paths"`
+	ExcludedChangelogPathSegments [][]string    `mapstructure:"-"`
 	ColumnLineageHost             string        `mapstructure:"column_lineage_host"`
 	ColumnLineageChangeIdentifier string        `mapstructure:"column_lineage_change_identifier"`
 }
 
+func (c *Config) prepareExcludedChangelog() {
+	if c.ExcludedChangelogPaths == nil {
+		c.ExcludedChangelogPaths = []string{}
+	}
+	c.ExcludedChangelogPathSegments = ParseExcludedChangelogPathSegments(c.ExcludedChangelogPaths)
+}
+
 func (c *Config) Validate() error {
+	c.prepareExcludedChangelog()
+
 	if c.DeleteAssetsTimeout == 0 {
 		return errDeleteAssetsTimeoutIsZero
 	}

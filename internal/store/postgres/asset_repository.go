@@ -17,7 +17,6 @@ import (
 	"github.com/goto/compass/pkg/generichelper"
 	"github.com/goto/compass/pkg/queryexpr"
 	"github.com/goto/salt/log"
-	"github.com/jinzhu/copier"
 	"github.com/jmoiron/sqlx"
 	"github.com/r3labs/diff/v2"
 )
@@ -455,7 +454,7 @@ func (r *AssetRepository) Upsert(
 			}
 
 			resolvedSQLInitialized = asset.InitOptimusQueryVersions(ast.Data)
-			_, simplifiedChangelog, err := new(asset.Asset).Diff(ast, assetConfig.ExcludedChangelogPaths)
+			_, simplifiedChangelog, err := new(asset.Asset).Diff(ast, assetConfig.ExcludedChangelogPathSegments)
 			if err != nil {
 				return fmt.Errorf("error diffing two assets: %w", err)
 			}
@@ -474,14 +473,17 @@ func (r *AssetRepository) Upsert(
 		// reset IsDeleted flag if asset is resync'd
 		ast.IsDeleted = false
 
-		fullChangelog, simplifiedChangelog, err := fetchedAsset.Diff(ast, assetConfig.ExcludedChangelogPaths)
+		fullChangelog, simplifiedChangelog, err := fetchedAsset.Diff(ast, assetConfig.ExcludedChangelogPathSegments)
 		if err != nil {
 			return fmt.Errorf("error diffing two assets: %w", err)
 		}
 		capturedChangelog = fullChangelog
 
 		resolvedSQLInitialized = asset.BumpOptimusQueryVersions(fetchedAsset.Data, ast.Data, fullChangelog)
-		upsertedAsset, err = r.update(ctx, tx, ast, &fetchedAsset, simplifiedChangelog)
+		upsertedAsset, err = r.update(ctx, tx, ast, &fetchedAsset, assetUpdateChangelogs{
+			simplified: simplifiedChangelog,
+			full:       fullChangelog,
+		})
 		if err != nil {
 			return fmt.Errorf("error updating asset to DB: %w", err)
 		}
@@ -525,7 +527,7 @@ func (r *AssetRepository) UpsertPatch( //nolint:gocognit
 			}
 
 			resolvedSQLInitialized = asset.InitOptimusQueryVersions(ast.Data)
-			fullChangelog, simplifiedChangelog, err := new(asset.Asset).Diff(ast, assetConfig.ExcludedChangelogPaths)
+			fullChangelog, simplifiedChangelog, err := new(asset.Asset).Diff(ast, assetConfig.ExcludedChangelogPathSegments)
 			if err != nil {
 				return fmt.Errorf("error diffing two assets: %w", err)
 			}
@@ -542,10 +544,7 @@ func (r *AssetRepository) UpsertPatch( //nolint:gocognit
 		}
 
 		// update flow
-		var newAsset asset.Asset
-		if err := copier.CopyWithOption(&newAsset, fetchedAsset, copier.Option{DeepCopy: true}); err != nil {
-			return err
-		}
+		newAsset := fetchedAsset.CopyForPatch()
 		newAsset.Patch(patchData)
 		newAsset.RefreshedAt = ast.RefreshedAt
 
@@ -556,14 +555,17 @@ func (r *AssetRepository) UpsertPatch( //nolint:gocognit
 			return err
 		}
 
-		fullChangelog, simplifiedChangelog, err := fetchedAsset.Diff(&newAsset, assetConfig.ExcludedChangelogPaths)
+		fullChangelog, simplifiedChangelog, err := fetchedAsset.Diff(&newAsset, assetConfig.ExcludedChangelogPathSegments)
 		if err != nil {
 			return fmt.Errorf("error diffing two assets: %w", err)
 		}
 		capturedChangelog = fullChangelog
 
 		resolvedSQLInitialized = asset.BumpOptimusQueryVersions(fetchedAsset.Data, newAsset.Data, fullChangelog)
-		upsertedAsset, err = r.update(ctx, tx, &newAsset, &fetchedAsset, simplifiedChangelog)
+		upsertedAsset, err = r.update(ctx, tx, &newAsset, &fetchedAsset, assetUpdateChangelogs{
+			simplified: simplifiedChangelog,
+			full:       fullChangelog,
+		})
 		if err != nil {
 			return fmt.Errorf("error updating asset to DB: %w", err)
 		}
@@ -1196,7 +1198,17 @@ func (r *AssetRepository) insert(ctx context.Context, tx *sqlx.Tx, ast *asset.As
 	return &insertedAsset, nil
 }
 
-func (r *AssetRepository) update(ctx context.Context, tx *sqlx.Tx, newAsset, oldAsset *asset.Asset, clog diff.Changelog) (*asset.Asset, error) {
+type assetUpdateChangelogs struct {
+	simplified diff.Changelog
+	full       diff.Changelog
+}
+
+func (r *AssetRepository) update(
+	ctx context.Context,
+	tx *sqlx.Tx,
+	newAsset, oldAsset *asset.Asset,
+	changelogs assetUpdateChangelogs,
+) (*asset.Asset, error) {
 	assetID := oldAsset.ID
 	if !isValidUUID(assetID) {
 		return nil, asset.InvalidError{AssetID: assetID}
@@ -1209,21 +1221,20 @@ func (r *AssetRepository) update(ctx context.Context, tx *sqlx.Tx, newAsset, old
 		currentTime = *newAsset.RefreshedAt
 	}
 
-	// managing owners
-	newAssetOwners, err := r.createOrFetchUsers(ctx, tx, newAsset.Owners)
-	if err != nil {
-		return nil, fmt.Errorf("error creating and fetching owners: %w", err)
-	}
-	toInserts, toRemoves := r.compareOwners(oldAsset.Owners, newAssetOwners)
-	if err := r.insertOwners(ctx, tx, assetID, toInserts); err != nil {
-		return nil, fmt.Errorf("error inserting asset's new owners: %w", err)
-	}
-	if err := r.removeOwners(ctx, tx, assetID, toRemoves); err != nil {
-		return nil, fmt.Errorf("error removing asset's old owners: %w", err)
+	if len(changelogs.full) == 0 {
+		refreshedAsset, err := r.updateAssetRefreshedAt(ctx, tx, assetID, currentTime)
+		if err != nil {
+			return nil, err
+		}
+
+		return &refreshedAsset, nil
 	}
 
-	// update assets
-	if len(clog) != 0 {
+	if err := r.replaceAssetOwners(ctx, tx, assetID, oldAsset, newAsset); err != nil {
+		return nil, err
+	}
+
+	if len(changelogs.simplified) != 0 {
 		newVersion, err := asset.IncreaseMinorVersion(oldAsset.Version)
 		if err != nil {
 			return nil, err
@@ -1239,14 +1250,45 @@ func (r *AssetRepository) update(ctx context.Context, tx *sqlx.Tx, newAsset, old
 		return nil, err
 	}
 
-	if len(clog) != 0 {
-		// insert versions
-		if err := r.insertAssetVersion(ctx, tx, newAsset, clog); err != nil {
-			return nil, err
-		}
+	if err := r.insertAssetVersionIfNeeded(ctx, tx, newAsset, changelogs.simplified); err != nil {
+		return nil, err
 	}
 
 	return &updatedAsset, nil
+}
+
+func (r *AssetRepository) replaceAssetOwners(
+	ctx context.Context,
+	tx *sqlx.Tx,
+	assetID string,
+	oldAsset, newAsset *asset.Asset,
+) error {
+	newAssetOwners, err := r.createOrFetchUsers(ctx, tx, newAsset.Owners)
+	if err != nil {
+		return fmt.Errorf("error creating and fetching owners: %w", err)
+	}
+	toInserts, toRemoves := r.compareOwners(oldAsset.Owners, newAssetOwners)
+	if err := r.insertOwners(ctx, tx, assetID, toInserts); err != nil {
+		return fmt.Errorf("error inserting asset's new owners: %w", err)
+	}
+	if err := r.removeOwners(ctx, tx, assetID, toRemoves); err != nil {
+		return fmt.Errorf("error removing asset's old owners: %w", err)
+	}
+
+	return nil
+}
+
+func (r *AssetRepository) insertAssetVersionIfNeeded(
+	ctx context.Context,
+	tx *sqlx.Tx,
+	newAsset *asset.Asset,
+	versionChangelog diff.Changelog,
+) error {
+	if len(versionChangelog) == 0 {
+		return nil
+	}
+
+	return r.insertAssetVersion(ctx, tx, newAsset, versionChangelog)
 }
 
 func (r *AssetRepository) updateAsset(ctx context.Context, tx *sqlx.Tx, assetID string, newAsset *asset.Asset) (asset.Asset, error) {

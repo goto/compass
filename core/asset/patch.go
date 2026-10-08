@@ -5,6 +5,41 @@ import (
 	"github.com/goto/compass/pkg/mergemap"
 )
 
+func (a *Asset) CopyForPatch() Asset {
+	cp := *a
+	cp.Data = deepCopyMap(a.Data)
+
+	return cp
+}
+
+func deepCopyMap(m map[string]interface{}) map[string]interface{} {
+	if m == nil {
+		return nil
+	}
+
+	cp := make(map[string]interface{}, len(m))
+	for key, value := range m {
+		cp[key] = deepCopyValue(value)
+	}
+
+	return cp
+}
+
+func deepCopyValue(value interface{}) interface{} {
+	switch v := value.(type) {
+	case map[string]interface{}:
+		return deepCopyMap(v)
+	case []interface{}:
+		cp := make([]interface{}, len(v))
+		for i, item := range v {
+			cp[i] = deepCopyValue(item)
+		}
+		return cp
+	default:
+		return value
+	}
+}
+
 // patch appends asset with data from map. It mutates the asset itself.
 func patchAsset(a *Asset, patchData map[string]interface{}) {
 	a.URN = patchString("urn", patchData, a.URN)
