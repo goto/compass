@@ -469,6 +469,95 @@ func TestAssetPatch(t *testing.T) {
 				},
 			},
 		},
+		{
+			description: "should set data labels to null when patch value is null",
+			asset: asset.Asset{
+				Data: map[string]interface{}{
+					"labels": map[string]interface{}{
+						"usage_tag": "none",
+					},
+				},
+			},
+			patchData: map[string]interface{}{
+				"data": map[string]interface{}{
+					"labels": nil,
+				},
+			},
+			expected: asset.Asset{
+				Data: map[string]interface{}{
+					"labels": nil,
+				},
+			},
+		},
+		{
+			description: "should set data labels to null when patch value is empty map",
+			asset: asset.Asset{
+				Data: map[string]interface{}{
+					"labels": map[string]interface{}{
+						"usage_tag": "none",
+					},
+				},
+			},
+			patchData: map[string]interface{}{
+				"data": map[string]interface{}{
+					"labels": map[string]interface{}{},
+				},
+			},
+			expected: asset.Asset{
+				Data: map[string]interface{}{
+					"labels": nil,
+				},
+			},
+		},
+		{
+			description: "should replace data labels when patch has content",
+			asset: asset.Asset{
+				Data: map[string]interface{}{
+					"labels": map[string]interface{}{
+						"category_table_tag": "business-critical",
+						"usage_tag":          "none",
+					},
+				},
+			},
+			patchData: map[string]interface{}{
+				"data": map[string]interface{}{
+					"labels": map[string]interface{}{
+						"usage_tag": "none",
+					},
+				},
+			},
+			expected: asset.Asset{
+				Data: map[string]interface{}{
+					"labels": map[string]interface{}{
+						"usage_tag": "none",
+					},
+				},
+			},
+		},
+		{
+			description: "should ignore data labels when key is omitted from patch",
+			asset: asset.Asset{
+				Data: map[string]interface{}{
+					"labels": map[string]interface{}{
+						"usage_tag": "none",
+					},
+					"foo": "bar",
+				},
+			},
+			patchData: map[string]interface{}{
+				"data": map[string]interface{}{
+					"foo": "baz",
+				},
+			},
+			expected: asset.Asset{
+				Data: map[string]interface{}{
+					"labels": map[string]interface{}{
+						"usage_tag": "none",
+					},
+					"foo": "baz",
+				},
+			},
+		},
 	}
 	for _, tc := range testcases {
 		t.Run(tc.description, func(t *testing.T) {
