@@ -5,6 +5,11 @@ import (
 	"github.com/goto/compass/pkg/mergemap"
 )
 
+const (
+	dataFieldLabels          = "labels"
+	dataFieldPartitionDetail = "partition_detail"
+)
+
 func (a *Asset) CopyForPatch() Asset {
 	cp := *a
 	cp.Data = deepCopyMap(a.Data)
@@ -131,12 +136,40 @@ func patchAssetData(a *Asset, data interface{}) {
 		return
 	}
 
+	patchReplaceableDataMapFields(a.Data, dataMap)
+
 	// Configure array merge behavior for data.columns
 	arrayMergeConfig := map[string]string{
 		"columns": "name",
 	}
 
 	a.Data = mergemap.Merge(a.Data, dataMap, arrayMergeConfig)
+}
+
+func patchReplaceableDataMapFields(dst, patch map[string]interface{}) {
+	for _, key := range []string{dataFieldLabels, dataFieldPartitionDetail} {
+		val, ok := patch[key]
+		if !ok {
+			continue
+		}
+
+		if val == nil || isEmptyStringMap(val) {
+			dst[key] = nil
+		} else {
+			dst[key] = deepCopyValue(val)
+		}
+
+		delete(patch, key)
+	}
+}
+
+func isEmptyStringMap(v interface{}) bool {
+	switch m := v.(type) {
+	case map[string]interface{}:
+		return len(m) == 0
+	default:
+		return false
+	}
 }
 
 func patchString(key string, data map[string]interface{}, defaultVal string) string {
